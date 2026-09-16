@@ -1,33 +1,44 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { StyleSheet, Text, Pressable, View } from "react-native";
-
-import { createHttpClient } from "@/api/http";
-import { createRenterApi } from "@/api/renter";
-import { useAuth } from "@/auth/AuthProvider";
-import { validateAuthForm } from "@/auth/validation";
+import { createMockAuthGateway, GatewayError, type GatewayErrorCode } from "@/auth/mockGateway";
+import { normalizeEmail, validateEmail, validatePassword } from "@/auth/validation";
 import { Button, Field } from "@/ui/components";
 import { colors, radius, spacing } from "@/theme/tokens";
 
+type Screen = "signIn" | "signUpEmail" | "signUpOtp" | "signUpPassword";
+const errorMessages: Record<GatewayErrorCode, string> = { INVALID_CREDENTIALS: "Email hoặc mật khẩu không đúng.", ACCOUNT_UNVERIFIED: "Email này chưa được xác thực. Hãy kiểm tra mã OTP.", OTP_EXPIRED: "Mã đã hết hạn. Hãy gửi lại mã mới.", OTP_ATTEMPTS_EXHAUSTED: "Bạn đã nhập sai quá nhiều lần. Hãy gửi lại mã.", RESEND_COOLDOWN: "Vui lòng chờ trước khi gửi lại mã.", RESEND_LIMIT: "Bạn đã đạt giới hạn gửi mã trong một giờ.", INVALID_OTP: "Mã xác thực không đúng.", ACCOUNT_EXISTS: "Tài khoản đã tồn tại. Hãy đăng nhập để tiếp tục." };
+const message = (error: unknown, fallback: string) => {
+  if (!(error instanceof GatewayError)) return fallback;
+  return errorMessages[error.code];
+};
+const maskEmail = (email: string) => { const [name = "", domain = ""] = email.split("@"); return `${name.slice(0, 2)}***@${domain}`; };
+
 export function AuthScreen() {
-  const [mode, setMode] = useState<"login" | "register">("login");
-  const [name, setName] = useState(""); const [email, setEmail] = useState(""); const [password, setPassword] = useState("");
-  const [error, setError] = useState(""); const [submitting, setSubmitting] = useState(false);
-  const { signIn } = useAuth();
-  const api = useMemo(() => createRenterApi(createHttpClient(async () => null)), []);
-  const isRegister = mode === "register";
-
-  async function submit() {
-    const errors = validateAuthForm({ name, email, password }, isRegister);
-    if (Object.keys(errors).length) { setError(Object.values(errors)[0] ?? "Check your details."); return; }
-    setError(""); setSubmitting(true);
-    try {
-      const response = isRegister ? await api.register(name.trim(), email, password) : await api.signIn(email, password);
-      await signIn(response.accessToken);
-    } catch (cause) { setError(cause instanceof Error ? cause.message : "Unable to sign in right now."); }
-    finally { setSubmitting(false); }
-  }
-
-  return <SafeAreaView style={styles.page}><View style={styles.hero}><Text style={styles.kicker}>SMART TRO</Text><Text style={styles.title}>{isRegister ? "Find your next place." : "A better way home."}</Text><Text style={styles.copy}>Simple, dependable tools for renters.</Text></View><View style={styles.card}>{isRegister ? <Field label="Name" value={name} onChangeText={setName} /> : null}<Field label="Email" value={email} onChangeText={setEmail} /><Field label="Password" value={password} onChangeText={setPassword} secureTextEntry />{error ? <Text style={styles.error}>{error}</Text> : null}<Button label={submitting ? "Please wait..." : isRegister ? "Create account" : "Sign in"} onPress={() => void submit()} disabled={submitting} /><Pressable onPress={() => { setMode(isRegister ? "login" : "register"); setError(""); }}><Text style={styles.switch}>{isRegister ? "Already have an account? Sign in" : "New here? Create an account"}</Text></Pressable></View></SafeAreaView>;
+  const gateway = useMemo(() => createMockAuthGateway(), []);
+  const [screen, setScreen] = useState<Screen>("signIn"), [email, setEmail] = useState(""), [otp, setOtp] = useState(""), [password, setPassword] = useState(""), [confirm, setConfirm] = useState("");
+  const [attemptId, setAttemptId] = useState(""), [resendAt, setResendAt] = useState(0), [seconds, setSeconds] = useState(0), [error, setError] = useState(""), [notice, setNotice] = useState(""), [submitting, setSubmitting] = useState(false);
+  useEffect(() => { const update = () => setSeconds(Math.max(0, Math.ceil((resendAt - Date.now()) / 1000))); update(); const timer = setInterval(update, 1000); return () => clearInterval(timer); }, [resendAt]);
+  const clearSensitive = () => { setOtp(""); setPassword(""); setConfirm(""); };
+  const go = (next: Screen) => { setError(""); setNotice(""); setScreen(next); };
+  const startOtp = async () => { const invalid = validateEmail(email); if (invalid) return setError(invalid); setSubmitting(true); setError(""); try { const result = await gateway.requestOtp(normalizeEmail(email)); setEmail(normalizeEmail(email)); setAttemptId(result.attemptId); setResendAt(result.resendAvailableAt); go("signUpOtp"); } catch (cause) { setError(message(cause, "Không thể gửi mã. Hãy thử lại.")); } finally { setSubmitting(false); } };
+  const verify = async () => { if (!/^\d{6}$/.test(otp)) return setError("Nhập đủ 6 chữ số."); setSubmitting(true); setError(""); try { await gateway.verifyOtp(attemptId, otp); setOtp(""); go("signUpPassword"); } catch (cause) { setError(message(cause, "Không thể xác thực mã.")); } finally { setSubmitting(false); } };
+  const resend = async () => { if (seconds || submitting) return; setSubmitting(true); setError(""); try { const result = await gateway.resendOtp(attemptId); setOtp(""); setResendAt(result.resendAvailableAt); } catch (cause) { setError(message(cause, "Không thể gửi lại mã.")); } finally { setSubmitting(false); } };
+  const register = async () => { const invalid = validatePassword(password); if (invalid) return setError(invalid); if (password !== confirm) return setError("Xác nhận mật khẩu chưa khớp."); setSubmitting(true); try { await gateway.createAccount(attemptId, password); clearSensitive(); go("signIn"); setError("Đăng ký thành công. Hãy đăng nhập để tiếp tục."); } catch (cause) { setError(message(cause, "Không thể tạo tài khoản.")); } finally { setSubmitting(false); } };
+  const login = async () => { const invalid = validateEmail(email); if (invalid) return setError(invalid); if (!password) return setError("Nhập mật khẩu để đăng nhập."); if (submitting) return; setSubmitting(true); setError(""); setNotice(""); try { await gateway.signIn(normalizeEmail(email), password); clearSensitive(); setNotice("Đăng nhập thành công trong bản xem trước. Phiên đăng nhập không được tạo hoặc lưu."); } catch (cause) { if (cause instanceof GatewayError && cause.code === "ACCOUNT_UNVERIFIED") { const result = await gateway.requestOtp(normalizeEmail(email)); clearSensitive(); setAttemptId(result.attemptId); setResendAt(result.resendAvailableAt); go("signUpOtp"); setError(message(cause, "")); } else setError(message(cause, "Không thể đăng nhập. Hãy thử lại.")); } finally { setSubmitting(false); } };
+  const title = screen === "signIn" ? "SmartTrọ xin chào!" : screen === "signUpEmail" ? "Tạo tài khoản" : screen === "signUpOtp" ? "Xác thực email" : "Tạo mật khẩu";
+  const revision = process.env.EXPO_PUBLIC_BUILD_SHA?.slice(0, 7) ?? "local";
+  return <SafeAreaView style={styles.page}><ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled"><View style={styles.hero}><Text style={styles.kicker}>SMARTTRỌ</Text><Text style={styles.title}>{title}</Text><Text style={styles.copy}>{screen === "signUpOtp" ? `Nhập mã 6 chữ số đã gửi tới ${maskEmail(email)}` : "Nơi bắt đầu cho một chỗ ở phù hợp."}</Text></View><View style={styles.card}>
+    {(screen === "signIn" || screen === "signUpEmail") && <Field label="Email" value={email} onChangeText={setEmail} placeholder="Nhập email của bạn" keyboardType="email-address" />}
+    {screen === "signIn" && <Field label="Mật khẩu" value={password} onChangeText={setPassword} secureTextEntry placeholder="Nhập mật khẩu" />}
+    {screen === "signUpOtp" && <Field label="Mã OTP" value={otp} onChangeText={(value) => setOtp(value.replace(/\D/g, "").slice(0, 6))} placeholder="6 chữ số" keyboardType="numeric" />}
+    {screen === "signUpPassword" && <><Text style={styles.hint}>Tối thiểu 8 ký tự, gồm chữ hoa, số và ký tự đặc biệt.</Text><Field label="Mật khẩu" value={password} onChangeText={setPassword} secureTextEntry /><Field label="Xác nhận mật khẩu" value={confirm} onChangeText={setConfirm} secureTextEntry /></>}
+    {!!error && <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text>}{!!notice && <Text accessibilityLiveRegion="polite" style={styles.notice}>{notice}</Text>}
+    {screen === "signIn" && <><Button label={submitting ? "Đang đăng nhập..." : "Đăng nhập"} onPress={() => void login()} disabled={submitting} /><Link label="Quên mật khẩu?" onPress={() => setError("Tính năng Quên mật khẩu sẽ được bổ sung trong UC-03.")} /><Link label="Chưa có tài khoản? Đăng ký" onPress={() => { clearSensitive(); go("signUpEmail"); }} /></>}
+    {screen === "signUpEmail" && <><Button label={submitting ? "Đang gửi mã..." : "Gửi mã OTP"} onPress={() => void startOtp()} disabled={submitting} /><Link label="Đã có tài khoản? Đăng nhập" onPress={() => go("signIn")} /></>}
+    {screen === "signUpOtp" && <><Button label={submitting ? "Đang xác thực..." : "Tiếp tục"} onPress={() => void verify()} disabled={submitting || otp.length !== 6} /><Link label={seconds ? `Gửi lại mã sau ${seconds}s` : "Gửi lại mã"} onPress={() => void resend()} disabled={!!seconds || submitting} /><Link label="Đổi email" onPress={() => { setOtp(""); go("signUpEmail"); }} /></>}
+    {screen === "signUpPassword" && <><Button label={submitting ? "Đang đăng ký..." : "Đăng ký"} onPress={() => void register()} disabled={submitting} /><Link label="Quay lại xác thực email" onPress={() => { clearSensitive(); go("signUpOtp"); }} /></>}
+  </View><Text style={styles.revision}>Preview revision: {revision}</Text></ScrollView></SafeAreaView>;
 }
-const styles = StyleSheet.create({ page: { backgroundColor: colors.canvas, flex: 1, justifyContent: "space-between", padding: spacing.lg }, hero: { gap: spacing.sm, paddingTop: spacing.xl }, kicker: { color: colors.primary, fontSize: 13, fontWeight: "800", letterSpacing: 2 }, title: { color: colors.ink, fontSize: 40, fontWeight: "800", letterSpacing: -1 }, copy: { color: colors.muted, fontSize: 16 }, card: { backgroundColor: colors.surface, borderRadius: radius.lg, gap: spacing.md, padding: spacing.lg }, error: { color: colors.danger }, switch: { color: colors.primary, fontWeight: "700", textAlign: "center" } });
+function Link({ label, onPress, disabled = false }: { label: string; onPress: () => void; disabled?: boolean }) { return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={styles.link}><Text style={[styles.linkText, disabled && styles.disabled]}>{label}</Text></Pressable>; }
+const styles = StyleSheet.create({ page: { backgroundColor: colors.canvas, flex: 1 }, content: { flexGrow: 1, padding: spacing.lg }, hero: { gap: spacing.sm, paddingTop: spacing.xl }, kicker: { color: colors.primary, fontSize: 13, fontWeight: "800", letterSpacing: 2 }, title: { color: colors.ink, fontSize: 36, fontWeight: "800", letterSpacing: -1 }, copy: { color: colors.muted, fontSize: 16, lineHeight: 24 }, card: { backgroundColor: colors.surface, borderRadius: radius.lg, gap: spacing.md, marginTop: spacing.xl, padding: spacing.lg }, error: { color: colors.danger, fontSize: 14 }, notice: { color: colors.primary, fontSize: 14 }, hint: { color: colors.muted, fontSize: 13, lineHeight: 20 }, link: { alignItems: "center", justifyContent: "center", minHeight: 48 }, linkText: { color: colors.action, fontWeight: "700", textAlign: "center" }, disabled: { color: colors.muted }, revision: { color: colors.muted, fontSize: 12, marginTop: spacing.lg, textAlign: "center" } });

@@ -5,8 +5,8 @@ export function Button({ label, onPress, disabled = false }: { label: string; on
   return <Pressable disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.button, (pressed || disabled) && styles.buttonPressed]}><Text style={styles.buttonLabel}>{label}</Text></Pressable>;
 }
 
-export function Field({ label, value, onChangeText, secureTextEntry = false, error }: { label: string; value: string; onChangeText: (value: string) => void; secureTextEntry?: boolean; error?: string }) {
-  return <View style={styles.field}><Text style={styles.label}>{label}</Text><TextInput value={value} onChangeText={onChangeText} secureTextEntry={secureTextEntry} autoCapitalize="none" style={[styles.input, error && styles.inputError]} accessibilityLabel={label} />{error ? <Text style={styles.error}>{error}</Text> : null}</View>;
+export function Field({ label, value, onChangeText, secureTextEntry = false, error, placeholder, keyboardType = "default" }: { label: string; value: string; onChangeText: (value: string) => void; secureTextEntry?: boolean; error?: string; placeholder?: string; keyboardType?: "default" | "email-address" | "numeric" }) {
+  return <View style={styles.field}><Text style={styles.label}>{label}</Text><TextInput value={value} onChangeText={onChangeText} secureTextEntry={secureTextEntry} placeholder={placeholder} keyboardType={keyboardType} autoCapitalize="none" autoCorrect={false} style={[styles.input, error && styles.inputError]} accessibilityLabel={label} />{error ? <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text> : null}</View>;
 }
 
 export function ScreenState({ kind, message, onRetry }: { kind: "loading" | "empty" | "error"; message?: string; onRetry?: () => void }) {

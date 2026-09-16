@@ -3,8 +3,9 @@ export const colors = {
   surface: "#FFFFFF",
   ink: "#20322B",
   muted: "#6A776F",
-  primary: "#176B4D",
-  primaryPressed: "#10513A",
+  primary: "#B84D00",
+  primaryPressed: "#8D3A00",
+  action: "#A84300",
   danger: "#B33A3A",
   border: "#DDE4DC",
   warm: "#E7A93C"

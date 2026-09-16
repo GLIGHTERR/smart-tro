@@ -30,6 +30,7 @@ jobs:
       - run: npx expo export --platform web
         env:
           EXPO_PUBLIC_BUILD_SHA: ${{ github.sha }}
+          EXPO_PUBLIC_REVIEW_SOCIALS: "true"
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

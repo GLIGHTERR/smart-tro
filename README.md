@@ -12,6 +12,17 @@ npm run start
 
 Set `EXPO_PUBLIC_API_BASE_URL` to the deployed `smart-platform-services` base URL. It is public configuration only: never add credentials or service secrets to this application.
 
+`EXPO_PUBLIC_REVIEW_SOCIALS=true` keeps the Facebook, Google, and Apple controls visible for visual review. These controls are UI-only in the current foundation and do not perform social authentication yet.
+
+## Typography
+
+The approved application font is **Be Vietnam Pro**. Keep the font mapping consistent across new screens:
+
+- `BeVietnamPro_400Regular`: inputs, placeholders, body, helper, notice, and error text.
+- `BeVietnamPro_600SemiBold`: screen titles, primary actions, links, separators, and social labels.
+
+Only load the weights a screen actually uses. Do not reintroduce Poppins or mix arbitrary system fonts into application content; platform status-bar chrome and brand icons are excluded from this rule.
+
 ## Architecture
 
 - `src/navigation`: unauthenticated auth screen and authenticated tab shell.

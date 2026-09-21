@@ -29,6 +29,8 @@ jobs:
       - run: npm ci
       - run: npx expo export --platform web
         env:
+          EXPO_PUBLIC_API_BASE_URL: "https://smart-platform-renter-api.onrender.com"
+          EXPO_PUBLIC_AUTH_USE_MOCK: "false"
           EXPO_PUBLIC_BUILD_SHA: ${{ github.sha }}
           EXPO_PUBLIC_REVIEW_SOCIALS: "true"
       - uses: actions/upload-pages-artifact@v3

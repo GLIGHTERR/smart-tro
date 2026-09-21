@@ -18,6 +18,12 @@
     "plugins": [
       "expo-font",
       "expo-asset"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "66c6315d-1950-4c15-9280-f1d2c495f7d3"
+      }
+    },
+    "owner": "josephnguyen1509"
   }
 }

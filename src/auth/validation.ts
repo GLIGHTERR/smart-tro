@@ -7,7 +7,7 @@ export function validateEmail(email: string): string | undefined {
 }
 
 export function validatePassword(password: string): string | undefined {
-  if (password.length < 8 || !/[A-Z]/.test(password) || !/\d/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
+  if (password.length < 8 || password.length > 128 || !/[a-z]/.test(password) || !/[A-Z]/.test(password) || !/\d/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
     return "Dùng ít nhất 8 ký tự, gồm chữ hoa, số và ký tự đặc biệt.";
   }
   return undefined;

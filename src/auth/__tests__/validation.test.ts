@@ -23,6 +23,8 @@ describe("signup validation", () => {
     expect(validatePassword("alllower!1")).toBeDefined();
     expect(validatePassword("NoNumber!")).toBeDefined();
     expect(validatePassword("NoSymbol1")).toBeDefined();
+    expect(validatePassword("NOLOWER1!")).toBeDefined();
+    expect(validatePassword(`${"Aa1!".repeat(33)}`)).toBeDefined();
     expect(validatePassword("Strong!1")).toBeUndefined();
   });
 });

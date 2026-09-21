@@ -1,18 +1,5 @@
-export type GatewayErrorCode =
-  | "INVALID_CREDENTIALS"
-  | "ACCOUNT_UNVERIFIED"
-  | "INVALID_OTP"
-  | "OTP_EXPIRED"
-  | "OTP_ATTEMPTS_EXHAUSTED"
-  | "RESEND_COOLDOWN"
-  | "RESEND_LIMIT"
-  | "ACCOUNT_EXISTS";
-
-export class GatewayError extends Error {
-  constructor(public readonly code: GatewayErrorCode) {
-    super(code);
-  }
-}
+import { GatewayError, type AuthGateway } from "./gateway";
+export { GatewayError, type GatewayErrorCode } from "./gateway";
 
 type Account = { password: string; verified: boolean };
 type Challenge = { email: string; expiresAt: number; attempts: number; resendAt: number };
@@ -22,14 +9,6 @@ const OTP_TTL_MS = 10 * 60 * 1000;
 const RESEND_COOLDOWN_MS = 60 * 1000;
 const MAX_ATTEMPTS = 5;
 const MAX_RESENDS_PER_HOUR = 5;
-
-export interface AuthGateway {
-  requestOtp(email: string): Promise<{ attemptId: string; expiresAt: number; resendAvailableAt: number }>;
-  resendOtp(attemptId: string): Promise<{ expiresAt: number; resendAvailableAt: number }>;
-  verifyOtp(attemptId: string, otp: string): Promise<void>;
-  createAccount(attemptId: string, password: string): Promise<void>;
-  signIn(email: string, password: string): Promise<void>;
-}
 
 export function createMockAuthGateway(now: () => number = Date.now): AuthGateway {
   const accounts = new Map<string, Account>([
@@ -55,7 +34,8 @@ export function createMockAuthGateway(now: () => number = Date.now): AuthGateway
       challenges.set(attemptId, { email, expiresAt, attempts: 0, resendAt: resendAvailableAt });
       return { attemptId, expiresAt, resendAvailableAt };
     },
-    async resendOtp(attemptId) {
+    async resendOtp(email) {
+      const attemptId = [...challenges.entries()].find(([, challenge]) => challenge.email === email)?.[0] ?? "";
       const challenge = challengeFor(attemptId);
       const current = now();
       if (current < challenge.resendAt) throw new GatewayError("RESEND_COOLDOWN");
@@ -65,9 +45,9 @@ export function createMockAuthGateway(now: () => number = Date.now): AuthGateway
       challenge.expiresAt = current + OTP_TTL_MS;
       challenge.resendAt = current + RESEND_COOLDOWN_MS;
       challenge.attempts = 0;
-      return { expiresAt: challenge.expiresAt, resendAvailableAt: challenge.resendAt };
+      return { attemptId, expiresAt: challenge.expiresAt, resendAvailableAt: challenge.resendAt };
     },
-    async verifyOtp(attemptId, otp) {
+    async verifyOtp(_email, attemptId, otp) {
       const challenge = challengeFor(attemptId);
       if (challenge.attempts >= MAX_ATTEMPTS) throw new GatewayError("OTP_ATTEMPTS_EXHAUSTED");
       if (otp !== OTP) {
@@ -75,7 +55,7 @@ export function createMockAuthGateway(now: () => number = Date.now): AuthGateway
         throw new GatewayError(challenge.attempts >= MAX_ATTEMPTS ? "OTP_ATTEMPTS_EXHAUSTED" : "INVALID_OTP");
       }
     },
-    async createAccount(attemptId, password) {
+    async createAccount(_email, attemptId, _otp, password) {
       const challenge = challengeFor(attemptId);
       if (accounts.has(challenge.email)) throw new GatewayError("ACCOUNT_EXISTS");
       accounts.set(challenge.email, { password, verified: true });
@@ -84,7 +64,10 @@ export function createMockAuthGateway(now: () => number = Date.now): AuthGateway
       const account = accounts.get(email);
       if (!account || account.password !== password) throw new GatewayError("INVALID_CREDENTIALS");
       if (!account.verified) throw new GatewayError("ACCOUNT_UNVERIFIED");
-      // The review build deliberately creates no session or token.
-    }
+      return { accessToken: "preview-access-token", refreshToken: "preview-refresh-token" };
+    },
+    async refresh() { return { accessToken: "preview-access-token", refreshToken: "preview-refresh-token" }; },
+    async me() { return undefined; },
+    async logout() { return undefined; }
   };
 }

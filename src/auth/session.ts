@@ -1,7 +1,7 @@
 import * as SecureStore from "expo-secure-store";
 
 const sessionKey = "smarttro.session";
-export type Session = { accessToken: string };
+export type Session = { accessToken: string; refreshToken: string };
 
 export const sessionStore = {
   async get(): Promise<Session | null> {

@@ -10,12 +10,12 @@ describe("email auth gateway", () => {
 
   beforeEach(() => { fetchMock.mockReset(); getDeviceId.mockClear(); });
 
-  it("uses the approved signup payloads and stable device header", async () => {
-    fetchMock.mockResolvedValueOnce(json({ attemptId: "attempt-1", expiresInSeconds: 300, resendAvailableInSeconds: 20 }));
+  it("uses the approved signup payloads and the API cooldown for an initial request", async () => {
+    fetchMock.mockResolvedValueOnce(json({ attemptId: "attempt-1", expiresInSeconds: 300, resendAfterSeconds: 41 }));
     fetchMock.mockResolvedValueOnce(noContent());
     fetchMock.mockResolvedValueOnce(noContent());
     const auth = gateway();
-    await expect(auth.requestOtp("mai@example.com")).resolves.toEqual({ attemptId: "attempt-1", expiresAt: 301000, resendAvailableAt: 21000 });
+    await expect(auth.requestOtp("mai@example.com")).resolves.toEqual({ attemptId: "attempt-1", expiresAt: 301000, resendAvailableAt: 42000 });
     await auth.verifyOtp("mai@example.com", "attempt-1", "123456");
     await auth.createAccount("mai@example.com", "attempt-1", "123456", "Strong!1");
     expect(fetchMock).toHaveBeenNthCalledWith(1, "https://api.example/auth/signup/otp/request", expect.objectContaining({ method: "POST", body: JSON.stringify({ email: "mai@example.com" }) }));
@@ -24,7 +24,12 @@ describe("email auth gateway", () => {
     expect((fetchMock.mock.calls[0]![1]?.headers as Record<string, string>)["X-Device-Id"]).toBe("device-1");
   });
 
-  it("uses the request endpoint to resend and defaults its cooldown", async () => {
+  it("uses the request endpoint to resend with the returned remaining cooldown", async () => {
+    fetchMock.mockResolvedValue(json({ attemptId: "attempt-2", expiresInSeconds: 600, resendAfterSeconds: 6 }));
+    await expect(gateway().resendOtp("mai@example.com")).resolves.toEqual({ attemptId: "attempt-2", expiresAt: 601000, resendAvailableAt: 7000 });
+  });
+
+  it("uses the legacy 60-second fallback only when the cooldown is absent", async () => {
     fetchMock.mockResolvedValue(json({ attemptId: "attempt-2", expiresInSeconds: 600 }));
     await expect(gateway().resendOtp("mai@example.com")).resolves.toEqual({ attemptId: "attempt-2", expiresAt: 601000, resendAvailableAt: 61000 });
   });

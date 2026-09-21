@@ -39,12 +39,14 @@ export interface AuthGateway {
 type Fetch = typeof fetch;
 type GatewayDependencies = { baseUrl: string; getDeviceId: () => Promise<string>; fetch?: Fetch; now?: () => number };
 type ErrorPayload = { code?: string; error?: { code?: string }; message?: string };
-type OtpResponse = { attemptId: string; expiresInSeconds: number; resendAvailableInSeconds?: number };
+type OtpResponse = { attemptId: string; expiresInSeconds: number; resendAfterSeconds?: number };
 type TokenResponse = { accessToken: string; refreshToken: string };
 
 const knownCodes = new Set<GatewayErrorCode>([
   "INVALID_CREDENTIALS", "ACCOUNT_UNVERIFIED", "ACCOUNT_INACTIVE", "INVALID_OTP", "OTP_EXPIRED", "OTP_ATTEMPTS_EXHAUSTED", "RESEND_COOLDOWN", "RESEND_LIMIT", "ACCOUNT_EXISTS", "AUTH_RATE_LIMITED", "OTP_PROVIDER_UNAVAILABLE", "SIGNUP_UNAVAILABLE", "INVALID_SESSION"
 ]);
+// Legacy servers may omit the field; current API responses define it explicitly.
+const DEFAULT_RESEND_AFTER_SECONDS = 60;
 
 function errorCode(status: number, payload: ErrorPayload | undefined): GatewayErrorCode {
   const code = payload?.code ?? payload?.error?.code;
@@ -60,7 +62,7 @@ function asOtpAttempt(response: OtpResponse, now: () => number): OtpAttempt {
   return {
     attemptId: response.attemptId,
     expiresAt: current + response.expiresInSeconds * 1000,
-    resendAvailableAt: current + (response.resendAvailableInSeconds ?? 60) * 1000
+    resendAvailableAt: current + (response.resendAfterSeconds ?? DEFAULT_RESEND_AFTER_SECONDS) * 1000
   };
 }
 

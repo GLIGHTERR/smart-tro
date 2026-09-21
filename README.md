@@ -45,6 +45,18 @@ npm run typecheck
 npm test
 ```
 
+## Android review APK
+
+The `preview` EAS profile builds an internally distributed APK against the deployed renter API. It uses the real auth gateway and mobile `expo-secure-store`; it never embeds backend, Brevo, database, or other service secrets.
+
+```bash
+npx eas-cli login
+npx eas-cli init
+npx eas-cli build --platform android --profile preview
+```
+
+Install the resulting APK on a review device and validate sign-in, app restart/session restoration, refresh-token rotation, `/auth/me`, and logout/revocation. The GitHub Pages review remains intentionally memory-only and is not evidence for persistent mobile session behavior.
+
 ## Auth integration test matrix
 
 | AC / behavior | Coverage |

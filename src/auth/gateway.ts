@@ -1,4 +1,5 @@
 import { env } from "@/config/env";
+import { Platform } from "react-native";
 
 export type GatewayErrorCode =
   | "INVALID_CREDENTIALS"
@@ -15,6 +16,7 @@ export type GatewayErrorCode =
   | "SIGNUP_UNAVAILABLE"
   | "INVALID_SESSION"
   | "NETWORK_ERROR"
+  | "SERVER_WAKING"
   | "SERVER_ERROR"
   | "CONFIGURATION_ERROR";
 
@@ -37,7 +39,21 @@ export interface AuthGateway {
 }
 
 type Fetch = typeof fetch;
-type GatewayDependencies = { baseUrl: string; getDeviceId: () => Promise<string>; fetch?: Fetch; now?: () => number };
+type DiagnosticPhase = "device_id" | "fetch" | "parse";
+type GatewayDiagnostic = { correlationId: string; elapsedMs: number; errorMessage?: string; errorName?: string; path: string; phase: DiagnosticPhase; platform: string; timedOut?: boolean };
+type GatewayDependencies = {
+  baseUrl: string;
+  clearTimeout?: (timeout: ReturnType<typeof setTimeout>) => void;
+  createCorrelationId?: () => string;
+  deviceIdTimeoutMs?: number;
+  diagnostic?: (event: GatewayDiagnostic) => void;
+  fetch?: Fetch;
+  getDeviceId: () => Promise<string>;
+  now?: () => number;
+  platform?: string;
+  requestTimeoutMs?: number;
+  setTimeout?: (callback: () => void, ms: number) => ReturnType<typeof setTimeout>;
+};
 type ErrorPayload = { code?: string; error?: { code?: string }; message?: string };
 type OtpResponse = { attemptId: string; expiresInSeconds: number; resendAfterSeconds?: number };
 type TokenResponse = { accessToken: string; refreshToken: string };
@@ -47,6 +63,28 @@ const knownCodes = new Set<GatewayErrorCode>([
 ]);
 // Legacy servers may omit the field; current API responses define it explicitly.
 const DEFAULT_RESEND_AFTER_SECONDS = 60;
+const DEFAULT_DEVICE_ID_TIMEOUT_MS = 5_000;
+const DEFAULT_REQUEST_TIMEOUT_MS = 60_000;
+
+function defaultCorrelationId(): string {
+  return `auth-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function safeError(error: unknown): Pick<GatewayDiagnostic, "errorName" | "errorMessage"> {
+  if (!error || typeof error !== "object") return {};
+  const { name, message } = error as { name?: unknown; message?: unknown };
+  return {
+    ...(typeof name === "string" ? { errorName: name.slice(0, 80) } : {}),
+    ...(typeof message === "string" ? { errorMessage: message.slice(0, 240) } : {})
+  };
+}
+
+function withTimeout<T>(operation: Promise<T>, timeoutMs: number, setTimer: GatewayDependencies["setTimeout"], clearTimer: GatewayDependencies["clearTimeout"]): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimer!(() => reject(new Error("timeout")), timeoutMs);
+    operation.then(resolve, reject).finally(() => clearTimer!(timer));
+  });
+}
 
 function errorCode(status: number, payload: ErrorPayload | undefined): GatewayErrorCode {
   const code = payload?.code ?? payload?.error?.code;
@@ -66,16 +104,45 @@ function asOtpAttempt(response: OtpResponse, now: () => number): OtpAttempt {
   };
 }
 
-export function createApiAuthGateway({ baseUrl, getDeviceId, fetch: fetchImpl = fetch, now = Date.now }: GatewayDependencies): AuthGateway {
-  const request = async <T>(path: string, init: RequestInit = {}, accessToken?: string): Promise<T> => {
+export function createApiAuthGateway({
+  baseUrl,
+  getDeviceId,
+  fetch: fetchImpl = fetch,
+  now = Date.now,
+  createCorrelationId = defaultCorrelationId,
+  diagnostic = (event) => console.warn("[auth-gateway]", JSON.stringify(event)),
+  platform = Platform.OS,
+  deviceIdTimeoutMs = DEFAULT_DEVICE_ID_TIMEOUT_MS,
+  requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
+  setTimeout: setTimer = setTimeout,
+  clearTimeout: clearTimer = clearTimeout
+}: GatewayDependencies): AuthGateway {
+  const request = async <T>(path: string, init: RequestInit, accessToken?: string): Promise<T> => {
+    const correlationId = createCorrelationId();
+    const startedAt = now();
+    const report = (phase: DiagnosticPhase, cause: unknown, timedOut = false) => diagnostic({ correlationId, elapsedMs: Math.max(0, now() - startedAt), path, phase, platform, timedOut, ...safeError(cause) });
+    let deviceId: string;
+    try {
+      deviceId = await withTimeout(getDeviceId(), deviceIdTimeoutMs, setTimer, clearTimer);
+    } catch (cause) {
+      report("device_id", cause);
+      throw new GatewayError("NETWORK_ERROR");
+    }
     let response: Response;
+    const controller = new AbortController();
+    let timedOut = false;
+    const timeout = setTimer(() => { timedOut = true; controller.abort(); }, requestTimeoutMs);
     try {
       response = await fetchImpl(`${baseUrl}${path}`, {
         ...init,
-        headers: { Accept: "application/json", "Content-Type": "application/json", "X-Device-Id": await getDeviceId(), ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}), ...init.headers }
+        headers: { Accept: "application/json", "Content-Type": "application/json", "X-Correlation-Id": correlationId, "X-Device-Id": deviceId, ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}), ...init.headers },
+        signal: controller.signal
       });
-    } catch {
-      throw new GatewayError("NETWORK_ERROR");
+    } catch (cause) {
+      report("fetch", cause, timedOut);
+      throw new GatewayError(timedOut ? "SERVER_WAKING" : "NETWORK_ERROR");
+    } finally {
+      clearTimer(timeout);
     }
     if (!response.ok) {
       let payload: ErrorPayload | undefined;
@@ -83,7 +150,7 @@ export function createApiAuthGateway({ baseUrl, getDeviceId, fetch: fetchImpl = 
       throw new GatewayError(errorCode(response.status, payload));
     }
     if (response.status === 204) return undefined as T;
-    try { return (await response.json()) as T; } catch { throw new GatewayError("SERVER_ERROR"); }
+    try { return (await response.json()) as T; } catch (cause) { report("parse", cause); throw new GatewayError("SERVER_ERROR"); }
   };
   const otpRequest = async (email: string) => asOtpAttempt(await request<OtpResponse>("/auth/signup/otp/request", { method: "POST", body: JSON.stringify({ email }) }), now);
   return {

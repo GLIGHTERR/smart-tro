@@ -66,8 +66,58 @@ describe("email auth gateway", () => {
     expect(new GatewayError("INVALID_OTP").message).toBe("INVALID_OTP");
   });
 
+  it("bounds device-ID retrieval and records a sanitized device phase diagnostic", async () => {
+    const diagnostic = jest.fn();
+    const never = new Promise<string>(() => undefined);
+    const immediateTimer = (callback: () => void) => { callback(); return 0 as unknown as ReturnType<typeof setTimeout>; };
+    const auth = createApiAuthGateway({ baseUrl: "https://api.example", getDeviceId: () => never, fetch: fetchMock, diagnostic, createCorrelationId: () => "correlation-1", now: () => 1_000, setTimeout: immediateTimer, clearTimeout: jest.fn() });
+
+    await expect(auth.requestOtp("mai@example.com")).rejects.toEqual(expect.objectContaining({ code: "NETWORK_ERROR" }));
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(diagnostic).toHaveBeenCalledWith(expect.objectContaining({ correlationId: "correlation-1", path: "/auth/signup/otp/request", phase: "device_id" }));
+  });
+
+  it("aborts a hung fetch at the hard deadline and identifies the request for backend correlation", async () => {
+    const diagnostic = jest.fn();
+    const deadlineTimer = (callback: () => void, ms: number) => {
+      if (ms !== 5_000) callback();
+      return 0 as unknown as ReturnType<typeof setTimeout>;
+    };
+    fetchMock.mockRejectedValue(new DOMException("aborted", "AbortError"));
+    const auth = createApiAuthGateway({ baseUrl: "https://api.example", getDeviceId, fetch: fetchMock, diagnostic, createCorrelationId: () => "correlation-2", now: () => 1_000, platform: "android", setTimeout: deadlineTimer, clearTimeout: jest.fn() });
+
+    await expect(auth.requestOtp("mai@example.com")).rejects.toEqual(expect.objectContaining({ code: "SERVER_WAKING" }));
+    expect(fetchMock).toHaveBeenCalledWith("https://api.example/auth/signup/otp/request", expect.objectContaining({ headers: expect.objectContaining({ "X-Correlation-Id": "correlation-2" }), signal: expect.objectContaining({ aborted: true }) }));
+    expect(diagnostic).toHaveBeenCalledWith(expect.objectContaining({ correlationId: "correlation-2", phase: "fetch", platform: "android", timedOut: true, errorName: "AbortError" }));
+  });
+
+  it("reports parse failures without recording credentials or tokens", async () => {
+    const diagnostic = jest.fn();
+    fetchMock.mockResolvedValue(new Response("not json", { status: 200 }));
+    const auth = createApiAuthGateway({ baseUrl: "https://api.example", getDeviceId, fetch: fetchMock, diagnostic, createCorrelationId: () => "correlation-3", now: () => 1_000 });
+
+    await expect(auth.signIn("mai@example.com", "Strong!1")).rejects.toEqual(expect.objectContaining({ code: "SERVER_ERROR" }));
+    expect(diagnostic).toHaveBeenCalledWith(expect.objectContaining({ correlationId: "correlation-3", path: "/auth/login", phase: "parse" }));
+    expect(JSON.stringify(diagnostic.mock.calls)).not.toContain("Strong!1");
+    expect(JSON.stringify(diagnostic.mock.calls)).not.toContain("mai@example.com");
+  });
+
+  it("keeps diagnostics safe for non-native fetch failures", async () => {
+    const diagnostic = jest.fn();
+    fetchMock.mockRejectedValueOnce(null).mockRejectedValueOnce({}).mockRejectedValueOnce("offline");
+    const auth = createApiAuthGateway({ baseUrl: "https://api.example", getDeviceId, fetch: fetchMock, diagnostic });
+
+    await expect(auth.requestOtp("mai@example.com")).rejects.toEqual(expect.objectContaining({ code: "NETWORK_ERROR" }));
+    await expect(auth.requestOtp("mai@example.com")).rejects.toEqual(expect.objectContaining({ code: "NETWORK_ERROR" }));
+    await expect(auth.requestOtp("mai@example.com")).rejects.toEqual(expect.objectContaining({ code: "NETWORK_ERROR" }));
+    expect(diagnostic).toHaveBeenNthCalledWith(1, expect.not.objectContaining({ errorName: expect.anything(), errorMessage: expect.anything() }));
+    expect(diagnostic).toHaveBeenNthCalledWith(2, expect.not.objectContaining({ errorName: expect.anything(), errorMessage: expect.anything() }));
+    expect(diagnostic).toHaveBeenNthCalledWith(3, expect.not.objectContaining({ errorName: expect.anything(), errorMessage: expect.anything() }));
+  });
+
   it("fails closed when no API base URL is configured", async () => {
     await expect(createConfiguredAuthGateway(getDeviceId, "").signIn("mai@example.com", "Strong!1")).rejects.toEqual(expect.objectContaining({ code: "CONFIGURATION_ERROR" }));
+    await expect(createConfiguredAuthGateway(getDeviceId).signIn("mai@example.com", "Strong!1")).rejects.toEqual(expect.objectContaining({ code: "CONFIGURATION_ERROR" }));
     expect(createConfiguredAuthGateway(getDeviceId, "https://api.example")).toEqual(expect.objectContaining({ requestOtp: expect.any(Function) }));
   });
 });

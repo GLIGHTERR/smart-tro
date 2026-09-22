@@ -7,3 +7,10 @@ export function getFontStartupState(fontsLoaded: boolean, fontError: Error | nul
   if (fontError || timedOut) return "system-fallback";
   return "loading";
 }
+
+export function getFontStartupDiagnostic(fontError: Error | null, timedOut: boolean, isDebug: boolean): string | null {
+  if (!isDebug) return null;
+  if (fontError) return "[startup] font-load-error";
+  if (timedOut) return "[startup] font-load-timeout";
+  return null;
+}

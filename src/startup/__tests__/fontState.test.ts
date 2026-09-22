@@ -1,4 +1,4 @@
-import { getFontStartupState } from "../fontState";
+import { getFontStartupDiagnostic, getFontStartupState } from "../fontState";
 
 describe("getFontStartupState", () => {
   it("waits only while the font request is still pending", () => {
@@ -19,5 +19,23 @@ describe("getFontStartupState", () => {
 
   it("prefers a successfully loaded font over a stale error or timeout", () => {
     expect(getFontStartupState(true, new Error("stale"), true)).toBe("ready");
+  });
+});
+
+describe("getFontStartupDiagnostic", () => {
+  it("does not emit diagnostics outside debug mode", () => {
+    expect(getFontStartupDiagnostic(new Error("private asset path"), true, false)).toBeNull();
+  });
+
+  it("uses a sanitized error code in debug mode", () => {
+    expect(getFontStartupDiagnostic(new Error("private asset path"), false, true)).toBe("[startup] font-load-error");
+  });
+
+  it("identifies a debug timeout without exposing runtime details", () => {
+    expect(getFontStartupDiagnostic(null, true, true)).toBe("[startup] font-load-timeout");
+  });
+
+  it("stays silent while the font request is healthy", () => {
+    expect(getFontStartupDiagnostic(null, false, true)).toBeNull();
   });
 });

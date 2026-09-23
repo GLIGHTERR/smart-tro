@@ -13,12 +13,16 @@
       "env": {
         "EXPO_PUBLIC_API_BASE_URL": "https://smart-platform-renter-api.onrender.com",
         "EXPO_PUBLIC_AUTH_USE_MOCK": "false",
-        "EXPO_PUBLIC_REVIEW_SOCIALS": "true"
+        "EXPO_PUBLIC_REVIEW_SOCIALS": "true",
+        "EXPO_PUBLIC_UC03_REVIEW": "true"
       }
     },
     "production": {
       "autoIncrement": true,
-      "environment": "production"
+      "environment": "production",
+      "env": {
+        "EXPO_PUBLIC_UC03_REVIEW": "false"
+      }
     }
   }
 }

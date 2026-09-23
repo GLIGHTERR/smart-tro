@@ -10,7 +10,8 @@
     "web": "expo start --web",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
-    "test": "jest --runInBand"
+    "test": "jest --runInBand",
+    "test:coverage": "jest --runInBand --coverage"
   },
   "dependencies": {
     "@expo-google-fonts/be-vietnam-pro": "^0.4.1",
@@ -43,6 +44,17 @@
     "preset": "jest-expo",
     "testMatch": [
       "**/__tests__/**/*.test.ts"
-    ]
+    ],
+    "collectCoverageFrom": [
+      "src/auth/recoveryState.ts"
+    ],
+    "coverageThreshold": {
+      "./src/auth/recoveryState.ts": {
+        "branches": 100,
+        "functions": 100,
+        "lines": 100,
+        "statements": 100
+      }
+    }
   }
 }

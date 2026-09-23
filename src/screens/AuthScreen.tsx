@@ -11,20 +11,24 @@ import { createMockAuthGateway } from "@/auth/mockGateway";
 import { useAuth } from "@/auth/AuthProvider";
 import { FONT_STARTUP_TIMEOUT_MS, getFontStartupDiagnostic, getFontStartupState } from "@/startup/fontState";
 import { normalizeEmail, validateEmail, validatePassword } from "@/auth/validation";
+import { getRecoveryReviewStep } from "@/auth/recoveryReview";
+import { ForgotPasswordScreen } from "@/screens/ForgotPasswordScreen";
 
-type Screen = "signIn" | "signUpEmail" | "signUpOtp" | "signUpPassword";
+type Screen = "signIn" | "signUpEmail" | "signUpOtp" | "signUpPassword" | "forgotPassword";
 const errors: Record<GatewayErrorCode, string> = { INVALID_CREDENTIALS: "Email hoặc mật khẩu không đúng.", ACCOUNT_UNVERIFIED: "Email này chưa được xác thực. Hãy kiểm tra mã OTP.", ACCOUNT_INACTIVE: "Tài khoản hiện không hoạt động.", OTP_EXPIRED: "Mã đã hết hạn. Hãy gửi lại mã mới.", OTP_ATTEMPTS_EXHAUSTED: "Bạn đã nhập sai quá nhiều lần. Hãy gửi lại mã.", RESEND_COOLDOWN: "Vui lòng chờ trước khi gửi lại mã.", RESEND_LIMIT: "Bạn đã đạt giới hạn gửi mã trong một giờ.", INVALID_OTP: "Mã xác thực không đúng.", ACCOUNT_EXISTS: "Tài khoản đã tồn tại. Hãy đăng nhập để tiếp tục.", AUTH_RATE_LIMITED: "Bạn đã thao tác quá nhiều. Vui lòng thử lại sau.", OTP_PROVIDER_UNAVAILABLE: "Dịch vụ gửi mã đang bận. Vui lòng thử lại sau.", SIGNUP_UNAVAILABLE: "Đăng ký hiện chưa khả dụng. Vui lòng thử lại sau.", INVALID_SESSION: "Phiên đăng nhập đã hết hạn.", NETWORK_ERROR: "Không thể kết nối máy chủ. Vui lòng thử lại.", SERVER_WAKING: "Máy chủ đang khởi động. Vui lòng thử lại sau ít phút.", SERVER_ERROR: "Máy chủ đang gặp sự cố. Vui lòng thử lại sau.", CONFIGURATION_ERROR: "Ứng dụng chưa được cấu hình kết nối máy chủ." };
 const message = (cause: unknown, fallback: string) => cause instanceof GatewayError ? errors[cause.code] : fallback;
 const maskedEmail = (email: string) => { const [name = "", domain = ""] = email.split("@"); return `${name.slice(0, 2)}***@${domain}`; };
 const showSocials = process.env.EXPO_PUBLIC_REVIEW_SOCIALS === "true";
+const showRecoveryReview = process.env.EXPO_PUBLIC_UC03_REVIEW === "true";
 const isDebugBuild = process.env.EXPO_PUBLIC_DEBUG_REVISION === "true";
 
 export function AuthScreen() {
+  const recoveryReviewStep = useMemo(getRecoveryReviewStep, []);
   const [fontsLoaded, fontError] = useFonts({ BeVietnamPro_400Regular, BeVietnamPro_600SemiBold });
   const [fontTimedOut, setFontTimedOut] = useState(false);
   const { signIn } = useAuth();
   const { width, height } = useWindowDimensions(); const gateway = useMemo(() => process.env.EXPO_PUBLIC_AUTH_USE_MOCK === "true" ? createMockAuthGateway() : createConfiguredAuthGateway(getDeviceId), []);
-  const [screen, setScreen] = useState<Screen>("signIn"); const [email, setEmail] = useState(""); const [otp, setOtp] = useState(""); const [password, setPassword] = useState(""); const [confirm, setConfirm] = useState(""); const [attemptId, setAttemptId] = useState(""); const [resendAt, setResendAt] = useState(0); const [seconds, setSeconds] = useState(0); const [error, setError] = useState(""); const [notice, setNotice] = useState(""); const [submitting, setSubmitting] = useState(false); const [showPassword, setShowPassword] = useState(false); const [showConfirm, setShowConfirm] = useState(false);
+  const [screen, setScreen] = useState<Screen>(recoveryReviewStep ? "forgotPassword" : "signIn"); const [email, setEmail] = useState(""); const [otp, setOtp] = useState(""); const [password, setPassword] = useState(""); const [confirm, setConfirm] = useState(""); const [attemptId, setAttemptId] = useState(""); const [resendAt, setResendAt] = useState(0); const [seconds, setSeconds] = useState(0); const [error, setError] = useState(""); const [notice, setNotice] = useState(""); const [submitting, setSubmitting] = useState(false); const [showPassword, setShowPassword] = useState(false); const [showConfirm, setShowConfirm] = useState(false);
   useEffect(() => { if (fontsLoaded || fontError) return; const timeout = setTimeout(() => setFontTimedOut(true), FONT_STARTUP_TIMEOUT_MS); return () => clearTimeout(timeout); }, [fontsLoaded, fontError]);
   useEffect(() => { const diagnostic = getFontStartupDiagnostic(fontError, fontTimedOut, isDebugBuild); if (diagnostic) console.warn(diagnostic); }, [fontError, fontTimedOut]);
   useEffect(() => { const update = () => setSeconds(Math.max(0, Math.ceil((resendAt - Date.now()) / 1000))); update(); const timer = setInterval(update, 1000); return () => clearInterval(timer); }, [resendAt]);
@@ -35,9 +39,10 @@ export function AuthScreen() {
   const resend = async () => { if (seconds || submitting) return; setSubmitting(true); try { const result = await gateway.resendOtp(email); setOtp(""); setAttemptId(result.attemptId); setResendAt(result.resendAvailableAt); } catch (cause) { setError(message(cause, "Không thể gửi lại mã.")); } finally { setSubmitting(false); } };
   const register = async () => { const invalid = validatePassword(password); if (invalid) return setError(invalid); if (password !== confirm) return setError("Xác nhận mật khẩu chưa khớp."); setSubmitting(true); try { await gateway.createAccount(email, attemptId, otp, password); clearSensitive(); go("signIn"); setNotice("Đăng ký thành công. Hãy đăng nhập để tiếp tục."); } catch (cause) { setError(message(cause, "Không thể tạo tài khoản.")); } finally { setSubmitting(false); } };
   const login = async () => { const invalid = validateEmail(email); if (invalid) return setError(invalid); if (!password) return setError("Nhập mật khẩu để đăng nhập."); if (submitting) return; setSubmitting(true); try { const session = await gateway.signIn(normalizeEmail(email), password); await gateway.me(session.accessToken); await signIn(session); clearSensitive(); } catch (cause) { if (cause instanceof GatewayError && cause.code === "ACCOUNT_UNVERIFIED") { try { const result = await gateway.requestOtp(normalizeEmail(email)); clearSensitive(); setAttemptId(result.attemptId); setResendAt(result.resendAvailableAt); go("signUpOtp"); setError(message(cause, "")); } catch (requestCause) { setError(message(requestCause, "Không thể gửi mã.")); } } else setError(message(cause, "Không thể đăng nhập.")); } finally { setSubmitting(false); } };
-  const signUp = screen !== "signIn"; const formWidth = width < 400 ? Math.min(290, width - 40) : Math.min(320, width - 96); const submit = screen === "signUpEmail" ? sendOtp : screen === "signUpOtp" ? verify : screen === "signUpPassword" ? register : login;
+  const signUp = screen === "signUpEmail" || screen === "signUpOtp" || screen === "signUpPassword"; const formWidth = width < 400 ? Math.min(290, width - 40) : Math.min(320, width - 96); const submit = screen === "signUpEmail" ? sendOtp : screen === "signUpOtp" ? verify : screen === "signUpPassword" ? register : login;
   const fontStartup = getFontStartupState(fontsLoaded, fontError, fontTimedOut);
   if (fontStartup === "loading") return <StartupLoading />;
+  if (screen === "forgotPassword") return <ForgotPasswordScreen initialStep={recoveryReviewStep ?? "email"} onExit={() => go("signIn")} onComplete={(recoveredEmail) => { clearSensitive(); setEmail(recoveredEmail); go("signIn"); setNotice("Đổi mật khẩu thành công. Hãy đăng nhập lại."); }} />;
   return <View style={styles.backdrop}><SafeAreaView style={[styles.canvas, { width: Math.min(width, 430) }]}><ScrollView contentContainerStyle={[styles.content, { paddingTop: height < 650 ? 24 : 72 }]} keyboardShouldPersistTaps="handled"><View style={[styles.header, height < 650 && styles.compactHeader]}><Text style={styles.title}>{signUp ? "Đăng ký" : "SmartTrọ\nxin chào!"}</Text></View><View style={[styles.form, { width: formWidth }, height < 650 && styles.compactForm]}>
     {(screen === "signIn" || screen === "signUpEmail") && <Input label="Email" value={email} onChangeText={setEmail} type="email-address" />}
     {screen === "signIn" && <SecretInput label="Mật khẩu" value={password} onChangeText={setPassword} visible={showPassword} onToggle={() => setShowPassword(!showPassword)} />}
@@ -47,7 +52,7 @@ export function AuthScreen() {
     {screen === "signUpOtp" && <Action label={seconds ? `Gửi lại mã OTP (${seconds}s)` : "Gửi lại mã OTP"} disabled={!!seconds || submitting} onPress={() => void resend()} />}
     <Action label={submitting ? "Đang xử lý..." : screen === "signUpEmail" ? "Gửi OTP" : screen === "signUpOtp" ? "Tiếp tục" : signUp ? "Đăng ký" : "Đăng nhập"} disabled={submitting || (screen === "signUpOtp" && otp.length !== 6)} onPress={() => void submit()} /><Text style={styles.or}>Hoặc</Text>
     {showSocials && <Socials action={signUp ? "Đăng ký" : "Đăng nhập"} onPress={() => setNotice("Chức năng chưa khả dụng trong bản preview")} />}
-    {screen === "signIn" && <Link label="Quên mật khẩu" onPress={() => setError("Tính năng Quên mật khẩu sẽ được bổ sung trong UC-03.")} />}
+    {screen === "signIn" && <Link label="Quên mật khẩu" onPress={() => { if (!showRecoveryReview) return setError("Quên mật khẩu chưa khả dụng trên bản production."); clearSensitive(); go("forgotPassword"); }} />}
     <Text style={styles.account}>{signUp ? "Bạn đã có tài khoản?" : "Bạn chưa có tài khoản?"}</Text><Link label={signUp ? "Đăng nhập" : "Đăng ký"} onPress={() => { clearSensitive(); go(signUp ? "signIn" : "signUpEmail"); }} />
   </View>{isDebugBuild && <Text style={styles.revision}>Preview revision: {process.env.EXPO_PUBLIC_BUILD_SHA?.slice(0, 7) ?? "local"}</Text>}</ScrollView></SafeAreaView></View>;
 }

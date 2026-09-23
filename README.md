@@ -16,6 +16,8 @@ Set `EXPO_PUBLIC_API_BASE_URL` to the deployed renter API (the current review UR
 
 `EXPO_PUBLIC_REVIEW_SOCIALS=true` keeps the Facebook, Google, and Apple controls visible for visual review. These controls are UI-only in the current foundation and do not perform social authentication yet.
 
+`EXPO_PUBLIC_UC03_REVIEW=true` enables the FE-only forgot-password review flow. It keeps recovery data in process memory only and does not call a recovery backend. Reviewers can enter from Sign In; web evidence can open `?uc03=email`, `?uc03=otp`, or `?uc03=password`. Production keeps this flag `false` until the approved backend contract is mapped.
+
 ## Typography
 
 The approved application font is **Be Vietnam Pro**. Keep the font mapping consistent across new screens:
@@ -43,6 +45,7 @@ GLI-17 owns confirmation of renter API routes/contracts in `smart-platform-servi
 npm run lint
 npm run typecheck
 npm test
+npm run test:coverage
 ```
 
 ## Android review APK

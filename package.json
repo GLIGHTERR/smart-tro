@@ -46,9 +46,23 @@
       "**/__tests__/**/*.test.ts"
     ],
     "collectCoverageFrom": [
+      "src/auth/gateway.ts",
+      "src/auth/mockGateway.ts",
       "src/auth/recoveryState.ts"
     ],
     "coverageThreshold": {
+      "./src/auth/gateway.ts": {
+        "branches": 100,
+        "functions": 100,
+        "lines": 100,
+        "statements": 100
+      },
+      "./src/auth/mockGateway.ts": {
+        "branches": 100,
+        "functions": 100,
+        "lines": 100,
+        "statements": 100
+      },
       "./src/auth/recoveryState.ts": {
         "branches": 100,
         "functions": 100,

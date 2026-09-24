@@ -48,9 +48,52 @@ describe("email auth gateway", () => {
     expect(fetchMock.mock.calls[2]![1]?.body).toBe(JSON.stringify({ refreshToken: "refresh-1" }));
   });
 
+  it("uses the deployed password-recovery contract without creating a session", async () => {
+    fetchMock.mockResolvedValueOnce(json({ accepted: true, message: "Nếu email tồn tại, mã xác thực đã được gửi.", challengeId: "challenge-1", expiresInSeconds: 600, resendAfterSeconds: 43 }, 202));
+    fetchMock.mockResolvedValueOnce(json({ verified: true, resetToken: "reset-token", expiresInSeconds: 600 }));
+    fetchMock.mockResolvedValueOnce(json({ reset: true, next: "sign_in", email: "mai@example.com" }));
+    const auth = gateway();
+    await expect(auth.requestPasswordRecovery("mai@example.com")).resolves.toEqual({ challengeId: "challenge-1", expiresAt: 601000, resendAvailableAt: 44000 });
+    await expect(auth.verifyPasswordRecovery("mai@example.com", "challenge-1", "123456")).resolves.toEqual({ resetToken: "reset-token", expiresAt: 601000 });
+    await expect(auth.resetPassword("reset-token", "Changed!1", "Changed!1")).resolves.toEqual({ email: "mai@example.com", next: "sign_in" });
+    expect(fetchMock).toHaveBeenNthCalledWith(1, "https://api.example/auth/password/recovery/request", expect.objectContaining({ body: JSON.stringify({ email: "mai@example.com" }) }));
+    expect(fetchMock).toHaveBeenNthCalledWith(2, "https://api.example/auth/password/recovery/verify", expect.objectContaining({ body: JSON.stringify({ email: "mai@example.com", challengeId: "challenge-1", code: "123456" }) }));
+    expect(fetchMock).toHaveBeenNthCalledWith(3, "https://api.example/auth/password/recovery/reset", expect.objectContaining({ body: JSON.stringify({ resetToken: "reset-token", newPassword: "Changed!1", confirmPassword: "Changed!1" }) }));
+    expect(JSON.stringify(fetchMock.mock.calls)).not.toContain("Authorization");
+  });
+
+  it.each([
+    ["challenge accepted", "requestPasswordRecovery", { accepted: false, challengeId: "challenge", expiresInSeconds: 600, resendAfterSeconds: 60 }],
+    ["challenge id", "requestPasswordRecovery", { accepted: true, challengeId: "", expiresInSeconds: 600, resendAfterSeconds: 60 }],
+    ["challenge expiry", "requestPasswordRecovery", { accepted: true, challengeId: "challenge", expiresInSeconds: "bad", resendAfterSeconds: 60 }],
+    ["challenge cooldown", "requestPasswordRecovery", { accepted: true, challengeId: "challenge", expiresInSeconds: 600, resendAfterSeconds: "bad" }],
+    ["verification flag", "verifyPasswordRecovery", { verified: false, resetToken: "token", expiresInSeconds: 600 }],
+    ["reset token", "verifyPasswordRecovery", { verified: true, resetToken: "", expiresInSeconds: 600 }],
+    ["reset expiry", "verifyPasswordRecovery", { verified: true, resetToken: "token", expiresInSeconds: "bad" }],
+    ["completion flag", "resetPassword", { reset: false, next: "sign_in", email: "mai@example.com" }],
+    ["completion next", "resetPassword", { reset: true, next: "other", email: "mai@example.com" }],
+    ["completion email", "resetPassword", { reset: true, next: "sign_in", email: "" }],
+  ] as const)("rejects a malformed recovery %s response", async (_label, method, body) => {
+    fetchMock.mockResolvedValue(json(body));
+    const auth = gateway();
+    const operation = method === "requestPasswordRecovery"
+      ? auth.requestPasswordRecovery("mai@example.com")
+      : method === "verifyPasswordRecovery"
+        ? auth.verifyPasswordRecovery("mai@example.com", "challenge", "123456")
+        : auth.resetPassword("token", "Changed!1", "Changed!1");
+    await expect(operation).rejects.toEqual(expect.objectContaining({ code: "SERVER_ERROR" }));
+  });
+
   it.each([["INVALID_OTP", 400, "INVALID_OTP"], ["EMAIL_EXISTS", 409, "ACCOUNT_EXISTS"], ["ignored", 429, "AUTH_RATE_LIMITED"], ["ignored", 503, "SERVER_ERROR"], ["ignored", 400, "NETWORK_ERROR"]] as const)("maps %s responses", async (backendCode, status, expected) => {
     fetchMock.mockResolvedValue(json({ code: backendCode }, status));
     await expect(gateway().requestOtp("mai@example.com")).rejects.toEqual(expect.objectContaining({ code: expected }));
+  });
+
+  it("preserves the backend retry duration for rate limits", async () => {
+    fetchMock.mockResolvedValueOnce(json({ code: "AUTH_RATE_LIMITED", details: { retryAfterSeconds: 17 } }, 429));
+    fetchMock.mockResolvedValueOnce(json({ code: "AUTH_RATE_LIMITED", details: { retryAfterSeconds: "bad" } }, 429));
+    await expect(gateway().requestPasswordRecovery("mai@example.com")).rejects.toEqual(expect.objectContaining({ code: "AUTH_RATE_LIMITED", retryAfterSeconds: 17 }));
+    await expect(gateway().requestPasswordRecovery("mai@example.com")).rejects.toEqual(expect.objectContaining({ code: "AUTH_RATE_LIMITED", retryAfterSeconds: undefined }));
   });
 
   it("maps nested backend errors, invalid JSON, invalid successful payloads, and fetch failures", async () => {

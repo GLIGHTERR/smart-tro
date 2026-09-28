@@ -1,0 +1,14 @@
+name: Android preview build
+
+on:
+  pull_request_labeled:
+    labels:
+      - eas-preview
+
+jobs:
+  build_android_preview:
+    name: Build SmartTrọ Android preview
+    type: build
+    params:
+      platform: android
+      profile: preview

@@ -14,9 +14,11 @@ import {
   createRecoverySubmissionGuard,
   getRecoveryRetrySeconds,
   getResendSeconds,
+  maskRecoveryEmail,
   prepareRecoveryEmail,
   prepareRecoveryOtp,
   prepareRecoveryPassword,
+  returnToRecoveryEmail,
   resumeRecovery,
   sanitizeRecoveryOtp,
 } from "../recoveryState";
@@ -36,6 +38,19 @@ describe("forgot-password recovery state", () => {
     await expect(first).resolves.toBe(true);
     await expect(guard.run(async () => { throw new Error("failed"); })).rejects.toThrow("failed");
     await expect(guard.run(async () => undefined)).resolves.toBe(true);
+
+    let staleIsCurrent!: () => boolean;
+    let releaseStale!: () => void;
+    const stale = guard.run(async (isCurrent) => {
+      staleIsCurrent = isCurrent;
+      await new Promise<void>((resolve) => { releaseStale = resolve; });
+    });
+    expect(staleIsCurrent()).toBe(true);
+    guard.cancel();
+    expect(staleIsCurrent()).toBe(false);
+    await expect(guard.run(async (isCurrent) => expect(isCurrent()).toBe(true))).resolves.toBe(true);
+    releaseStale();
+    await expect(stale).resolves.toBe(false);
   });
 
   it("starts clean and can seed each review-only screen without persisted state", () => {
@@ -57,6 +72,10 @@ describe("forgot-password recovery state", () => {
 
   it("sanitizes, validates, and accepts the OTP result", () => {
     expect(sanitizeRecoveryOtp("1a23-4567")).toBe("123456");
+    expect(maskRecoveryEmail("nghia@gmail.com")).toBe("ng***@gmail.com");
+    expect(maskRecoveryEmail("a@example.com")).toBe("a***@example.com");
+    expect(maskRecoveryEmail("invalid")).toBe("invalid");
+    expect(maskRecoveryEmail("invalid@")).toBe("invalid@");
     const otpState = { ...createRecoveryState("otp", now), otp: "123" };
     expect(prepareRecoveryOtp(otpState, now)).toMatchObject({ state: { error: "Nhập đủ 6 chữ số." } });
     expect(prepareRecoveryOtp({ ...otpState, challengeExpiresAt: now }, now)).toMatchObject({ state: { step: "email", error: RECOVERY_EXPIRED_ERROR } });
@@ -108,6 +127,8 @@ describe("forgot-password recovery state", () => {
     expect(resumeRecovery({ ...createRecoveryState("otp", now), challengeExpiresAt: now }, now)).toMatchObject({ step: "email", error: RECOVERY_EXPIRED_ERROR });
     expect(resumeRecovery(createRecoveryState("email", now), now)).toMatchObject({ step: "email", password: "", confirmPassword: "" });
     expect(backRecovery(passwordState)).toMatchObject({ step: "email", email: "", resetToken: "", otp: "", resetExpiresAt: 0 });
-    expect(backRecovery(createRecoveryState("otp", now))).toMatchObject({ step: "email", email: "", challengeId: "" });
+    const dirtyOtp = { ...createRecoveryState("otp", now), email: "mai@example.com", otp: "123456", otpFailures: 4, error: "old", retryAvailableAt: now + 5_000 };
+    expect(returnToRecoveryEmail(dirtyOtp)).toMatchObject({ step: "email", email: "mai@example.com", challengeId: "", otp: "", otpFailures: 0, error: "", retryAvailableAt: 0, resendAvailableAt: 0 });
+    expect(backRecovery(dirtyOtp)).toEqual(returnToRecoveryEmail(dirtyOtp));
   });
 });

@@ -32,12 +32,23 @@ export type RecoverySubmission =
 
 export function createRecoverySubmissionGuard() {
   let pending = false;
+  let generation = 0;
   return {
-    async run(operation: () => Promise<void>): Promise<boolean> {
+    async run(operation: (isCurrent: () => boolean) => Promise<void>): Promise<boolean> {
       if (pending) return false;
       pending = true;
-      try { await operation(); return true; }
-      finally { pending = false; }
+      const operationGeneration = generation;
+      const isCurrent = () => generation === operationGeneration;
+      try {
+        await operation(isCurrent);
+        return isCurrent();
+      } finally {
+        if (isCurrent()) pending = false;
+      }
+    },
+    cancel() {
+      generation += 1;
+      pending = false;
     },
   };
 }
@@ -90,6 +101,12 @@ export function acceptRecoveryChallenge(state: RecoveryState, email: string, cha
 
 export function sanitizeRecoveryOtp(value: string): string {
   return value.replace(/\D/g, "").slice(0, 6);
+}
+
+export function maskRecoveryEmail(email: string): string {
+  const at = email.lastIndexOf("@");
+  if (at <= 0 || at === email.length - 1) return email;
+  return `${email.slice(0, Math.min(2, at))}***${email.slice(at)}`;
 }
 
 export function prepareRecoveryOtp(state: RecoveryState, now: number): RecoverySubmission {
@@ -164,8 +181,13 @@ export function resumeRecovery(state: RecoveryState, now: number): RecoveryState
   return { ...state, password: "", confirmPassword: "" };
 }
 
-export function backRecovery(_state: RecoveryState): RecoveryState {
-  // Verification consumes the challenge, so any backward navigation restarts recovery.
+export function returnToRecoveryEmail(state: RecoveryState): RecoveryState {
+  return { ...createRecoveryState(), email: state.email };
+}
+
+export function backRecovery(state: RecoveryState): RecoveryState {
+  if (state.step === "otp") return returnToRecoveryEmail(state);
+  // Verification consumes the challenge, so leaving the password step restarts recovery.
   return createRecoveryState();
 }
 

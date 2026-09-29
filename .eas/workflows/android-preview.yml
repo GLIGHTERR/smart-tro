@@ -1,9 +1,9 @@
 name: Android preview build
 
 on:
-  pull_request_labeled:
-    labels:
-      - eas-preview
+  push:
+    branches:
+      - master
 
 jobs:
   build_android_preview:

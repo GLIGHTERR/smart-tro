@@ -14,9 +14,11 @@ import {
   createRecoverySubmissionGuard,
   getRecoveryRetrySeconds,
   getResendSeconds,
+  maskRecoveryEmail,
   prepareRecoveryEmail,
   prepareRecoveryOtp,
   prepareRecoveryPassword,
+  returnToRecoveryEmail,
   resumeRecovery,
   sanitizeRecoveryOtp,
   type RecoveryState,
@@ -37,6 +39,7 @@ export function ForgotPasswordScreen({ gateway, initialStep = "email", onExit, o
   const [now, setNow] = useState(Date.now());
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [focusEmail, setFocusEmail] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const submissionGuard = useRef(createRecoverySubmissionGuard()).current;
   const appState = useRef(AppState.currentState);
@@ -60,29 +63,49 @@ export function ForgotPasswordScreen({ gateway, initialStep = "email", onExit, o
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
-      if (submitting) return true;
       if (state.step === "email") onExit();
-      else setState((current) => backRecovery(current));
+      else {
+        submissionGuard.cancel();
+        setSubmitting(false);
+        setShowPassword(false);
+        setShowConfirm(false);
+        setFocusEmail(true);
+        setState((current) => backRecovery(current));
+      }
       return true;
     });
     return () => subscription.remove();
-  }, [onExit, state.step, submitting]);
+  }, [onExit, state.step, submissionGuard]);
 
   const update = (values: Partial<RecoveryState>) => setState((current) => ({ ...current, ...values, error: "" }));
-  const runOnce = (operation: () => Promise<void>) => submissionGuard.run(async () => {
+  const runOnce = (operation: (isCurrent: () => boolean) => Promise<void>) => submissionGuard.run(async (isCurrent) => {
     setSubmitting(true);
-    try { await operation(); }
-    finally { setSubmitting(false); }
+    try { await operation(isCurrent); }
+    finally { if (isCurrent()) setSubmitting(false); }
   });
-  const goBack = () => {
-    if (submitting) return;
+  const clearLocalOtpState = () => {
+    submissionGuard.cancel();
+    setSubmitting(false);
     setShowPassword(false);
     setShowConfirm(false);
-    if (state.step === "email") onExit();
-    else setState((current) => backRecovery(current));
+    setFocusEmail(true);
   };
-  const fail = (cause: unknown) => setState((current) => applyRecoveryError(current, cause instanceof GatewayError ? cause.code : "SERVER_ERROR", cause instanceof GatewayError ? cause.retryAfterSeconds : undefined, Date.now()));
-  const submit = () => void runOnce(async () => {
+  const changeEmail = () => {
+    clearLocalOtpState();
+    setState((current) => returnToRecoveryEmail(current));
+  };
+  const goBack = () => {
+    if (state.step === "email") onExit();
+    else {
+      clearLocalOtpState();
+      setState((current) => backRecovery(current));
+    }
+  };
+  const fail = (cause: unknown, isCurrent: () => boolean) => {
+    if (!isCurrent()) return;
+    setState((current) => applyRecoveryError(current, cause instanceof GatewayError ? cause.code : "SERVER_ERROR", cause instanceof GatewayError ? cause.retryAfterSeconds : undefined, Date.now()));
+  };
+  const submit = () => void runOnce(async (isCurrent) => {
     const timestamp = Date.now();
     if (state.step === "email") {
       const prepared = prepareRecoveryEmail(state);
@@ -90,36 +113,41 @@ export function ForgotPasswordScreen({ gateway, initialStep = "email", onExit, o
       if (!("value" in prepared)) return;
       try {
         const challenge = await gateway.requestPasswordRecovery(prepared.value);
+        if (!isCurrent()) return;
+        setFocusEmail(false);
         setState((current) => acceptRecoveryChallenge(current, prepared.value, challenge));
-      } catch (cause) { fail(cause); }
+      } catch (cause) { fail(cause, isCurrent); }
     } else if (state.step === "otp") {
       const prepared = prepareRecoveryOtp(state, timestamp);
       setState(prepared.state);
       if (!("value" in prepared)) return;
       try {
         const credential = await gateway.verifyPasswordRecovery(state.email, state.challengeId, prepared.value);
+        if (!isCurrent()) return;
         setState((current) => acceptRecoveryVerification(current, credential));
-      } catch (cause) { fail(cause); }
+      } catch (cause) { fail(cause, isCurrent); }
     } else {
       const prepared = prepareRecoveryPassword(state, timestamp);
       setState(prepared.state);
       if (!("value" in prepared)) return;
       try {
         const result = await gateway.resetPassword(state.resetToken, prepared.value, state.confirmPassword);
+        if (!isCurrent()) return;
         setState(completeRecovery(timestamp));
         setShowPassword(false);
         setShowConfirm(false);
         onComplete(result.email);
-      } catch (cause) { fail(cause); }
+      } catch (cause) { fail(cause, isCurrent); }
     }
   });
-  const resend = () => void runOnce(async () => {
+  const resend = () => void runOnce(async (isCurrent) => {
     const timestamp = Date.now();
     if (!canResendRecoveryOtp(state, timestamp)) return;
     try {
       const challenge = await gateway.requestPasswordRecovery(state.email);
+      if (!isCurrent()) return;
       setState((current) => acceptRecoveryChallenge(current, state.email, challenge));
-    } catch (cause) { fail(cause); }
+    } catch (cause) { fail(cause, isCurrent); }
   });
   const resendSeconds = getResendSeconds(state, now);
   const retrySeconds = getRecoveryRetrySeconds(state, now);
@@ -134,32 +162,41 @@ export function ForgotPasswordScreen({ gateway, initialStep = "email", onExit, o
       <ScrollView contentContainerStyle={[styles.content, { paddingTop: height < 650 ? 18 : 70 }]} keyboardShouldPersistTaps="handled">
         <View style={[styles.header, height < 650 && styles.compactHeader]}><Text style={styles.title}>Quên mật{`\n`}khẩu</Text></View>
         <View style={[styles.form, { width: formWidth }, height < 650 && styles.compactForm]}>
-          {state.step === "email" && <RecoveryInput editable={!submitting} label="Email" value={state.email} onChangeText={(email) => update({ email })} type="email-address" />}
-          {state.step === "otp" && <RecoveryInput editable={!submitting} label="Mã OTP" value={state.otp} onChangeText={(otp) => update({ otp: sanitizeRecoveryOtp(otp) })} type="numeric" />}
+          {state.step === "email" && <RecoveryInput autoFocus={focusEmail} editable={!submitting} label="Email" selectTextOnFocus={focusEmail} value={state.email} onChangeText={(email) => update({ email })} type="email-address" />}
+          {state.step === "otp" && <>
+            <View style={styles.otpDestination}>
+              <Text style={styles.otpDestinationCopy}>Mã xác thực đã được gửi tới</Text>
+              <Text style={styles.maskedEmail}>{maskRecoveryEmail(state.email)}</Text>
+              <Pressable accessibilityLabel="Đổi email" accessibilityRole="button" onPress={changeEmail} style={styles.changeEmail}>
+                <Text style={styles.changeEmailText}>Đổi email</Text>
+              </Pressable>
+            </View>
+            <RecoveryInput editable={!submitting} label="Mã OTP" value={state.otp} onChangeText={(otp) => update({ otp: sanitizeRecoveryOtp(otp) })} type="numeric" />
+          </>}
           {state.step === "password" && <>
             <SecretRecoveryInput editable={!submitting} label="Mật khẩu" value={state.password} visible={showPassword} onChangeText={(password) => update({ password })} onToggle={() => setShowPassword((visible) => !visible)} />
             <SecretRecoveryInput editable={!submitting} label="Nhập lại mật khẩu" value={state.confirmPassword} visible={showConfirm} onChangeText={(confirmPassword) => update({ confirmPassword })} onToggle={() => setShowConfirm((visible) => !visible)} />
           </>}
-          {!!state.notice && <Text accessibilityLiveRegion="polite" style={styles.notice}>{state.notice}</Text>}
+          {!!state.notice && state.step !== "otp" && <Text accessibilityLiveRegion="polite" style={styles.notice}>{state.notice}</Text>}
           {!!state.error && <Text accessibilityLiveRegion="polite" style={styles.error}>{state.error}</Text>}
-          {state.step === "otp" && <RecoveryAction
-            disabled={submitting || resendSeconds > 0}
-            label={resendSeconds ? `Gửi lại mã OTP (${resendSeconds}s)` : "Gửi lại mã OTP"}
-            onPress={resend}
-          />}
           <RecoveryAction
             disabled={submitting || retrySeconds > 0 || (state.step === "otp" && state.otp.length !== 6)}
             label={submitting ? "Đang xử lý..." : retrySeconds ? `${actionLabel} (${retrySeconds}s)` : actionLabel}
             onPress={submit}
           />
+          {state.step === "otp" && <RecoveryAction
+            disabled={submitting || resendSeconds > 0}
+            label={resendSeconds ? `Gửi lại mã OTP (${resendSeconds}s)` : "Gửi lại mã OTP"}
+            onPress={resend}
+          />}
         </View>
       </ScrollView>
     </SafeAreaView>
   </View>;
 }
 
-function RecoveryInput({ editable, label, value, onChangeText, type = "default" }: { editable: boolean; label: string; value: string; onChangeText: (value: string) => void; type?: "default" | "email-address" | "numeric" }) {
-  return <TextInput accessibilityLabel={label} autoCapitalize="none" autoCorrect={false} editable={editable} keyboardType={type} onChangeText={onChangeText} placeholder={label} placeholderTextColor="#A78B68" style={styles.input} value={value} />;
+function RecoveryInput({ autoFocus = false, editable, label, selectTextOnFocus = false, value, onChangeText, type = "default" }: { autoFocus?: boolean; editable: boolean; label: string; selectTextOnFocus?: boolean; value: string; onChangeText: (value: string) => void; type?: "default" | "email-address" | "numeric" }) {
+  return <TextInput accessibilityLabel={label} autoCapitalize="none" autoCorrect={false} autoFocus={autoFocus} editable={editable} keyboardType={type} onChangeText={onChangeText} placeholder={label} placeholderTextColor="#A78B68" selectTextOnFocus={selectTextOnFocus} style={styles.input} value={value} />;
 }
 
 function SecretRecoveryInput({ editable, label, value, visible, onChangeText, onToggle }: { editable: boolean; label: string; value: string; visible: boolean; onChangeText: (value: string) => void; onToggle: () => void }) {
@@ -185,6 +222,11 @@ const styles = StyleSheet.create({
   form: { marginTop: 28 },
   compactForm: { marginTop: 14 },
   input: { backgroundColor: "#FBC97E", borderRadius: 24, color: "#5B4126", fontFamily: "BeVietnamPro_400Regular", fontSize: 15, height: 48, marginBottom: 16, paddingHorizontal: 28 },
+  otpDestination: { alignItems: "center", marginBottom: 4 },
+  otpDestinationCopy: { color: "#FFFFFF", fontFamily: "BeVietnamPro_400Regular", fontSize: 12, lineHeight: 18, textAlign: "center" },
+  maskedEmail: { color: "#FFFFFF", fontFamily: "BeVietnamPro_600SemiBold", fontSize: 12, lineHeight: 18, textAlign: "center" },
+  changeEmail: { alignItems: "center", justifyContent: "center", minHeight: 44, minWidth: 88 },
+  changeEmailText: { color: "#FFFFFF", fontFamily: "BeVietnamPro_600SemiBold", fontSize: 12, textDecorationLine: "underline" },
   secret: { backgroundColor: "#FBC97E", borderRadius: 24, height: 48, marginBottom: 16 },
   secretInput: { color: "#5B4126", fontFamily: "BeVietnamPro_400Regular", fontSize: 15, height: 48, paddingHorizontal: 28, paddingRight: 54 },
   eye: { height: 48, justifyContent: "center", position: "absolute", right: 18 },

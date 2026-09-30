@@ -1,5 +1,5 @@
 import React from "react";
-import { BackHandler, Pressable, Text, TextInput } from "react-native";
+import { BackHandler, Pressable, StyleSheet, Text, TextInput } from "react-native";
 import TestRenderer, { act, type ReactTestInstance } from "react-test-renderer";
 
 import type { AuthGateway } from "../../auth/gateway";
@@ -39,6 +39,10 @@ function button(root: ReactTestInstance, label: string): ReactTestInstance {
   return root.findAllByType(Pressable).find((pressable) => textOf(pressable) === label) as ReactTestInstance;
 }
 
+function resendButton(root: ReactTestInstance): ReactTestInstance {
+  return root.findAllByType(Pressable).find((pressable) => textOf(pressable).startsWith("Gửi lại mã OTP")) as ReactTestInstance;
+}
+
 describe("ForgotPasswordScreen email change", () => {
   beforeEach(() => {
     jest.useFakeTimers();
@@ -60,6 +64,25 @@ describe("ForgotPasswordScreen email change", () => {
     expect(labels).toEqual(expect.arrayContaining(["Mã xác thực đã được gửi tới", "ma***@example.com", "Đổi email"]));
     expect(labels.indexOf("Mã xác thực đã được gửi tới")).toBeLessThan(labels.indexOf("Tiếp tục"));
     expect(labels.indexOf("Tiếp tục")).toBeLessThan(labels.findIndex((label) => typeof label === "string" && label.startsWith("Gửi lại mã OTP")));
+    act(() => renderer.unmount());
+  });
+
+  it("uses a readable inverse resend button in both cooldown and enabled states", () => {
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      renderer = TestRenderer.create(<ForgotPasswordScreen gateway={gateway()} initialStep="otp" onComplete={jest.fn()} onExit={jest.fn()} />);
+    });
+
+    const coolingDown = resendButton(renderer.root);
+    expect(coolingDown.props.disabled).toBe(true);
+    expect(StyleSheet.flatten(coolingDown.props.style)).toMatchObject({ backgroundColor: "#C97900", borderColor: "#126DCC", borderWidth: 1.5, borderRadius: 9, height: 33 });
+    expect(StyleSheet.flatten(coolingDown.findByType(Text).props.style)).toMatchObject({ color: "#FFFFFF", fontFamily: "BeVietnamPro_600SemiBold" });
+
+    act(() => { jest.advanceTimersByTime(60_000); });
+    const enabled = resendButton(renderer.root);
+    expect(enabled.props.disabled).toBe(false);
+    expect(StyleSheet.flatten(enabled.props.style)).toMatchObject({ backgroundColor: "#FF9A05", borderColor: "#1684F7", borderWidth: 1.5, borderRadius: 9, height: 33 });
+    expect(StyleSheet.flatten(enabled.findByType(Text).props.style)).toMatchObject({ color: "#FFFFFF", fontFamily: "BeVietnamPro_600SemiBold" });
     act(() => renderer.unmount());
   });
 

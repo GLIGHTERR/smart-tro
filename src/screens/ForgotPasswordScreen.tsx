@@ -188,6 +188,7 @@ export function ForgotPasswordScreen({ gateway, initialStep = "email", onExit, o
             disabled={submitting || resendSeconds > 0}
             label={resendSeconds ? `Gửi lại mã OTP (${resendSeconds}s)` : "Gửi lại mã OTP"}
             onPress={resend}
+            variant="inverse"
           />}
         </View>
       </ScrollView>
@@ -206,8 +207,9 @@ function SecretRecoveryInput({ editable, label, value, visible, onChangeText, on
   </View>;
 }
 
-function RecoveryAction({ label, onPress, disabled = false }: { label: string; onPress: () => void; disabled?: boolean }) {
-  return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={[styles.action, disabled && styles.disabled]}><Text style={styles.actionText}>{label}</Text></Pressable>;
+function RecoveryAction({ label, onPress, disabled = false, variant = "default" }: { label: string; onPress: () => void; disabled?: boolean; variant?: "default" | "inverse" }) {
+  const inverse = variant === "inverse";
+  return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={[styles.action, inverse && styles.inverseAction, disabled && (inverse ? styles.inverseDisabled : styles.disabled)]}><Text style={[styles.actionText, inverse && styles.inverseActionText]}>{label}</Text></Pressable>;
 }
 
 const styles = StyleSheet.create({
@@ -233,6 +235,9 @@ const styles = StyleSheet.create({
   action: { alignItems: "center", backgroundColor: "#FFFFFF", borderColor: "#1684F7", borderRadius: 9, borderWidth: 1.5, height: 33, justifyContent: "center", marginTop: 10 },
   actionText: { color: "#F09200", fontFamily: "BeVietnamPro_600SemiBold", fontSize: 14 },
   disabled: { opacity: 0.55 },
+  inverseAction: { backgroundColor: "#FF9A05" },
+  inverseActionText: { color: "#FFFFFF" },
+  inverseDisabled: { backgroundColor: "#C97900", borderColor: "#126DCC" },
   notice: { color: "#5B4126", fontFamily: "BeVietnamPro_400Regular", fontSize: 12, lineHeight: 18, marginBottom: 2, textAlign: "center" },
   error: { color: "#8B1C1C", fontFamily: "BeVietnamPro_400Regular", fontSize: 12, lineHeight: 18, marginBottom: 2, textAlign: "center" },
 });

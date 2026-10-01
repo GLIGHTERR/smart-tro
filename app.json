@@ -1,12 +1,19 @@
 {
   "expo": {
-    "name": "SmartTro",
+    "name": "SmartTrọ",
     "slug": "smart-tro",
+    "icon": "./assets/app/icon.png",
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "android": {
-      "package": "com.smartplatform.smarttro"
+      "package": "com.smartplatform.smarttro",
+      "icon": "./assets/app/icon.png",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/app/adaptive-icon-foreground.png",
+        "backgroundColor": "#FF9800",
+        "monochromeImage": "./assets/app/adaptive-icon-monochrome.png"
+      }
     },
     "assetBundlePatterns": [
       "**/*"

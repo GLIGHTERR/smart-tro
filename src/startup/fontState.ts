@@ -1,10 +1,10 @@
 export const FONT_STARTUP_TIMEOUT_MS = 5000;
 
-export type FontStartupState = "loading" | "ready" | "system-fallback";
+export type FontStartupState = "loading" | "ready" | "failed";
 
 export function getFontStartupState(fontsLoaded: boolean, fontError: Error | null, timedOut: boolean): FontStartupState {
   if (fontsLoaded) return "ready";
-  if (fontError || timedOut) return "system-fallback";
+  if (fontError || timedOut) return "failed";
   return "loading";
 }
 

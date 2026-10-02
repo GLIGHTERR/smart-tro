@@ -9,12 +9,12 @@ describe("getFontStartupState", () => {
     expect(getFontStartupState(true, null, false)).toBe("ready");
   });
 
-  it("continues with the system font after a font error", () => {
-    expect(getFontStartupState(false, new Error("asset unavailable"), false)).toBe("system-fallback");
+  it("fails closed after a font error so branded screens never use a system fallback", () => {
+    expect(getFontStartupState(false, new Error("asset unavailable"), false)).toBe("failed");
   });
 
-  it("continues with the system font when the request exceeds the startup bound", () => {
-    expect(getFontStartupState(false, null, true)).toBe("system-fallback");
+  it("fails closed when the request exceeds the startup bound", () => {
+    expect(getFontStartupState(false, null, true)).toBe("failed");
   });
 
   it("prefers a successfully loaded font over a stale error or timeout", () => {

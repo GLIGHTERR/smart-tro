@@ -1,7 +1,7 @@
 import React from "react";
+import { IconOutline } from "@ant-design/icons-react-native";
 import { Pressable, StyleSheet, Text } from "react-native";
 import TestRenderer, { act, type ReactTestInstance } from "react-test-renderer";
-import Svg from "react-native-svg";
 
 import { HomeScreen } from "../HomeScreen";
 
@@ -12,7 +12,7 @@ function text(root: ReactTestInstance) {
 }
 
 function press(root: ReactTestInstance, label: string) {
-  const target = root.findAllByType(Pressable).find((node) => text(node) === label);
+  const target = root.findAllByType(Pressable).find((node) => node.props.accessibilityLabel?.startsWith(`${label}:`) || text(node) === label);
   if (!target) throw new Error(`Missing button ${label}`);
   act(() => target.props.onPress());
 }
@@ -32,7 +32,7 @@ describe("HomeScreen", () => {
     act(() => { renderer = TestRenderer.create(<HomeScreen onNavigate={jest.fn()} sessionKey="renter-a" />); });
     expect(renderer.root.findByProps({ accessibilityLabel: "Đang tải hợp đồng" })).toBeTruthy();
     act(() => { jest.advanceTimersByTime(220); });
-    expect(text(renderer.root)).toContain("Hợp đồng|Tin nhắn|Tài khoản|D.S.Trọ|T.Toán");
+    ["Hợp đồng", "Tin nhắn", "Tài khoản", "D.S.Trọ", "T.Toán"].forEach((label) => expect(text(renderer.root)).toContain(label));
     expect(text(renderer.root)).not.toContain("Báo cáo");
     expect(text(renderer.root)).not.toContain("Làm mới");
     act(() => renderer.unmount());
@@ -46,7 +46,8 @@ describe("HomeScreen", () => {
     act(() => { jest.advanceTimersByTime(220); });
     expect(renderer.root.findByProps({ accessibilityLabel: "1 trên 3 hợp đồng" })).toBeTruthy();
     expect(text(renderer.root)).toContain("Báo cáo");
-    expect(renderer.root.findAllByType(Svg)).toHaveLength(6);
+    expect(renderer.root.findAllByType(IconOutline).map((icon) => icon.props.name)).toEqual(["file-protect", "message", "user", "bank", "dollar-circle", "alert"]);
+    expect(renderer.root.findAllByType(IconOutline).every((icon) => icon.props.accessible === false && icon.props.importantForAccessibility === "no")).toBe(true);
     expect(renderer.root.findByProps({ accessibilityLabel: "Nguyễn Văn A" }).props.style).toMatchObject({ fontFamily: "BeVietnamPro_600SemiBold" });
     expect(renderer.root.findByProps({ children: "Phòng 102 - Trọ Xuân Hạ" }).props.style).toMatchObject({ fontFamily: "BeVietnamPro_600SemiBold" });
     expect(StyleSheet.flatten(renderer.root.findByProps({ children: "Hợp đồng" }).props.style)).toMatchObject({ fontFamily: "BeVietnamPro_400Regular" });
@@ -76,7 +77,7 @@ describe("HomeScreen", () => {
     act(() => { jest.advanceTimersByTime(220); });
     expect(text(renderer.root)).toContain("Chưa thể tải tóm tắt hợp đồng.");
     expect(text(renderer.root)).toContain("Bạn đang ngoại tuyến. Vui lòng thử lại.");
-    expect(text(renderer.root)).toContain("Hợp đồng|Tin nhắn|Tài khoản|D.S.Trọ|T.Toán");
+    ["Hợp đồng", "Tin nhắn", "Tài khoản", "D.S.Trọ", "T.Toán"].forEach((label) => expect(text(renderer.root)).toContain(label));
     press(renderer.root, "Thử lại");
     act(() => { jest.advanceTimersByTime(220); });
     expect(text(renderer.root)).toContain("Bạn đang ngoại tuyến. Vui lòng thử lại.");

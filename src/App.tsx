@@ -13,6 +13,8 @@ export default function App() {
   const [fontsLoaded, fontError] = useFonts({
     BeVietnamPro_400Regular: require("../assets/fonts/BeVietnamPro_400Regular.ttf"),
     BeVietnamPro_600SemiBold: require("../assets/fonts/BeVietnamPro_600SemiBold.ttf"),
+    // The approved Ant Design outline source uses this registered family.
+    antoutline: require("@ant-design/icons-react-native/fonts/antoutline.ttf"),
   });
   const [fontTimedOut, setFontTimedOut] = useState(false);
   const isDebugBuild = process.env.EXPO_PUBLIC_DEBUG_REVISION === "true";

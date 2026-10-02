@@ -27,7 +27,8 @@
         {
           "fonts": [
             "./assets/fonts/BeVietnamPro_400Regular.ttf",
-            "./assets/fonts/BeVietnamPro_600SemiBold.ttf"
+            "./assets/fonts/BeVietnamPro_600SemiBold.ttf",
+            "./node_modules/@ant-design/icons-react-native/fonts/antoutline.ttf"
           ]
         }
       ],

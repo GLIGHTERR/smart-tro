@@ -14,6 +14,7 @@
     "test:coverage": "jest --runInBand --coverage"
   },
   "dependencies": {
+    "@ant-design/icons-react-native": "^2.3.2",
     "@expo-google-fonts/be-vietnam-pro": "^0.4.1",
     "@expo/metro-runtime": "~5.0.5",
     "@expo/vector-icons": "^14.1.0",

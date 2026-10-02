@@ -1,3 +1,5 @@
+import type { OutlineGlyphMapType } from "@ant-design/icons-react-native";
+
 export type ActiveContract = {
   id: string;
   roomAndProperty: string;
@@ -17,13 +19,14 @@ export const homeDestinations = {
 } as const;
 
 export type HomeAction = keyof typeof homeDestinations;
+export type HomeActionIconName = Extract<OutlineGlyphMapType, "file-protect" | "message" | "user" | "bank" | "dollar-circle" | "alert">;
 
-export const homeActions: readonly { id: HomeAction; label: string; icon: HomeAction }[] = [
-  { id: "contract", label: "Hợp đồng", icon: "contract" },
-  { id: "messages", label: "Tin nhắn", icon: "messages" },
-  { id: "account", label: "Tài khoản", icon: "account" },
-  { id: "properties", label: "D.S.Trọ", icon: "properties" },
-  { id: "payment", label: "T.Toán", icon: "payment" },
+export const homeActions: readonly { id: HomeAction; label: string; icon: HomeActionIconName }[] = [
+  { id: "contract", label: "Hợp đồng", icon: "file-protect" },
+  { id: "messages", label: "Tin nhắn", icon: "message" },
+  { id: "account", label: "Tài khoản", icon: "user" },
+  { id: "properties", label: "D.S.Trọ", icon: "bank" },
+  { id: "payment", label: "T.Toán", icon: "dollar-circle" },
 ];
 
 export function displayNameFor(profile: HomeProfile) {
@@ -35,5 +38,5 @@ export function sortActiveContracts(contracts: readonly ActiveContract[]) {
 }
 
 export function actionsFor(contracts: readonly ActiveContract[]) {
-  return contracts.length ? [...homeActions, { id: "reports" as const, label: "Báo cáo", icon: "reports" as const }] : [...homeActions];
+  return contracts.length ? [...homeActions, { id: "reports" as const, label: "Báo cáo", icon: "alert" as const }] : [...homeActions];
 }

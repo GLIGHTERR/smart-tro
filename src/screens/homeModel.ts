@@ -18,12 +18,12 @@ export const homeDestinations = {
 
 export type HomeAction = keyof typeof homeDestinations;
 
-export const homeActions: readonly { id: HomeAction; label: string; icon: string }[] = [
-  { id: "contract", label: "Hợp đồng", icon: "file-text-o" },
-  { id: "messages", label: "Tin nhắn", icon: "commenting-o" },
-  { id: "account", label: "Tài khoản", icon: "user-o" },
-  { id: "properties", label: "D.S.Trọ", icon: "university" },
-  { id: "payment", label: "T.Toán", icon: "dollar" },
+export const homeActions: readonly { id: HomeAction; label: string; icon: HomeAction }[] = [
+  { id: "contract", label: "Hợp đồng", icon: "contract" },
+  { id: "messages", label: "Tin nhắn", icon: "messages" },
+  { id: "account", label: "Tài khoản", icon: "account" },
+  { id: "properties", label: "D.S.Trọ", icon: "properties" },
+  { id: "payment", label: "T.Toán", icon: "payment" },
 ];
 
 export function displayNameFor(profile: HomeProfile) {
@@ -35,5 +35,5 @@ export function sortActiveContracts(contracts: readonly ActiveContract[]) {
 }
 
 export function actionsFor(contracts: readonly ActiveContract[]) {
-  return contracts.length ? [...homeActions, { id: "reports" as const, label: "Báo cáo", icon: "bell-o" }] : [...homeActions];
+  return contracts.length ? [...homeActions, { id: "reports" as const, label: "Báo cáo", icon: "reports" as const }] : [...homeActions];
 }

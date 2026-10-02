@@ -20,6 +20,10 @@ describe("Home model", () => {
     expect(actionsFor([{ id: "c", roomAndProperty: "", address: "", expiryDate: "2026-01-01" }]).map(({ id }) => id)).toEqual(["contract", "messages", "account", "properties", "payment", "reports"]);
   });
 
+  it("maps every Home action to a bundled SVG icon instead of an icon-font glyph", () => {
+    expect(actionsFor([{ id: "c", roomAndProperty: "", address: "", expiryDate: "2026-01-01" }]).map(({ icon }) => icon)).toEqual(["contract", "messages", "account", "properties", "payment", "reports"]);
+  });
+
   it("keeps every Home navigation stub mapped to its approved destination", () => {
     expect(homeDestinations).toEqual({
       contract: "UC-07 — Hợp đồng điện tử của tôi",

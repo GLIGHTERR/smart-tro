@@ -30,6 +30,7 @@
     "react-native": "0.79.6",
     "react-native-safe-area-context": "5.4.0",
     "react-native-screens": "~4.11.1",
+    "react-native-svg": "15.11.2",
     "react-native-web": "^0.20.0"
   },
   "devDependencies": {
@@ -53,7 +54,8 @@
       "src/auth/restoreSession.ts",
       "src/auth/mockGateway.ts",
       "src/auth/recoveryState.ts",
-      "src/screens/homeModel.ts"
+      "src/screens/homeModel.ts",
+      "src/startup/fontState.ts"
     ],
     "coverageThreshold": {
       "./src/auth/gateway.ts": {
@@ -81,6 +83,12 @@
         "statements": 100
       },
       "./src/screens/homeModel.ts": {
+        "branches": 100,
+        "functions": 100,
+        "lines": 100,
+        "statements": 100
+      },
+      "./src/startup/fontState.ts": {
         "branches": 100,
         "functions": 100,
         "lines": 100,

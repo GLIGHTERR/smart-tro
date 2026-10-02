@@ -1,10 +1,10 @@
 import React from "react";
-import { Pressable, Text } from "react-native";
+import { Pressable, StyleSheet, Text } from "react-native";
 import TestRenderer, { act, type ReactTestInstance } from "react-test-renderer";
+import Svg from "react-native-svg";
 
 import { HomeScreen } from "../HomeScreen";
 
-jest.mock("@expo/vector-icons/FontAwesome", () => "FontAwesome");
 jest.mock("react-native-safe-area-context", () => ({ SafeAreaView: "SafeAreaView" }));
 
 function text(root: ReactTestInstance) {
@@ -46,6 +46,10 @@ describe("HomeScreen", () => {
     act(() => { jest.advanceTimersByTime(220); });
     expect(renderer.root.findByProps({ accessibilityLabel: "1 trên 3 hợp đồng" })).toBeTruthy();
     expect(text(renderer.root)).toContain("Báo cáo");
+    expect(renderer.root.findAllByType(Svg)).toHaveLength(6);
+    expect(renderer.root.findByProps({ accessibilityLabel: "Nguyễn Văn A" }).props.style).toMatchObject({ fontFamily: "BeVietnamPro_600SemiBold" });
+    expect(renderer.root.findByProps({ children: "Phòng 102 - Trọ Xuân Hạ" }).props.style).toMatchObject({ fontFamily: "BeVietnamPro_600SemiBold" });
+    expect(StyleSheet.flatten(renderer.root.findByProps({ children: "Hợp đồng" }).props.style)).toMatchObject({ fontFamily: "BeVietnamPro_400Regular" });
     expect(text(renderer.root)).not.toContain("Làm mới");
     press(renderer.root, "Hợp đồng");
     press(renderer.root, "Tin nhắn");

@@ -1,10 +1,10 @@
-import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { LinearGradient } from "expo-linear-gradient";
 import { useEffect, useMemo, useState } from "react";
 import { ActivityIndicator, FlatList, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { colors, radius, spacing } from "@/theme/tokens";
+import { HomeActionIcon } from "@/ui/HomeActionIcon";
 import { actionsFor, displayNameFor, homeDestinations, sortActiveContracts, type ActiveContract, type HomeProfile } from "./homeModel";
 
 type HomePayload = { profile: HomeProfile; contracts: ActiveContract[] };
@@ -70,7 +70,7 @@ export function HomeScreen({ sessionKey, onNavigate }: { sessionKey: string; onN
         {payload && contracts.length === 1 ? <ContractCard contract={contracts[0]!} /> : null}
         {payload && contracts.length > 1 ? <ContractCarousel contracts={contracts} width={width} /> : null}
       </View>
-      <View style={styles.actions}>{actions.map((action) => <Pressable accessibilityLabel={`${action.label}: ${homeDestinations[action.id]}`} accessibilityRole="button" key={action.id} onPress={() => onNavigate(homeDestinations[action.id])} style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}><FontAwesome color="#2E2E2E" name={action.icon as never} size={31} /><Text style={styles.actionLabel}>{action.label}</Text></Pressable>)}</View>
+      <View style={styles.actions}>{actions.map((action) => <Pressable accessibilityLabel={`${action.label}: ${homeDestinations[action.id]}`} accessibilityRole="button" key={action.id} onPress={() => onNavigate(homeDestinations[action.id])} style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}><HomeActionIcon name={action.icon} /><Text style={styles.actionLabel}>{action.label}</Text></Pressable>)}</View>
     </ScrollView>
     {toast ? <View accessibilityLiveRegion="polite" style={styles.toast}><Text style={styles.toastText}>{toast}</Text></View> : null}
   </LinearGradient></SafeAreaView>;

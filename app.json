@@ -22,7 +22,15 @@
       "baseUrl": "/smart-tro"
     },
     "plugins": [
-      "expo-font",
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/fonts/BeVietnamPro_400Regular.ttf",
+            "./assets/fonts/BeVietnamPro_600SemiBold.ttf"
+          ]
+        }
+      ],
       "expo-asset"
     ],
     "extra": {

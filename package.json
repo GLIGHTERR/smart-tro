@@ -23,6 +23,7 @@
     "expo": "^53.0.20",
     "expo-asset": "~11.1.7",
     "expo-font": "~13.3.2",
+    "expo-linear-gradient": "~14.1.5",
     "expo-secure-store": "~14.2.3",
     "react": "19.0.0",
     "react-dom": "19.0.0",

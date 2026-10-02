@@ -1,25 +1,19 @@
 import { NavigationContainer } from "@react-navigation/native";
-import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { Alert, StyleSheet, Text } from "react-native";
+import { Alert } from "react-native";
 
 import { useAuth } from "@/auth/AuthProvider";
-import { Button, ScreenState } from "@/ui/components";
-import { colors, spacing } from "@/theme/tokens";
+import { ScreenState } from "@/ui/components";
 import { AuthScreen } from "@/screens/AuthScreen";
 import { HomeScreen } from "@/screens/HomeScreen";
 
 const Stack = createNativeStackNavigator();
-const Tabs = createBottomTabNavigator();
+const isWebReview = process.env.EXPO_PUBLIC_HOME_REVIEW === "true";
 
-function Placeholder({ title, copy }: { title: string; copy: string }) { return <SafeAreaView style={styles.page}><Text style={styles.title}>{title}</Text><Text style={styles.copy}>{copy}</Text></SafeAreaView>; }
-function Account() { const { signOut } = useAuth(); return <SafeAreaView style={styles.page}><Text style={styles.title}>Account</Text><Text style={styles.copy}>Your secure renter session is active.</Text><Button label="Sign out" onPress={() => void signOut()} /></SafeAreaView>; }
-function AppTabs() { const { token } = useAuth(); return <Tabs.Navigator screenOptions={{ headerShown: false, tabBarActiveTintColor: colors.primary }}><Tabs.Screen name="Home">{() => <HomeScreen sessionKey={token ?? ""} onNavigate={(destination) => Alert.alert("Điều hướng", destination)} />}</Tabs.Screen><Tabs.Screen name="Saved">{() => <Placeholder title="Saved" copy="Your saved homes will appear here." />}</Tabs.Screen><Tabs.Screen name="Account" component={Account} /></Tabs.Navigator>; }
+function AuthenticatedHome() { const { token } = useAuth(); return <HomeScreen sessionKey={token ?? ""} onNavigate={(destination) => Alert.alert("Điều hướng", destination)} />; }
 
 export function RootNavigator() {
   const { token, isRestoring } = useAuth();
   if (isRestoring) return <ScreenState kind="loading" />;
-  return <NavigationContainer>{token ? <AppTabs /> : <Stack.Navigator screenOptions={{ headerShown: false }}><Stack.Screen name="Auth" component={AuthScreen} /></Stack.Navigator>}</NavigationContainer>;
+  return <NavigationContainer>{token || isWebReview ? <Stack.Navigator screenOptions={{ headerShown: false }}><Stack.Screen name="Home" component={AuthenticatedHome} /></Stack.Navigator> : <Stack.Navigator screenOptions={{ headerShown: false }}><Stack.Screen name="Auth" component={AuthScreen} /></Stack.Navigator>}</NavigationContainer>;
 }
-const styles = StyleSheet.create({ page: { backgroundColor: colors.canvas, flex: 1, gap: spacing.md, justifyContent: "center", padding: spacing.lg }, title: { color: colors.ink, fontSize: 30, fontWeight: "800" }, copy: { color: colors.muted, fontSize: 16, lineHeight: 24 } });

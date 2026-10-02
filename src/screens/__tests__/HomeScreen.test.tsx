@@ -34,6 +34,7 @@ describe("HomeScreen", () => {
     act(() => { jest.advanceTimersByTime(220); });
     expect(text(renderer.root)).toContain("Hợp đồng|Tin nhắn|Tài khoản|D.S.Trọ|T.Toán");
     expect(text(renderer.root)).not.toContain("Báo cáo");
+    expect(text(renderer.root)).not.toContain("Làm mới");
     act(() => renderer.unmount());
   });
 
@@ -45,6 +46,7 @@ describe("HomeScreen", () => {
     act(() => { jest.advanceTimersByTime(220); });
     expect(renderer.root.findByProps({ accessibilityLabel: "1 trên 3 hợp đồng" })).toBeTruthy();
     expect(text(renderer.root)).toContain("Báo cáo");
+    expect(text(renderer.root)).not.toContain("Làm mới");
     press(renderer.root, "Hợp đồng");
     press(renderer.root, "Tin nhắn");
     press(renderer.root, "Tài khoản");

@@ -50,12 +50,19 @@
     ],
     "collectCoverageFrom": [
       "src/auth/gateway.ts",
+      "src/auth/restoreSession.ts",
       "src/auth/mockGateway.ts",
       "src/auth/recoveryState.ts",
       "src/screens/homeModel.ts"
     ],
     "coverageThreshold": {
       "./src/auth/gateway.ts": {
+        "branches": 100,
+        "functions": 100,
+        "lines": 100,
+        "statements": 100
+      },
+      "./src/auth/restoreSession.ts": {
         "branches": 100,
         "functions": 100,
         "lines": 100,

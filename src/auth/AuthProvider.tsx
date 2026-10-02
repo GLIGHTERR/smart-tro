@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { getDeviceId } from "./device";
 import { createConfiguredAuthGateway, type AuthSession } from "./gateway";
 import { sessionStore } from "./session";
+import { restoreStoredSession } from "./restoreSession";
 
 type AuthContextValue = {
   token: string | null;
@@ -19,15 +20,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const restore = async () => {
-      const session = await sessionStore.get();
-      if (!session) return;
-      try {
-        const gateway = createConfiguredAuthGateway(getDeviceId);
-        const rotated = await gateway.refresh(session.refreshToken);
-        await gateway.me(rotated.accessToken);
-        await sessionStore.set(rotated);
-        setToken(rotated.accessToken);
-      } catch { await sessionStore.clear(); }
+      const session = await restoreStoredSession({ gateway: createConfiguredAuthGateway(getDeviceId), store: sessionStore });
+      if (session) setToken(session.accessToken);
     };
     restore().finally(() => setIsRestoring(false));
   }, []);

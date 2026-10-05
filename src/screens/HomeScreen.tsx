@@ -5,7 +5,7 @@ import { ActivityIndicator, FlatList, Platform, Pressable, RefreshControl, Scrol
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { colors, radius, spacing } from "@/theme/tokens";
-import { actionsFor, displayNameFor, homeDestinations, sortActiveContracts, type ActiveContract, type HomeProfile } from "./homeModel";
+import { actionsFor, displayNameFor, homeDestinations, sortActiveContracts, type ActiveContract, type HomeAction, type HomeProfile } from "./homeModel";
 
 type HomePayload = { profile: HomeProfile; contracts: ActiveContract[] };
 type LoadState = "loading" | "ready" | "error";
@@ -28,7 +28,7 @@ function reviewScenario() {
   return scenario === "none" || scenario === "single" || scenario === "multiple" || scenario === "error" ? scenario : "single";
 }
 
-export function HomeScreen({ sessionKey, onNavigate }: { sessionKey: string; onNavigate: (destination: string) => void }) {
+export function HomeScreen({ sessionKey, onNavigate }: { sessionKey: string; onNavigate: (action: HomeAction) => void }) {
   const [state, setState] = useState<LoadState>("loading");
   const [payload, setPayload] = useState<HomePayload | null>(null);
   const [toast, setToast] = useState("");
@@ -70,7 +70,7 @@ export function HomeScreen({ sessionKey, onNavigate }: { sessionKey: string; onN
         {payload && contracts.length === 1 ? <ContractCard contract={contracts[0]!} /> : null}
         {payload && contracts.length > 1 ? <ContractCarousel contracts={contracts} width={width} /> : null}
       </View>
-      <View style={styles.actions}>{actions.map((action) => <Pressable accessibilityLabel={`${action.label}: ${homeDestinations[action.id]}`} accessibilityRole="button" key={action.id} onPress={() => onNavigate(homeDestinations[action.id])} style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}><IconOutline accessible={false} color="#2E2E2E" importantForAccessibility="no" name={action.icon} size={31} /><Text style={styles.actionLabel}>{action.label}</Text></Pressable>)}</View>
+      <View style={styles.actions}>{actions.map((action) => <Pressable accessibilityLabel={`${action.label}: ${homeDestinations[action.id]}`} accessibilityRole="button" key={action.id} onPress={() => onNavigate(action.id)} style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}><IconOutline accessible={false} color="#2E2E2E" importantForAccessibility="no" name={action.icon} size={31} /><Text style={styles.actionLabel}>{action.label}</Text></Pressable>)}</View>
     </ScrollView>
     {toast ? <View accessibilityLiveRegion="polite" style={styles.toast}><Text style={styles.toastText}>{toast}</Text></View> : null}
   </LinearGradient></SafeAreaView>;

@@ -5,7 +5,7 @@ import { ActivityIndicator, FlatList, Platform, Pressable, RefreshControl, Scrol
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { colors, radius, spacing } from "@/theme/tokens";
-import { actionsFor, displayNameFor, homeDestinations, sortActiveContracts, type ActiveContract, type HomeAction, type HomeProfile } from "./homeModel";
+import { actionsFor, carouselIndex, displayNameFor, homeDestinations, sortActiveContracts, type ActiveContract, type HomeAction, type HomeProfile } from "./homeModel";
 
 type HomePayload = { profile: HomeProfile; contracts: ActiveContract[] };
 type LoadState = "loading" | "ready" | "error";
@@ -78,7 +78,10 @@ export function HomeScreen({ sessionKey, onNavigate }: { sessionKey: string; onN
 
 function ContractCarousel({ contracts, width }: { contracts: ActiveContract[]; width: number }) {
   const [active, setActive] = useState(0);
-  return <><FlatList data={contracts} horizontal keyExtractor={(contract) => contract.id} onMomentumScrollEnd={(event) => setActive(Math.round(event.nativeEvent.contentOffset.x / event.nativeEvent.layoutMeasurement.width))} pagingEnabled renderItem={({ item }) => <View style={{ width }}><ContractCard contract={item} /></View>} showsHorizontalScrollIndicator={false} /><View accessibilityLabel={`${active + 1} trên ${contracts.length} hợp đồng`} style={styles.dots}>{contracts.map((contract, index) => <View key={contract.id} style={[styles.dot, index === active && styles.dotActive]} />)}</View></>;
+  const updateActive = (event: { nativeEvent: { contentOffset: { x: number }; layoutMeasurement: { width: number } } }) => {
+    setActive(carouselIndex(event.nativeEvent.contentOffset.x, event.nativeEvent.layoutMeasurement.width, contracts.length));
+  };
+  return <><FlatList data={contracts} horizontal keyExtractor={(contract) => contract.id} onMomentumScrollEnd={updateActive} onScroll={updateActive} pagingEnabled renderItem={({ item }) => <View style={{ width }}><ContractCard contract={item} /></View>} scrollEventThrottle={16} showsHorizontalScrollIndicator={false} testID="contract-carousel" /><View accessibilityLabel={`${active + 1} trên ${contracts.length} hợp đồng`} style={styles.dots}>{contracts.map((contract, index) => <View key={contract.id} style={[styles.dot, index === active && styles.dotActive]} />)}</View></>;
 }
 
 function ContractCard({ contract }: { contract: ActiveContract }) {

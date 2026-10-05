@@ -12,7 +12,7 @@
     "typecheck": "tsc --noEmit",
     "test": "jest --runInBand",
     "test:coverage": "jest --runInBand --coverage",
-    "test:web": "expo export --platform web && playwright test"
+    "test:web": "expo export --platform web --clear && playwright test"
   },
   "dependencies": {
     "@ant-design/icons-react-native": "^2.3.2",

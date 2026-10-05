@@ -1,4 +1,4 @@
-import { actionsFor, displayNameFor, homeActions, homeDestinations, sortActiveContracts } from "../homeModel";
+import { actionsFor, carouselIndex, displayNameFor, homeActions, homeDestinations, sortActiveContracts } from "../homeModel";
 
 describe("Home model", () => {
   it("uses a non-empty display name and otherwise falls back to the account email", () => {
@@ -33,5 +33,14 @@ describe("Home model", () => {
       payment: "Thanh Toán",
       reports: "UC-18 — Danh sách báo cáo sự cố",
     });
+  });
+
+  it("maps scroll offsets to a valid carousel page", () => {
+    expect(carouselIndex(0, 1280, 3)).toBe(0);
+    expect(carouselIndex(1280, 1280, 3)).toBe(1);
+    expect(carouselIndex(-20, 1280, 3)).toBe(0);
+    expect(carouselIndex(9999, 1280, 3)).toBe(2);
+    expect(carouselIndex(1280, 0, 3)).toBe(0);
+    expect(carouselIndex(1280, 1280, 0)).toBe(0);
   });
 });

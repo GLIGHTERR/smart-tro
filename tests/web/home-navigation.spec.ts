@@ -32,6 +32,10 @@ test("every Home action changes the web route and displays its approved destinat
 
 test("multiple contracts preserve all six web navigation outcomes on desktop", async ({ page }) => {
   await openHome(page, "multiple", { width: 1280, height: 900 });
+  const carousel = page.getByTestId("contract-carousel");
+  await carousel.hover();
+  await page.mouse.wheel(1280, 0);
+  await expect(page.getByLabel("2 trên 3 hợp đồng")).toBeVisible();
   for (const action of actions) await expectNavigation(page, action);
 });
 

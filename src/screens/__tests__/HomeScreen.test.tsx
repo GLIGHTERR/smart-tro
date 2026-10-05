@@ -1,6 +1,6 @@
 import React from "react";
 import { IconOutline } from "@ant-design/icons-react-native";
-import { Pressable, StyleSheet, Text } from "react-native";
+import { FlatList, Pressable, StyleSheet, Text } from "react-native";
 import TestRenderer, { act, type ReactTestInstance } from "react-test-renderer";
 
 import { HomeScreen } from "../HomeScreen";
@@ -45,6 +45,9 @@ describe("HomeScreen", () => {
     act(() => { renderer = TestRenderer.create(<HomeScreen onNavigate={onNavigate} sessionKey="renter-a" />); });
     act(() => { jest.advanceTimersByTime(220); });
     expect(renderer.root.findByProps({ accessibilityLabel: "1 trên 3 hợp đồng" })).toBeTruthy();
+    const carousel = renderer.root.findByType(FlatList);
+    act(() => carousel.props.onScroll({ nativeEvent: { contentOffset: { x: 1280 }, layoutMeasurement: { width: 1280 } } }));
+    expect(renderer.root.findByProps({ accessibilityLabel: "2 trên 3 hợp đồng" })).toBeTruthy();
     expect(text(renderer.root)).toContain("Báo cáo");
     expect(renderer.root.findAllByType(IconOutline).map((icon) => icon.props.name)).toEqual(["file-protect", "message", "user", "bank", "dollar-circle", "alert"]);
     expect(renderer.root.findAllByType(IconOutline).every((icon) => icon.props.accessible === false && icon.props.importantForAccessibility === "no")).toBe(true);

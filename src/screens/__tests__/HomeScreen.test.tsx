@@ -58,9 +58,8 @@ describe("HomeScreen", () => {
     press(renderer.root, "D.S.Trọ");
     press(renderer.root, "T.Toán");
     press(renderer.root, "Báo cáo");
-    expect(onNavigate.mock.calls.map(([destination]) => destination)).toEqual([
-      "UC-07 — Hợp đồng điện tử của tôi", "UC-15 — Tin nhắn", "UC-04 — Tài khoản/Cá nhân",
-      "UC-10 — Danh sách phòng available", "Thanh Toán", "UC-18 — Danh sách báo cáo sự cố",
+    expect(onNavigate.mock.calls.map(([action]) => action)).toEqual([
+      "contract", "messages", "account", "properties", "payment", "reports",
     ]);
     process.env.EXPO_PUBLIC_HOME_REVIEW_SCENARIO = "none";
     act(() => { renderer.update(<HomeScreen onNavigate={onNavigate} sessionKey="renter-b" />); });

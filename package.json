@@ -11,7 +11,8 @@
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "test": "jest --runInBand",
-    "test:coverage": "jest --runInBand --coverage"
+    "test:coverage": "jest --runInBand --coverage",
+    "test:web": "expo export --platform web && playwright test"
   },
   "dependencies": {
     "@ant-design/icons-react-native": "^2.3.2",
@@ -35,6 +36,7 @@
     "react-native-web": "^0.20.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/jest": "^29.5.14",
     "@types/react": "~19.0.10",
     "@types/react-test-renderer": "^19.0.0",

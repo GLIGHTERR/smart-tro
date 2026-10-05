@@ -40,3 +40,8 @@ export function sortActiveContracts(contracts: readonly ActiveContract[]) {
 export function actionsFor(contracts: readonly ActiveContract[]) {
   return contracts.length ? [...homeActions, { id: "reports" as const, label: "Báo cáo", icon: "alert" as const }] : [...homeActions];
 }
+
+export function carouselIndex(offset: number, pageWidth: number, itemCount: number) {
+  if (pageWidth <= 0 || itemCount <= 0) return 0;
+  return Math.min(itemCount - 1, Math.max(0, Math.round(offset / pageWidth)));
+}

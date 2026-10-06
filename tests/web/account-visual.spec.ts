@@ -16,6 +16,15 @@ test("the Home account action opens UC-04 instead of a placeholder", async ({ pa
   await expect(page).toHaveURL(/\/account$/);
   await expect(page.getByRole("tab", { name: "Cá nhân" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Chữ ký" })).toBeVisible();
+  await page.getByRole("button", { name: "Quay lại" }).click();
+  await expect(page).toHaveURL(/\/smart-tro\/\?home=single$/);
+});
+
+test("the Account back control falls back to Home for direct entry", async ({ page }) => {
+  await openAccount(page, "one", { width: 375, height: 812 });
+  await page.getByRole("button", { name: "Quay lại" }).click();
+  await expect(page).toHaveURL(/\/smart-tro\/$/);
+  await expect(page.getByText("Xin chào")).toBeVisible();
 });
 
 for (const scenario of scenarios) {

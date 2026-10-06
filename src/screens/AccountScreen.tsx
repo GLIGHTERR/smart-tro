@@ -1,10 +1,10 @@
 import { IconOutline } from "@ant-design/icons-react-native";
-import { useCallback, useEffect, useMemo, useState, type ComponentProps } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import { ActivityIndicator, FlatList, Image, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { colors, radius } from "@/theme/tokens";
-import { accountReviewScenario, maskEmail, maskPhone, sortActiveRentals, type AccountProfile, type ActiveRental } from "./accountModel";
+import { accountReviewScenario, isDisplayableEmail, maskEmail, maskPhone, sortActiveRentals, type AccountProfile, type ActiveRental } from "./accountModel";
 
 type AccountState = "loading" | "ready" | "error" | "session";
 type AccountPayload = { profile: AccountProfile; rentals: ActiveRental[] };
@@ -18,12 +18,18 @@ const reviewRentals: ActiveRental[] = [
 function mockPayload(): AccountPayload {
   const scenario = accountReviewScenario();
   const rentals = scenario === "zero" ? [] : scenario === "multiple" ? reviewRentals : [reviewRentals[0]!];
-  return { profile: { displayName: "Nguyễn Văn A", email: "nguyen.van.a.renter@example.com", phone: "0901234567", avatar: null }, rentals };
+  if (scenario === "email-invalid") return { profile: { displayName: "Nguyễn Văn A", email: "", phone: "0901234567", avatar: null }, rentals };
+  if (scenario === "long") return { profile: { displayName: "Nguyễn Văn A có tên hiển thị rất dài để kiểm tra nội dung không bị tràn", email: "nguyen.van.a.renter@example.com", phone: "0901234567", avatar: null }, rentals: [{ ...reviewRentals[0]!, property: "Nhà trọ có tên dài để kiểm tra xuống dòng an toàn ở các kích thước màn hình hỗ trợ" }] };
+  return { profile: { displayName: "Nguyễn Văn A", email: "nguyen.van.a.renter@example.com", phone: scenario === "phone-empty" ? null : "0901234567", avatar: null }, rentals };
 }
 
-export function AccountScreen({ sessionKey, onBack, onEditProfile, onChangePassword, onSignOut }: { sessionKey: string; onBack: () => void; onEditProfile: () => void; onChangePassword: () => void; onSignOut: () => void }) {
+export function AccountScreen({ sessionKey, onBack, onEditProfile, onChangePassword, onSignOut }: { sessionKey: string; onBack: () => void; onEditProfile: () => void; onChangePassword: () => void; onSignOut: () => void | Promise<void> }) {
   const [state, setState] = useState<AccountState>("loading");
   const [payload, setPayload] = useState<AccountPayload | null>(null);
+  const [tab, setTab] = useState<"personal" | "signature">("personal");
+  const [isConfirmingSignOut, setIsConfirmingSignOut] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const signOutStarted = useRef(false);
   const scenario = accountReviewScenario();
   const load = useCallback(() => {
     setPayload(null);
@@ -32,7 +38,9 @@ export function AccountScreen({ sessionKey, onBack, onEditProfile, onChangePassw
     setTimeout(() => {
       if (scenario === "error" || scenario === "timeout") return setState("error");
       if (scenario === "session") return setState("session");
-      setPayload(mockPayload());
+      const nextPayload = mockPayload();
+      if (!isDisplayableEmail(nextPayload.profile.email)) return setState("error");
+      setPayload(nextPayload);
       setState("ready");
     }, 220);
   }, [scenario]);
@@ -41,19 +49,24 @@ export function AccountScreen({ sessionKey, onBack, onEditProfile, onChangePassw
   const rentals = useMemo(() => sortActiveRentals(payload?.rentals ?? []), [payload]);
   const { width } = useWindowDimensions();
 
+  const confirmSignOut = () => {
+    if (signOutStarted.current) return;
+    signOutStarted.current = true;
+    setIsSigningOut(true);
+    void Promise.resolve(onSignOut()).finally(() => { signOutStarted.current = false; setIsSigningOut(false); });
+  };
+
   return <SafeAreaView edges={["top", "left", "right"]} style={styles.safe}><ScrollView contentContainerStyle={styles.content}>
     <View style={styles.header}><HeaderButton accessibilityLabel="Quay lại" icon="left" onPress={onBack} /><Text accessibilityRole="header" style={styles.title}>Tài khoản</Text><HeaderButton accessibilityLabel="Chỉnh sửa thông tin cá nhân" icon="edit" onPress={onEditProfile} /></View>
-    <View accessibilityRole="tablist" style={styles.tabs}><Text accessibilityRole="tab" accessibilityState={{ selected: true }} style={styles.activeTab}>Cá nhân</Text><Text accessibilityRole="tab" accessibilityState={{ selected: false }} style={styles.tab}>Chữ ký</Text></View>
-    {state === "loading" ? <LoadingCard /> : null}
-    {state === "error" ? <ErrorState timeout={scenario === "timeout"} onRetry={load} /> : null}
-    {state === "session" ? <SessionState onSignOut={onSignOut} /> : null}
-    {state === "ready" && payload ? <><ProfileCard profile={payload.profile} />{rentals.length ? <RentalRegion rentals={rentals} width={width} /> : null}<View style={styles.actions}><Action label="Đổi mật khẩu" icon="lock" onPress={onChangePassword} /><Action label="Đăng xuất" icon="logout" onPress={onSignOut} danger /></View></> : null}
-  </ScrollView></SafeAreaView>;
+    <View accessibilityRole="tablist" style={styles.tabs}><Tab label="Cá nhân" selected={tab === "personal"} onPress={() => setTab("personal")} /><Tab label="Chữ ký" selected={tab === "signature"} onPress={() => setTab("signature")} /></View>
+    {tab === "signature" ? <SignaturePlaceholder /> : <>{state === "loading" ? <LoadingCard /> : null}{state === "error" ? <ErrorState timeout={scenario === "timeout"} onRetry={load} /> : null}{state === "session" ? <SessionState onSignOut={onSignOut} /> : null}{state === "ready" && payload ? <><ProfileCard profile={payload.profile} />{rentals.length ? <RentalRegion rentals={rentals} width={width} /> : null}<View style={styles.actions}><Action label="Đổi mật khẩu" icon="lock" onPress={onChangePassword} /><Action label="Đăng xuất" icon="logout" onPress={() => setIsConfirmingSignOut(true)} danger /></View></> : null}</>}
+  </ScrollView>{isConfirmingSignOut ? <SignOutDialog busy={isSigningOut} onCancel={() => !isSigningOut && setIsConfirmingSignOut(false)} onConfirm={confirmSignOut} /> : null}</SafeAreaView>;
 }
 
 function ProfileCard({ profile }: { profile: AccountProfile }) {
   const [avatarFailed, setAvatarFailed] = useState(!profile.avatar?.trim());
-  return <View style={styles.profileCard}><Avatar source={avatarFailed ? null : profile.avatar} onError={() => setAvatarFailed(true)} /><View style={styles.profileText}><Text style={styles.name}>{profile.displayName}</Text><Text accessibilityLabel={`Số điện thoại ${maskPhone(profile.phone)}`} style={styles.contact}>{maskPhone(profile.phone)}</Text><Text accessibilityLabel={`Email ${maskEmail(profile.email)}`} style={styles.contact}>{maskEmail(profile.email)}</Text></View></View>;
+  const phone = profile.phone ? maskPhone(profile.phone) : null;
+  return <View style={styles.profileCard}><Avatar source={avatarFailed ? null : profile.avatar} onError={() => setAvatarFailed(true)} /><View style={styles.profileText}><Text numberOfLines={2} style={styles.name}>{profile.displayName}</Text><Text accessibilityLabel={phone ? `Số điện thoại kết thúc bằng ${profile.phone!.slice(-3)}` : "Số điện thoại chưa cập nhật"} numberOfLines={2} style={styles.contact}>{phone ?? "Chưa cập nhật"}</Text><Text accessibilityLabel={`Email ${maskEmail(profile.email!)}`} ellipsizeMode="middle" numberOfLines={2} style={styles.contact}>{maskEmail(profile.email!)}</Text></View></View>;
 }
 
 function Avatar({ source, onError }: { source: string | null; onError: () => void }) {
@@ -69,13 +82,16 @@ function RentalRegion({ rentals, width }: { rentals: ActiveRental[]; width: numb
 }
 
 function RentalCard({ rental }: { rental: ActiveRental }) { return <View style={styles.rentalCard}><RentalValue label="Phòng" value={rental.room} /><RentalValue label="Nhà trọ" value={rental.property} /><RentalValue label="Hết hạn" value={new Date(`${rental.expiresAt}T00:00:00`).toLocaleDateString("vi-VN")} /></View>; }
-function RentalValue({ label, value }: { label: string; value: string }) { return <View style={styles.rentalRow}><Text style={styles.rentalLabel}>{label}</Text><Text style={styles.rentalValue}>{value}</Text></View>; }
+function RentalValue({ label, value }: { label: string; value: string }) { return <View style={styles.rentalRow}><Text style={styles.rentalLabel}>{label}</Text><Text numberOfLines={2} style={styles.rentalValue}>{value}</Text></View>; }
 function LoadingCard() { return <View accessibilityLabel="Đang tải thông tin tài khoản" style={styles.stateCard}><ActivityIndicator color={colors.action} /><Text style={styles.stateText}>Đang tải thông tin tài khoản</Text></View>; }
 function ErrorState({ timeout, onRetry }: { timeout: boolean; onRetry: () => void }) { return <View accessibilityRole="alert" style={styles.stateCard}><Text style={styles.stateText}>{timeout ? "Kết nối mất nhiều thời gian hơn dự kiến." : "Chưa thể tải thông tin tài khoản."}</Text><Pressable accessibilityRole="button" onPress={onRetry} style={styles.retry}><Text style={styles.retryText}>Thử lại</Text></Pressable></View>; }
 function SessionState({ onSignOut }: { onSignOut: () => void }) { return <View accessibilityRole="alert" style={styles.stateCard}><Text style={styles.stateText}>Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.</Text><Pressable accessibilityRole="button" onPress={onSignOut} style={styles.retry}><Text style={styles.retryText}>Đăng nhập lại</Text></Pressable></View>; }
+function Tab({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) { return <Pressable accessibilityRole="tab" accessibilityState={{ selected }} onPress={onPress} style={({ pressed }) => [styles.tabButton, selected && styles.tabSelected, pressed && styles.tabPressed]}><Text style={selected ? styles.activeTab : styles.tab}>{label}</Text></Pressable>; }
+function SignaturePlaceholder() { return <View accessibilityRole="alert" style={styles.stateCard}><Text style={styles.stateText}>UC-32/UC-33 — Xem chữ ký điện tử.</Text></View>; }
+function SignOutDialog({ busy, onCancel, onConfirm }: { busy: boolean; onCancel: () => void; onConfirm: () => void }) { return <View accessibilityLabel="Xác nhận đăng xuất" accessibilityRole="alert" accessibilityViewIsModal style={styles.dialogBackdrop}><View style={styles.dialog}><Text style={styles.dialogTitle}>Đăng xuất?</Text><Text style={styles.stateText}>Bạn có chắc chắn muốn đăng xuất khỏi tài khoản này?</Text><View style={styles.dialogActions}><Pressable accessibilityRole="button" disabled={busy} onPress={onCancel} style={styles.cancel}><Text style={styles.cancelText}>Hủy</Text></Pressable><Pressable accessibilityRole="button" accessibilityState={{ disabled: busy }} disabled={busy} onPress={onConfirm} style={styles.confirm}><Text style={styles.confirmText}>Đăng xuất</Text></Pressable></View></View></View>; }
 function HeaderButton({ accessibilityLabel, icon, onPress }: { accessibilityLabel: string; icon: ComponentProps<typeof IconOutline>["name"]; onPress: () => void }) { return <Pressable accessibilityRole="button" accessibilityLabel={accessibilityLabel} onPress={onPress} style={({ pressed }) => [styles.headerButton, pressed && styles.headerButtonPressed]}><IconOutline accessible={false} importantForAccessibility="no" color="#A84300" name={icon} size={24} /></Pressable>; }
 function Action({ label, icon, onPress, danger = false }: { label: string; icon: ComponentProps<typeof IconOutline>["name"]; onPress: () => void; danger?: boolean }) { return <Pressable accessibilityRole="button" onPress={onPress} style={styles.action}><IconOutline accessible={false} importantForAccessibility="no" color={danger ? "#B33A3A" : "#A84300"} name={icon} size={21} /><Text style={[styles.actionText, danger && styles.danger]}>{label}</Text></Pressable>; }
 
 const styles = StyleSheet.create({
-  safe: { backgroundColor: "#FFF2DB", flex: 1 }, content: { flexGrow: 1, paddingBottom: 40 }, header: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 16, paddingTop: 16 }, headerButton: { alignItems: "center", borderRadius: 24, height: 48, justifyContent: "center", width: 48 }, headerButtonPressed: { backgroundColor: "#F3DEC0", opacity: 0.75 }, title: { color: "#2E2E2E", fontFamily: "BeVietnamPro_600SemiBold", fontSize: 28 }, tabs: { borderBottomColor: "#E6CDA8", borderBottomWidth: 1, flexDirection: "row", gap: 28, marginHorizontal: 24, marginTop: 22 }, tab: { color: "#856D51", fontFamily: "BeVietnamPro_400Regular", fontSize: 16, paddingBottom: 12 }, activeTab: { borderBottomColor: "#A84300", borderBottomWidth: 3, color: "#A84300", fontFamily: "BeVietnamPro_600SemiBold", fontSize: 16, paddingBottom: 9 }, profileCard: { alignItems: "center", backgroundColor: "#FFFFFF", borderRadius: radius.md, flexDirection: "row", marginHorizontal: 24, marginTop: 24, padding: 20 }, avatar: { alignItems: "center", backgroundColor: "#FFFFFF", borderColor: "#F0DDBF", borderRadius: 42, borderWidth: 1, height: 84, justifyContent: "center", overflow: "hidden", width: 84 }, profileText: { flex: 1, marginLeft: 16 }, name: { color: "#2E2E2E", fontFamily: "BeVietnamPro_600SemiBold", fontSize: 18 }, contact: { color: "#675440", fontFamily: "BeVietnamPro_400Regular", fontSize: 14, marginTop: 7 }, rentals: { marginTop: 26 }, sectionTitle: { color: "#2E2E2E", fontFamily: "BeVietnamPro_600SemiBold", fontSize: 18, marginBottom: 12, marginHorizontal: 24 }, rentalCard: { backgroundColor: "#FFFFFF", borderRadius: radius.md, marginHorizontal: 24, minHeight: 142, padding: 18 }, rentalRow: { flexDirection: "row", justifyContent: "space-between", marginVertical: 5 }, rentalLabel: { color: "#806C57", fontFamily: "BeVietnamPro_400Regular", fontSize: 14 }, rentalValue: { color: "#2E2E2E", flexShrink: 1, fontFamily: "BeVietnamPro_600SemiBold", fontSize: 14, textAlign: "right" }, indicator: { color: "#806C57", fontFamily: "BeVietnamPro_400Regular", fontSize: 13, marginTop: 10, textAlign: "center" }, actions: { backgroundColor: "#FFFFFF", borderRadius: radius.md, marginHorizontal: 24, marginTop: 26 }, action: { alignItems: "center", flexDirection: "row", gap: 12, minHeight: 52, paddingHorizontal: 18 }, actionText: { color: "#2E2E2E", fontFamily: "BeVietnamPro_600SemiBold", fontSize: 15 }, danger: { color: "#B33A3A" }, stateCard: { alignItems: "center", backgroundColor: "#FFFFFF", borderRadius: radius.md, gap: 14, margin: 24, padding: 28 }, stateText: { color: "#675440", fontFamily: "BeVietnamPro_400Regular", fontSize: 15, lineHeight: 23, textAlign: "center" }, retry: { backgroundColor: "#A84300", borderRadius: 8, paddingHorizontal: 18, paddingVertical: 10 }, retryText: { color: "#FFFFFF", fontFamily: "BeVietnamPro_600SemiBold" },
+  safe: { backgroundColor: "#FFF2DB", flex: 1 }, content: { flexGrow: 1, paddingBottom: 40 }, header: { alignItems: "center", flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 16, paddingTop: 16 }, headerButton: { alignItems: "center", borderRadius: 24, height: 48, justifyContent: "center", width: 48 }, headerButtonPressed: { backgroundColor: "#F3DEC0", opacity: 0.75 }, title: { color: "#2E2E2E", fontFamily: "BeVietnamPro_600SemiBold", fontSize: 28 }, tabs: { borderBottomColor: "#E6CDA8", borderBottomWidth: 1, flexDirection: "row", gap: 28, marginHorizontal: 24, marginTop: 22 }, tabButton: { paddingBottom: 9 }, tabPressed: { opacity: 0.68 }, tabSelected: { borderBottomColor: "#A84300", borderBottomWidth: 3 }, tab: { color: "#856D51", fontFamily: "BeVietnamPro_400Regular", fontSize: 16 }, activeTab: { color: "#A84300", fontFamily: "BeVietnamPro_600SemiBold", fontSize: 16 }, profileCard: { alignItems: "center", backgroundColor: "#FFFFFF", borderRadius: radius.md, flexDirection: "row", marginHorizontal: 24, marginTop: 24, padding: 20 }, avatar: { alignItems: "center", backgroundColor: "#FFFFFF", borderColor: "#F0DDBF", borderRadius: 42, borderWidth: 1, height: 84, justifyContent: "center", overflow: "hidden", width: 84 }, profileText: { flex: 1, marginLeft: 16, minWidth: 0 }, name: { color: "#2E2E2E", fontFamily: "BeVietnamPro_600SemiBold", fontSize: 18, lineHeight: 25 }, contact: { color: "#675440", fontFamily: "BeVietnamPro_400Regular", flexShrink: 1, fontSize: 14, lineHeight: 20, marginTop: 7 }, rentals: { marginTop: 26 }, sectionTitle: { color: "#2E2E2E", fontFamily: "BeVietnamPro_600SemiBold", fontSize: 18, marginBottom: 12, marginHorizontal: 24 }, rentalCard: { backgroundColor: "#FFFFFF", borderRadius: radius.md, marginHorizontal: 24, minHeight: 142, padding: 18 }, rentalRow: { alignItems: "flex-start", flexDirection: "row", justifyContent: "space-between", marginVertical: 5 }, rentalLabel: { color: "#806C57", flexShrink: 0, fontFamily: "BeVietnamPro_400Regular", fontSize: 14, marginRight: 12 }, rentalValue: { color: "#2E2E2E", flexShrink: 1, fontFamily: "BeVietnamPro_600SemiBold", fontSize: 14, textAlign: "right" }, indicator: { color: "#806C57", fontFamily: "BeVietnamPro_400Regular", fontSize: 13, marginTop: 10, textAlign: "center" }, actions: { backgroundColor: "#FFFFFF", borderRadius: radius.md, marginHorizontal: 24, marginTop: 26 }, action: { alignItems: "center", flexDirection: "row", gap: 12, minHeight: 52, paddingHorizontal: 18 }, actionText: { color: "#2E2E2E", fontFamily: "BeVietnamPro_600SemiBold", fontSize: 15 }, danger: { color: "#B33A3A" }, stateCard: { alignItems: "center", backgroundColor: "#FFFFFF", borderRadius: radius.md, gap: 14, margin: 24, padding: 28 }, stateText: { color: "#675440", fontFamily: "BeVietnamPro_400Regular", fontSize: 15, lineHeight: 23, textAlign: "center" }, retry: { backgroundColor: "#A84300", borderRadius: 8, paddingHorizontal: 18, paddingVertical: 10 }, retryText: { color: "#FFFFFF", fontFamily: "BeVietnamPro_600SemiBold" }, dialogBackdrop: { alignItems: "center", backgroundColor: "rgba(46, 46, 46, 0.35)", bottom: 0, justifyContent: "center", left: 0, padding: 24, position: "absolute", right: 0, top: 0, zIndex: 1 }, dialog: { backgroundColor: "#FFFFFF", borderRadius: radius.md, elevation: 8, gap: 14, maxWidth: 460, padding: 24, shadowColor: "#000000", shadowOpacity: 0.2, shadowRadius: 8, width: "100%" }, dialogTitle: { color: "#2E2E2E", fontFamily: "BeVietnamPro_600SemiBold", fontSize: 20 }, dialogActions: { flexDirection: "row", gap: 12, justifyContent: "flex-end" }, cancel: { borderColor: "#A84300", borderRadius: 8, borderWidth: 1, paddingHorizontal: 16, paddingVertical: 10 }, cancelText: { color: "#A84300", fontFamily: "BeVietnamPro_600SemiBold" }, confirm: { backgroundColor: "#B33A3A", borderRadius: 8, paddingHorizontal: 16, paddingVertical: 10 }, confirmText: { color: "#FFFFFF", fontFamily: "BeVietnamPro_600SemiBold" },
 });

@@ -1,4 +1,4 @@
-import { accountReviewScenario, maskEmail, maskPhone, sortActiveRentals } from "../accountModel";
+import { accountReviewScenario, isDisplayableEmail, maskEmail, maskPhone, sortActiveRentals } from "../accountModel";
 
 describe("account model", () => {
   it("masks each approved email local-part length without changing its domain", () => {
@@ -10,9 +10,18 @@ describe("account model", () => {
   });
 
   it("shows only the last three phone digits", () => {
-    expect(maskPhone("0901 234 567")).toBe("******567");
-    expect(maskPhone("12")).toBe("******12");
-    expect(maskPhone("abc")).toBe("");
+    expect(maskPhone("0901234567")).toBe("•••••••567");
+    expect(maskPhone("0901234567")?.match(/•/g)).toHaveLength(7);
+    expect(maskPhone("0901 234 567")).toBeNull();
+    expect(maskPhone("12")).toBeNull();
+    expect(maskPhone("abc")).toBeNull();
+  });
+
+  it("requires a non-empty valid email before rendering approved PII", () => {
+    expect(isDisplayableEmail("mai@example.com")).toBe(true);
+    expect(isDisplayableEmail("")).toBe(false);
+    expect(isDisplayableEmail(null)).toBe(false);
+    expect(isDisplayableEmail("not-an-email")).toBe(false);
   });
 
   it("sorts active rentals by signedAt then contractId, never expiry", () => {

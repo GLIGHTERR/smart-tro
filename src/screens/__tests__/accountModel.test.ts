@@ -25,6 +25,7 @@ describe("account model", () => {
 
   it("reads only approved review scenarios", () => {
     const priorEnabled = process.env.EXPO_PUBLIC_ACCOUNT_REVIEW;
+    const priorHomeEnabled = process.env.EXPO_PUBLIC_HOME_REVIEW;
     const priorScenario = process.env.EXPO_PUBLIC_ACCOUNT_REVIEW_SCENARIO;
     const priorLocation = globalThis.location;
     process.env.EXPO_PUBLIC_ACCOUNT_REVIEW = "false";
@@ -32,6 +33,9 @@ describe("account model", () => {
     expect(accountReviewScenario()).toBe("zero");
     process.env.EXPO_PUBLIC_ACCOUNT_REVIEW = "true";
     Object.defineProperty(globalThis, "location", { configurable: true, value: { search: "?account=multiple" } });
+    expect(accountReviewScenario()).toBe("multiple");
+    process.env.EXPO_PUBLIC_ACCOUNT_REVIEW = "false";
+    process.env.EXPO_PUBLIC_HOME_REVIEW = "true";
     expect(accountReviewScenario()).toBe("multiple");
     Object.defineProperty(globalThis, "location", { configurable: true, value: { search: "?account=unknown" } });
     expect(accountReviewScenario()).toBe("one");
@@ -41,6 +45,7 @@ describe("account model", () => {
     expect(accountReviewScenario()).toBeUndefined();
     Object.defineProperty(globalThis, "location", { configurable: true, value: priorLocation });
     process.env.EXPO_PUBLIC_ACCOUNT_REVIEW = priorEnabled;
+    process.env.EXPO_PUBLIC_HOME_REVIEW = priorHomeEnabled;
     process.env.EXPO_PUBLIC_ACCOUNT_REVIEW_SCENARIO = priorScenario;
   });
 });

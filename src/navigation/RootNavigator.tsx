@@ -23,9 +23,9 @@ const linking = {
 
 function AuthenticatedHome({ navigation }: { navigation: { navigate: (screen: "Account") => void } & { navigate: (screen: "Destination", params: { action: Exclude<HomeAction, "account"> }) => void } }) { const { token } = useAuth(); return <HomeScreen sessionKey={token ?? ""} onNavigate={(action) => action === "account" ? navigation.navigate("Account") : navigation.navigate("Destination", { action })} />; }
 
-function AuthenticatedAccount({ navigation }: { navigation: { navigate: (screen: "Destination", params: { action: "edit-profile" | "change-password" }) => void } }) {
+function AuthenticatedAccount({ navigation }: { navigation: { canGoBack: () => boolean; goBack: () => void; navigate: (screen: "Destination", params: { action: "edit-profile" | "change-password" }) => void; reset: (state: { index: number; routes: { name: "Home" }[] }) => void } }) {
   const { token, signOut } = useAuth();
-  return <AccountScreen sessionKey={token ?? ""} onChangePassword={() => navigation.navigate("Destination", { action: "change-password" })} onEditProfile={() => navigation.navigate("Destination", { action: "edit-profile" })} onSignOut={() => { void signOut(); }} />;
+  return <AccountScreen sessionKey={token ?? ""} onBack={() => navigation.canGoBack() ? navigation.goBack() : navigation.reset({ index: 0, routes: [{ name: "Home" }] })} onChangePassword={() => navigation.navigate("Destination", { action: "change-password" })} onEditProfile={() => navigation.navigate("Destination", { action: "edit-profile" })} onSignOut={() => { void signOut(); }} />;
 }
 
 function DestinationScreen({ navigation, route }: { navigation: { goBack: () => void }; route: { params: RootStackParamList["Destination"] } }) {

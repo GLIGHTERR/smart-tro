@@ -1,10 +1,11 @@
-export type AccountProfile = { displayName: string; email: string; phone: string; avatar: string | null };
+export type AccountProfile = { displayName: string; email: string | null; phone: string | null; avatar: string | null };
 export type ActiveRental = { contractId: string; room: string; property: string; expiresAt: string; signedAt: string };
 
 export function maskPhone(phone: string) {
-  const tail = phone.replace(/\D/g, "").slice(-3);
-  return tail ? `******${tail}` : "";
+  return /^\d{10}$/.test(phone) ? `•••••••${phone.slice(-3)}` : null;
 }
+
+export function isDisplayableEmail(email: string | null) { return typeof email === "string" && email.trim().length > 0 && /^[^@\s]+@[^@\s]+$/.test(email); }
 
 export function maskEmail(email: string) {
   const at = email.lastIndexOf("@");
@@ -24,5 +25,5 @@ export function accountReviewScenario() {
   if (process.env.EXPO_PUBLIC_ACCOUNT_REVIEW !== "true" && process.env.EXPO_PUBLIC_HOME_REVIEW !== "true") return process.env.EXPO_PUBLIC_ACCOUNT_REVIEW_SCENARIO;
   if (typeof globalThis.location === "undefined") return undefined;
   const scenario = new URLSearchParams(globalThis.location.search).get("account");
-  return ["zero", "one", "multiple", "loading", "error", "timeout", "session"].includes(scenario ?? "") ? scenario : "one";
+  return ["zero", "one", "multiple", "loading", "error", "timeout", "session", "long", "phone-empty", "email-invalid"].includes(scenario ?? "") ? scenario : "one";
 }

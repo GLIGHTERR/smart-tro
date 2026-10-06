@@ -25,7 +25,7 @@ function AuthenticatedHome({ navigation }: { navigation: { navigate: (screen: "A
 
 function AuthenticatedAccount({ navigation }: { navigation: { canGoBack: () => boolean; goBack: () => void; navigate: (screen: "Destination", params: { action: "edit-profile" | "change-password" }) => void; reset: (state: { index: number; routes: { name: "Home" }[] }) => void } }) {
   const { token, signOut } = useAuth();
-  return <AccountScreen sessionKey={token ?? ""} onBack={() => navigation.canGoBack() ? navigation.goBack() : navigation.reset({ index: 0, routes: [{ name: "Home" }] })} onChangePassword={() => navigation.navigate("Destination", { action: "change-password" })} onEditProfile={() => navigation.navigate("Destination", { action: "edit-profile" })} onSignOut={() => { void signOut(); }} />;
+  return <AccountScreen sessionKey={token ?? ""} onBack={() => navigation.canGoBack() ? navigation.goBack() : navigation.reset({ index: 0, routes: [{ name: "Home" }] })} onChangePassword={() => navigation.navigate("Destination", { action: "change-password" })} onEditProfile={() => navigation.navigate("Destination", { action: "edit-profile" })} onSignOut={signOut} />;
 }
 
 function DestinationScreen({ navigation, route }: { navigation: { goBack: () => void }; route: { params: RootStackParamList["Destination"] } }) {

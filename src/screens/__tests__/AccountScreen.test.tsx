@@ -29,7 +29,7 @@ describe("AccountScreen", () => {
     const edit = renderer.root.findAllByType(Pressable).find((node) => node.props.accessibilityLabel === "Chỉnh sửa thông tin cá nhân");
     act(() => back!.props.onPress());
     act(() => edit!.props.onPress());
-    expect(onBack).toHaveBeenCalledTimes(1); expect(onEditProfile).toHaveBeenCalledTimes(1); expect(onChangePassword).toHaveBeenCalledTimes(1); expect(onSignOut).toHaveBeenCalledTimes(1);
+    expect(onBack).toHaveBeenCalledTimes(1); expect(onEditProfile).toHaveBeenCalledTimes(1); expect(onChangePassword).toHaveBeenCalledTimes(1); expect(onSignOut).not.toHaveBeenCalled();
     act(() => renderer.unmount());
   });
 
@@ -64,6 +64,62 @@ describe("AccountScreen", () => {
     act(() => { renderer = TestRenderer.create(<AccountScreen onBack={jest.fn()} onChangePassword={jest.fn()} onEditProfile={jest.fn()} onSignOut={jest.fn()} sessionKey="renter-b" />); });
     act(() => { jest.advanceTimersByTime(220); });
     expect(text(renderer.root)).toContain("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."); expect(text(renderer.root)).not.toContain("Nguyễn Văn A");
+    act(() => renderer.unmount());
+  });
+
+  it("switches tabs without rendering a Home action in the signature placeholder", () => {
+    process.env.EXPO_PUBLIC_ACCOUNT_REVIEW_SCENARIO = "one";
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<AccountScreen onBack={jest.fn()} onChangePassword={jest.fn()} onEditProfile={jest.fn()} onSignOut={jest.fn()} sessionKey="renter-a" />); });
+    act(() => { jest.advanceTimersByTime(220); });
+    press(renderer.root, "Chữ ký");
+    expect(text(renderer.root)).toContain("UC-32/UC-33 — Xem chữ ký điện tử.");
+    expect(text(renderer.root)).not.toContain("Quay lại trang chủ");
+    expect(renderer.root.findAllByType(Pressable).find((node) => text(node).includes("Cá nhân"))?.props.accessibilityState).toEqual({ selected: false });
+    expect(renderer.root.findAllByType(Pressable).find((node) => text(node).includes("Chữ ký"))?.props.accessibilityState).toEqual({ selected: true });
+    press(renderer.root, "Cá nhân");
+    expect(text(renderer.root)).toContain("Nguyễn Văn A");
+    act(() => renderer.unmount());
+  });
+
+  it("uses non-sensitive partial/error behavior for invalid email and a nullable phone label", () => {
+    process.env.EXPO_PUBLIC_ACCOUNT_REVIEW_SCENARIO = "email-invalid";
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<AccountScreen onBack={jest.fn()} onChangePassword={jest.fn()} onEditProfile={jest.fn()} onSignOut={jest.fn()} sessionKey="renter-a" />); });
+    act(() => { jest.advanceTimersByTime(220); });
+    expect(text(renderer.root)).toContain("Chưa thể tải thông tin tài khoản."); expect(text(renderer.root)).not.toContain("Nguyễn Văn A");
+    act(() => renderer.unmount());
+    process.env.EXPO_PUBLIC_ACCOUNT_REVIEW_SCENARIO = "phone-empty";
+    act(() => { renderer = TestRenderer.create(<AccountScreen onBack={jest.fn()} onChangePassword={jest.fn()} onEditProfile={jest.fn()} onSignOut={jest.fn()} sessionKey="renter-b" />); });
+    act(() => { jest.advanceTimersByTime(220); });
+    expect(renderer.root.findByProps({ accessibilityLabel: "Số điện thoại chưa cập nhật" })).toBeTruthy();
+    act(() => renderer.unmount());
+  });
+
+  it("wraps long profile and rental text to two lines", () => {
+    process.env.EXPO_PUBLIC_ACCOUNT_REVIEW_SCENARIO = "long";
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<AccountScreen onBack={jest.fn()} onChangePassword={jest.fn()} onEditProfile={jest.fn()} onSignOut={jest.fn()} sessionKey="renter-a" />); });
+    act(() => { jest.advanceTimersByTime(220); });
+    expect(renderer.root.findByProps({ children: "Nguyễn Văn A có tên hiển thị rất dài để kiểm tra nội dung không bị tràn" }).props.numberOfLines).toBe(2);
+    expect(renderer.root.findByProps({ children: "Nhà trọ có tên dài để kiểm tra xuống dòng an toàn ở các kích thước màn hình hỗ trợ" }).props.numberOfLines).toBe(2);
+    act(() => renderer.unmount());
+  });
+
+  it("cancels or confirms sign-out exactly once while the flow is pending", async () => {
+    process.env.EXPO_PUBLIC_ACCOUNT_REVIEW_SCENARIO = "one";
+    let resolveSignOut!: () => void;
+    const onSignOut = jest.fn(() => new Promise<void>((resolve) => { resolveSignOut = resolve; }));
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<AccountScreen onBack={jest.fn()} onChangePassword={jest.fn()} onEditProfile={jest.fn()} onSignOut={onSignOut} sessionKey="renter-a" />); });
+    act(() => { jest.advanceTimersByTime(220); });
+    press(renderer.root, "Đăng xuất"); expect(text(renderer.root)).toContain("Đăng xuất?");
+    press(renderer.root, "Hủy"); expect(text(renderer.root)).not.toContain("Đăng xuất?"); expect(onSignOut).not.toHaveBeenCalled();
+    press(renderer.root, "Đăng xuất");
+    const confirm = renderer.root.findAllByType(Pressable).find((node) => text(node).includes("Đăng xuất") && node.props.accessibilityState?.disabled === false);
+    act(() => { confirm!.props.onPress(); confirm!.props.onPress(); });
+    expect(onSignOut).toHaveBeenCalledTimes(1);
+    await act(async () => { resolveSignOut(); await Promise.resolve(); });
     act(() => renderer.unmount());
   });
 });

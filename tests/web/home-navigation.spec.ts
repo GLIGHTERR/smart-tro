@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 const actions = [
   ["Hợp đồng", "UC-07 — Hợp đồng điện tử của tôi", "contract"],
   ["Tin nhắn", "UC-15 — Tin nhắn", "messages"],
-  ["Tài khoản", "UC-04 — Tài khoản/Cá nhân", "account"],
+  ["Tài khoản", "Tài khoản", "account"],
   ["D.S.Trọ", "UC-10 — Danh sách phòng available", "properties"],
   ["T.Toán", "Thanh Toán", "payment"],
   ["Báo cáo", "UC-18 — Danh sách báo cáo sự cố", "reports"],
@@ -18,7 +18,15 @@ async function openHome(page: import("@playwright/test").Page, scenario: string,
 
 async function expectNavigation(page: import("@playwright/test").Page, action: readonly [string, string, string]) {
   const [label, destination, route] = action;
-  await page.getByRole("button", { name: `${label}: ${destination}` }).click();
+  const homeDestination = route === "account" ? "UC-04 — Tài khoản/Cá nhân" : destination;
+  await page.getByRole("button", { name: `${label}: ${homeDestination}` }).click();
+  if (route === "account") {
+    await expect(page).toHaveURL(/\/account$/);
+    await expect(page.getByRole("heading", { name: destination })).toBeVisible();
+    await page.goBack();
+    await expect(page).toHaveURL(/\/smart-tro\/(?:\?home=.*)?$/);
+    return;
+  }
   await expect(page).toHaveURL(new RegExp(`/destination/${route}$`));
   await expect(page.getByRole("heading", { name: destination })).toBeVisible();
   await page.getByRole("button", { name: "Quay lại Trang chủ" }).click();

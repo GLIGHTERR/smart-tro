@@ -7,30 +7,36 @@ import { useAuth } from "@/auth/AuthProvider";
 import { ScreenState } from "@/ui/components";
 import { AuthScreen } from "@/screens/AuthScreen";
 import { HomeScreen } from "@/screens/HomeScreen";
+import { AccountScreen } from "@/screens/AccountScreen";
 import { homeDestinations, type HomeAction } from "@/screens/homeModel";
 
-type RootStackParamList = { Auth: undefined; Home: undefined; Destination: { action: HomeAction } };
+type RootStackParamList = { Auth: undefined; Home: undefined; Account: undefined; Destination: { action: Exclude<HomeAction, "account"> | "edit-profile" | "change-password" } };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
-const isWebReview = process.env.EXPO_PUBLIC_HOME_REVIEW === "true";
+const isWebReview = process.env.EXPO_PUBLIC_HOME_REVIEW === "true" || process.env.EXPO_PUBLIC_ACCOUNT_REVIEW === "true";
 const linking = {
   prefixes: [],
-  config: { screens: { Home: "", Destination: "destination/:action" } },
+  config: { screens: { Home: "", Account: "account", Destination: "destination/:action" } },
   getPathFromState: (state: Parameters<typeof getPathFromState>[0], config: Parameters<typeof getPathFromState>[1]) => `/smart-tro${getPathFromState(state, config)}`,
   getStateFromPath: (path: string, config: Parameters<typeof getStateFromPath>[1]) => getStateFromPath(path.replace(/^\/?smart-tro\/?/, ""), config),
 };
 
-function AuthenticatedHome({ navigation }: { navigation: { navigate: (screen: "Destination", params: { action: HomeAction }) => void } }) { const { token } = useAuth(); return <HomeScreen sessionKey={token ?? ""} onNavigate={(action) => navigation.navigate("Destination", { action })} />; }
+function AuthenticatedHome({ navigation }: { navigation: { navigate: (screen: "Account") => void } & { navigate: (screen: "Destination", params: { action: Exclude<HomeAction, "account"> }) => void } }) { const { token } = useAuth(); return <HomeScreen sessionKey={token ?? ""} onNavigate={(action) => action === "account" ? navigation.navigate("Account") : navigation.navigate("Destination", { action })} />; }
 
-function DestinationScreen({ navigation, route }: { navigation: { goBack: () => void }; route: { params: { action: HomeAction } } }) {
-  const destination = homeDestinations[route.params.action];
+function AuthenticatedAccount({ navigation }: { navigation: { navigate: (screen: "Destination", params: { action: "edit-profile" | "change-password" }) => void } }) {
+  const { token, signOut } = useAuth();
+  return <AccountScreen sessionKey={token ?? ""} onChangePassword={() => navigation.navigate("Destination", { action: "change-password" })} onEditProfile={() => navigation.navigate("Destination", { action: "edit-profile" })} onSignOut={() => { void signOut(); }} />;
+}
+
+function DestinationScreen({ navigation, route }: { navigation: { goBack: () => void }; route: { params: RootStackParamList["Destination"] } }) {
+  const destination = route.params.action === "edit-profile" ? "UC-05 — Chỉnh sửa thông tin cá nhân" : route.params.action === "change-password" ? "UC-06 — Đổi mật khẩu" : homeDestinations[route.params.action];
   return <SafeAreaView style={styles.safe}><View style={styles.content}><Text accessibilityRole="header" style={styles.title}>{destination}</Text><Text style={styles.copy}>Bạn đã đến điểm điều hướng được chọn từ Trang chủ.</Text><Pressable accessibilityRole="button" accessibilityLabel="Quay lại Trang chủ" onPress={navigation.goBack} style={styles.back}><Text style={styles.backText}>Quay lại Trang chủ</Text></Pressable></View></SafeAreaView>;
 }
 
 export function RootNavigator() {
   const { token, isRestoring } = useAuth();
   if (isRestoring) return <ScreenState kind="loading" />;
-  return <NavigationContainer linking={linking}>{token || isWebReview ? <Stack.Navigator screenOptions={{ headerShown: false }}><Stack.Screen name="Home" component={AuthenticatedHome} /><Stack.Screen name="Destination" component={DestinationScreen} /></Stack.Navigator> : <Stack.Navigator screenOptions={{ headerShown: false }}><Stack.Screen name="Auth" component={AuthScreen} /></Stack.Navigator>}</NavigationContainer>;
+  return <NavigationContainer linking={linking}>{token || isWebReview ? <Stack.Navigator screenOptions={{ headerShown: false }}><Stack.Screen name="Home" component={AuthenticatedHome} /><Stack.Screen name="Account" component={AuthenticatedAccount} /><Stack.Screen name="Destination" component={DestinationScreen} /></Stack.Navigator> : <Stack.Navigator screenOptions={{ headerShown: false }}><Stack.Screen name="Auth" component={AuthScreen} /></Stack.Navigator>}</NavigationContainer>;
 }
 
 const styles = StyleSheet.create({

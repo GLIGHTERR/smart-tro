@@ -17,10 +17,10 @@ describe("email auth gateway", () => {
     const auth = gateway();
     await expect(auth.requestOtp("mai@example.com")).resolves.toEqual({ attemptId: "attempt-1", expiresAt: 301000, resendAvailableAt: 42000 });
     await auth.verifyOtp("mai@example.com", "attempt-1", "123456");
-    await auth.createAccount("mai@example.com", "attempt-1", "123456", "Strong!1");
+    await auth.createAccount("mai@example.com", "attempt-1", "123456", "Strong!1", "  Mai An  ");
     expect(fetchMock).toHaveBeenNthCalledWith(1, "https://api.example/auth/signup/otp/request", expect.objectContaining({ method: "POST", body: JSON.stringify({ email: "mai@example.com" }) }));
     expect(fetchMock).toHaveBeenNthCalledWith(2, "https://api.example/auth/signup/otp/verify", expect.objectContaining({ body: JSON.stringify({ email: "mai@example.com", attemptId: "attempt-1", code: "123456" }) }));
-    expect(fetchMock).toHaveBeenNthCalledWith(3, "https://api.example/auth/signup/complete", expect.objectContaining({ body: JSON.stringify({ email: "mai@example.com", attemptId: "attempt-1", code: "123456", password: "Strong!1" }) }));
+    expect(fetchMock).toHaveBeenNthCalledWith(3, "https://api.example/auth/signup/complete", expect.objectContaining({ body: JSON.stringify({ email: "mai@example.com", attemptId: "attempt-1", code: "123456", password: "Strong!1", displayName: "Mai An" }) }));
     expect((fetchMock.mock.calls[0]![1]?.headers as Record<string, string>)["X-Device-Id"]).toBe("device-1");
   });
 

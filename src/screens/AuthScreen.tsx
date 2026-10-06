@@ -6,11 +6,11 @@ import { useEffect, useMemo, useState } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getDeviceId } from "@/auth/device";
-import { createConfiguredAuthGateway, GatewayError, type GatewayErrorCode } from "@/auth/gateway";
+import { createConfiguredAuthGateway, GatewayError, type AuthGateway, type GatewayErrorCode } from "@/auth/gateway";
 import { createMockAuthGateway } from "@/auth/mockGateway";
 import { useAuth } from "@/auth/AuthProvider";
 import { FONT_STARTUP_TIMEOUT_MS, getFontStartupDiagnostic, getFontStartupState } from "@/startup/fontState";
-import { normalizeEmail, validateEmail, validatePassword } from "@/auth/validation";
+import { normalizeDisplayName, normalizeEmail, validateDisplayName, validateEmail, validatePassword } from "@/auth/validation";
 import { getRecoveryReviewStep } from "@/auth/recoveryReview";
 import { ForgotPasswordScreen } from "@/screens/ForgotPasswordScreen";
 
@@ -22,22 +22,22 @@ const showSocials = process.env.EXPO_PUBLIC_REVIEW_SOCIALS === "true";
 const showRecoveryReview = process.env.EXPO_PUBLIC_UC03_REVIEW === "true";
 const isDebugBuild = process.env.EXPO_PUBLIC_DEBUG_REVISION === "true";
 
-export function AuthScreen() {
+export function AuthScreen({ gateway: gatewayOverride }: { gateway?: AuthGateway } = {}) {
   const recoveryReviewStep = useMemo(getRecoveryReviewStep, []);
   const [fontsLoaded, fontError] = useFonts({ BeVietnamPro_400Regular, BeVietnamPro_600SemiBold });
   const [fontTimedOut, setFontTimedOut] = useState(false);
   const { signIn } = useAuth();
-  const { width, height } = useWindowDimensions(); const gateway = useMemo(() => process.env.EXPO_PUBLIC_AUTH_USE_MOCK === "true" ? createMockAuthGateway() : createConfiguredAuthGateway(getDeviceId), []);
-  const [screen, setScreen] = useState<Screen>(recoveryReviewStep ? "forgotPassword" : "signIn"); const [email, setEmail] = useState(""); const [otp, setOtp] = useState(""); const [password, setPassword] = useState(""); const [confirm, setConfirm] = useState(""); const [attemptId, setAttemptId] = useState(""); const [resendAt, setResendAt] = useState(0); const [seconds, setSeconds] = useState(0); const [error, setError] = useState(""); const [notice, setNotice] = useState(""); const [submitting, setSubmitting] = useState(false); const [showPassword, setShowPassword] = useState(false); const [showConfirm, setShowConfirm] = useState(false);
+  const { width, height } = useWindowDimensions(); const gateway = useMemo(() => gatewayOverride ?? (process.env.EXPO_PUBLIC_AUTH_USE_MOCK === "true" ? createMockAuthGateway() : createConfiguredAuthGateway(getDeviceId)), [gatewayOverride]);
+  const [screen, setScreen] = useState<Screen>(recoveryReviewStep ? "forgotPassword" : "signIn"); const [email, setEmail] = useState(""); const [otp, setOtp] = useState(""); const [displayName, setDisplayName] = useState(""); const [password, setPassword] = useState(""); const [confirm, setConfirm] = useState(""); const [attemptId, setAttemptId] = useState(""); const [resendAt, setResendAt] = useState(0); const [seconds, setSeconds] = useState(0); const [error, setError] = useState(""); const [notice, setNotice] = useState(""); const [submitting, setSubmitting] = useState(false); const [showPassword, setShowPassword] = useState(false); const [showConfirm, setShowConfirm] = useState(false);
   useEffect(() => { if (fontsLoaded || fontError) return; const timeout = setTimeout(() => setFontTimedOut(true), FONT_STARTUP_TIMEOUT_MS); return () => clearTimeout(timeout); }, [fontsLoaded, fontError]);
   useEffect(() => { const diagnostic = getFontStartupDiagnostic(fontError, fontTimedOut, isDebugBuild); if (diagnostic) console.warn(diagnostic); }, [fontError, fontTimedOut]);
   useEffect(() => { const update = () => setSeconds(Math.max(0, Math.ceil((resendAt - Date.now()) / 1000))); update(); const timer = setInterval(update, 1000); return () => clearInterval(timer); }, [resendAt]);
-  const clearSensitive = () => { setOtp(""); setPassword(""); setConfirm(""); setShowPassword(false); setShowConfirm(false); };
+  const clearSensitive = () => { setOtp(""); setDisplayName(""); setPassword(""); setConfirm(""); setShowPassword(false); setShowConfirm(false); };
   const go = (next: Screen) => { setError(""); setNotice(""); setScreen(next); };
   const sendOtp = async () => { const invalid = validateEmail(email); if (invalid) return setError(invalid); setSubmitting(true); try { const result = await gateway.requestOtp(normalizeEmail(email)); setEmail(normalizeEmail(email)); setAttemptId(result.attemptId); setResendAt(result.resendAvailableAt); go("signUpOtp"); } catch (cause) { setError(message(cause, "Không thể gửi mã.")); } finally { setSubmitting(false); } };
   const verify = async () => { if (!/^\d{6}$/.test(otp)) return setError("Nhập đủ 6 chữ số."); setSubmitting(true); try { await gateway.verifyOtp(email, attemptId, otp); go("signUpPassword"); } catch (cause) { setError(message(cause, "Không thể xác thực mã.")); } finally { setSubmitting(false); } };
   const resend = async () => { if (seconds || submitting) return; setSubmitting(true); try { const result = await gateway.resendOtp(email); setOtp(""); setAttemptId(result.attemptId); setResendAt(result.resendAvailableAt); } catch (cause) { setError(message(cause, "Không thể gửi lại mã.")); } finally { setSubmitting(false); } };
-  const register = async () => { const invalid = validatePassword(password); if (invalid) return setError(invalid); if (password !== confirm) return setError("Xác nhận mật khẩu chưa khớp."); setSubmitting(true); try { await gateway.createAccount(email, attemptId, otp, password); clearSensitive(); go("signIn"); setNotice("Đăng ký thành công. Hãy đăng nhập để tiếp tục."); } catch (cause) { setError(message(cause, "Không thể tạo tài khoản.")); } finally { setSubmitting(false); } };
+  const register = async () => { const invalidName = validateDisplayName(displayName); if (invalidName) return setError(invalidName); const invalid = validatePassword(password); if (invalid) return setError(invalid); if (password !== confirm) return setError("Xác nhận mật khẩu chưa khớp."); setSubmitting(true); try { await gateway.createAccount(email, attemptId, otp, password, normalizeDisplayName(displayName)); clearSensitive(); go("signIn"); setNotice("Đăng ký thành công. Hãy đăng nhập để tiếp tục."); } catch (cause) { setError(message(cause, "Không thể tạo tài khoản.")); } finally { setSubmitting(false); } };
   const login = async () => { const invalid = validateEmail(email); if (invalid) return setError(invalid); if (!password) return setError("Nhập mật khẩu để đăng nhập."); if (submitting) return; setSubmitting(true); try { const session = await gateway.signIn(normalizeEmail(email), password); await gateway.me(session.accessToken); await signIn(session); clearSensitive(); } catch (cause) { if (cause instanceof GatewayError && cause.code === "ACCOUNT_UNVERIFIED") { try { const result = await gateway.requestOtp(normalizeEmail(email)); clearSensitive(); setAttemptId(result.attemptId); setResendAt(result.resendAvailableAt); go("signUpOtp"); setError(message(cause, "")); } catch (requestCause) { setError(message(requestCause, "Không thể gửi mã.")); } } else setError(message(cause, "Không thể đăng nhập.")); } finally { setSubmitting(false); } };
   const signUp = screen === "signUpEmail" || screen === "signUpOtp" || screen === "signUpPassword"; const formWidth = width < 400 ? Math.min(290, width - 40) : Math.min(320, width - 96); const submit = screen === "signUpEmail" ? sendOtp : screen === "signUpOtp" ? verify : screen === "signUpPassword" ? register : login;
   const fontStartup = getFontStartupState(fontsLoaded, fontError, fontTimedOut);
@@ -47,7 +47,7 @@ export function AuthScreen() {
     {(screen === "signIn" || screen === "signUpEmail") && <Input label="Email" value={email} onChangeText={setEmail} type="email-address" />}
     {screen === "signIn" && <SecretInput label="Mật khẩu" value={password} onChangeText={setPassword} visible={showPassword} onToggle={() => setShowPassword(!showPassword)} />}
     {screen === "signUpOtp" && <><Text style={styles.helper}>Nhập mã 6 chữ số đã gửi tới {maskedEmail(email)}</Text><Input label="Mã OTP" value={otp} onChangeText={(value) => setOtp(value.replace(/\D/g, "").slice(0, 6))} type="numeric" /></>}
-    {screen === "signUpPassword" && <><Text style={styles.helper}>Tối thiểu 8 ký tự, gồm chữ hoa, số và ký tự đặc biệt.</Text><SecretInput label="Mật khẩu" value={password} onChangeText={setPassword} visible={showPassword} onToggle={() => setShowPassword(!showPassword)} /><SecretInput label="Nhập lại mật khẩu" value={confirm} onChangeText={setConfirm} visible={showConfirm} onToggle={() => setShowConfirm(!showConfirm)} /></>}
+    {screen === "signUpPassword" && <><Input label="Họ và tên" value={displayName} onChangeText={setDisplayName} /><Text style={styles.helper}>Tối thiểu 8 ký tự, gồm chữ hoa, số và ký tự đặc biệt.</Text><SecretInput label="Mật khẩu" value={password} onChangeText={setPassword} visible={showPassword} onToggle={() => setShowPassword(!showPassword)} /><SecretInput label="Nhập lại mật khẩu" value={confirm} onChangeText={setConfirm} visible={showConfirm} onToggle={() => setShowConfirm(!showConfirm)} /></>}
     {!!error && <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text>}{!!notice && <Text accessibilityLiveRegion="polite" style={styles.notice}>{notice}</Text>}
     {screen === "signUpOtp" && <Action label={seconds ? `Gửi lại mã OTP (${seconds}s)` : "Gửi lại mã OTP"} disabled={!!seconds || submitting} onPress={() => void resend()} />}
     <Action label={submitting ? "Đang xử lý..." : screen === "signUpEmail" ? "Gửi OTP" : screen === "signUpOtp" ? "Tiếp tục" : signUp ? "Đăng ký" : "Đăng nhập"} disabled={submitting || (screen === "signUpOtp" && otp.length !== 6)} onPress={() => void submit()} /><Text style={styles.or}>Hoặc</Text>

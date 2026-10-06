@@ -38,7 +38,7 @@ export interface AuthGateway {
   requestOtp(email: string): Promise<OtpAttempt>;
   resendOtp(email: string): Promise<OtpAttempt>;
   verifyOtp(email: string, attemptId: string, otp: string): Promise<void>;
-  createAccount(email: string, attemptId: string, otp: string, password: string): Promise<void>;
+  createAccount(email: string, attemptId: string, otp: string, password: string, displayName: string): Promise<void>;
   signIn(email: string, password: string): Promise<AuthSession>;
   refresh(refreshToken: string): Promise<AuthSession>;
   me(accessToken: string): Promise<void>;
@@ -191,7 +191,7 @@ export function createApiAuthGateway({
     requestOtp: otpRequest,
     resendOtp: otpRequest,
     verifyOtp: async (email, attemptId, code) => { await request("/auth/signup/otp/verify", { method: "POST", body: JSON.stringify({ email, attemptId, code }) }); },
-    createAccount: async (email, attemptId, code, password) => { await request("/auth/signup/complete", { method: "POST", body: JSON.stringify({ email, attemptId, code, password }) }); },
+    createAccount: async (email, attemptId, code, password, displayName) => { await request("/auth/signup/complete", { method: "POST", body: JSON.stringify({ email, attemptId, code, password, displayName: displayName.trim() }) }); },
     signIn: (email, password) => request<TokenResponse>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
     refresh: (refreshToken) => request<TokenResponse>("/auth/token/refresh", { method: "POST", body: JSON.stringify({ refreshToken }) }),
     me: async (accessToken) => { await request("/auth/me", { method: "GET" }, accessToken); },

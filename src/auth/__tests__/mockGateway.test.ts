@@ -10,7 +10,7 @@ describe("preview auth gateway", () => {
   it("creates, verifies, and signs in a new account without exposing OTP", async () => {
     const auth = gateway(); const attempt = await auth.requestOtp("mai@example.com");
     expect(attempt).toEqual({ attemptId: "preview-1", expiresAt: 601000, resendAvailableAt: 61000 });
-    await auth.verifyOtp("mai@example.com", attempt.attemptId, "123456"); await auth.createAccount("mai@example.com", attempt.attemptId, "123456", "Strong!1");
+    await auth.verifyOtp("mai@example.com", attempt.attemptId, "123456"); await auth.createAccount("mai@example.com", attempt.attemptId, "123456", "Strong!1", "Mai An");
     await expect(auth.signIn("mai@example.com", "Strong!1")).resolves.toEqual({ accessToken: "preview-access-token", refreshToken: "preview-refresh-token" });
   });
   it("rejects invalid credentials and routes unverified accounts distinctly", async () => {
@@ -41,7 +41,7 @@ describe("preview auth gateway", () => {
   it("does not overwrite an existing account", async () => {
     const auth = gateway(); const attempt = await auth.requestOtp("demo@smarttro.vn");
     await auth.verifyOtp("demo@smarttro.vn", attempt.attemptId, "123456");
-    await expectCode(auth.createAccount("demo@smarttro.vn", attempt.attemptId, "123456", "NewPass!1"), "ACCOUNT_EXISTS");
+    await expectCode(auth.createAccount("demo@smarttro.vn", attempt.attemptId, "123456", "NewPass!1", "Mai An"), "ACCOUNT_EXISTS");
   });
   it("keeps mock session methods available only for local previews", async () => {
     const auth = gateway();

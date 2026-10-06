@@ -1,4 +1,4 @@
-import { normalizeEmail, validateAuthForm, validateEmail, validatePassword } from "../validation";
+import { normalizeDisplayName, normalizeEmail, validateAuthForm, validateDisplayName, validateEmail, validatePassword } from "../validation";
 
 describe("validateAuthForm", () => {
   it("requires valid sign-in credentials", () => {
@@ -13,6 +13,15 @@ describe("validateAuthForm", () => {
 });
 
 describe("signup validation", () => {
+  it("requires a trimmed display name within the backend limit", () => {
+    expect(normalizeDisplayName("  Mai An  ")).toBe("Mai An");
+    expect(validateDisplayName(undefined)).toBeDefined();
+    expect(validateDisplayName(null)).toBeDefined();
+    expect(validateDisplayName("")).toBeDefined();
+    expect(validateDisplayName("   ")).toBeDefined();
+    expect(validateDisplayName("a".repeat(161))).toBeDefined();
+    expect(validateDisplayName("  Mai An  ")).toBeUndefined();
+  });
   it("normalizes email and rejects empty or malformed email", () => {
     expect(normalizeEmail(" Mai@Example.COM ")).toBe("mai@example.com");
     expect(validateEmail("bad")).toBeDefined();

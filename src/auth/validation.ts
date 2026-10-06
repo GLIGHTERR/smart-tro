@@ -13,6 +13,20 @@ export function validatePassword(password: string): string | undefined {
   return undefined;
 }
 
+export function normalizeDisplayName(displayName: string): string {
+  return displayName.trim();
+}
+
+export function validateDisplayName(displayName: unknown): string | undefined {
+  if (typeof displayName !== "string" || !normalizeDisplayName(displayName)) {
+    return "Nhập họ và tên.";
+  }
+  if (normalizeDisplayName(displayName).length > 160) {
+    return "Họ và tên không được vượt quá 160 ký tự.";
+  }
+  return undefined;
+}
+
 export function validateAuthForm(form: AuthForm, requiresName = false): Partial<Record<keyof AuthForm, string>> {
   const errors: Partial<Record<keyof AuthForm, string>> = {};
   if (requiresName && !form.name?.trim()) errors.name = "Please enter your name.";

@@ -11,8 +11,9 @@ function press(root: ReactTestInstance, label: string) { const button = root.fin
 
 describe("AccountScreen", () => {
   const priorScenario = process.env.EXPO_PUBLIC_ACCOUNT_REVIEW_SCENARIO;
-  beforeEach(() => jest.useFakeTimers());
-  afterEach(() => { jest.useRealTimers(); process.env.EXPO_PUBLIC_ACCOUNT_REVIEW_SCENARIO = priorScenario; });
+  const priorReview = process.env.EXPO_PUBLIC_ACCOUNT_REVIEW;
+  beforeEach(() => { jest.useFakeTimers(); process.env.EXPO_PUBLIC_ACCOUNT_REVIEW = "true"; });
+  afterEach(() => { jest.useRealTimers(); process.env.EXPO_PUBLIC_ACCOUNT_REVIEW_SCENARIO = priorScenario; process.env.EXPO_PUBLIC_ACCOUNT_REVIEW = priorReview; });
 
   it("renders loading without subject data, then the zero-contract ready state and account actions", () => {
     process.env.EXPO_PUBLIC_ACCOUNT_REVIEW_SCENARIO = "zero";

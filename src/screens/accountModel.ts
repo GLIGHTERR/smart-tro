@@ -21,9 +21,9 @@ export function sortActiveRentals(rentals: ActiveRental[]) {
 }
 
 export function accountReviewScenario() {
-  // CI already enables the shared Home review mode for browser fixtures.
-  if (process.env.EXPO_PUBLIC_ACCOUNT_REVIEW !== "true" && process.env.EXPO_PUBLIC_HOME_REVIEW !== "true") return process.env.EXPO_PUBLIC_ACCOUNT_REVIEW_SCENARIO;
-  if (typeof globalThis.location === "undefined") return undefined;
+  // Fixtures are available only on the explicitly enabled review surface.
+  if (process.env.EXPO_PUBLIC_ACCOUNT_REVIEW !== "true" && process.env.EXPO_PUBLIC_HOME_REVIEW !== "true") return undefined;
+  if (typeof globalThis.location === "undefined") return process.env.EXPO_PUBLIC_ACCOUNT_REVIEW_SCENARIO;
   const scenario = new URLSearchParams(globalThis.location.search).get("account");
   return ["zero", "one", "multiple", "loading", "error", "timeout", "session", "long", "phone-empty", "email-invalid"].includes(scenario ?? "") ? scenario : "one";
 }

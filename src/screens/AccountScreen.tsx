@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps 
 import { ActivityIndicator, FlatList, Image, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { createConfiguredProfileGateway, ProfileGatewayError, type ProfileGateway } from "@/profile/gateway";
 import { colors, radius } from "@/theme/tokens";
 import { accountReviewScenario, isDisplayableEmail, maskEmail, maskPhone, sortActiveRentals, type AccountProfile, type ActiveRental } from "./accountModel";
 
@@ -23,29 +24,54 @@ function mockPayload(): AccountPayload {
   return { profile: { displayName: "Nguyễn Văn A", email: "nguyen.van.a.renter@example.com", phone: scenario === "phone-empty" ? null : "0901234567", avatar: null }, rentals };
 }
 
-export function AccountScreen({ sessionKey, onBack, onEditProfile, onChangePassword, onSignOut }: { sessionKey: string; onBack: () => void; onEditProfile: () => void; onChangePassword: () => void; onSignOut: () => void | Promise<void> }) {
+export function AccountScreen({ sessionKey, onBack, onEditProfile, onChangePassword, onSignOut, gateway }: { sessionKey: string; onBack: () => void; onEditProfile: () => void; onChangePassword: () => void; onSignOut: () => void | Promise<void>; gateway?: ProfileGateway }) {
   const [state, setState] = useState<AccountState>("loading");
   const [payload, setPayload] = useState<AccountPayload | null>(null);
+  const [isTimeout, setIsTimeout] = useState(false);
   const [tab, setTab] = useState<"personal" | "signature">("personal");
   const [isConfirmingSignOut, setIsConfirmingSignOut] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const signOutStarted = useRef(false);
+  const requestId = useRef(0);
   const scenario = accountReviewScenario();
-  const load = useCallback(() => {
+  const profileGateway = useMemo(() => gateway ?? createConfiguredProfileGateway(), [gateway]);
+  const load = useCallback(async () => {
+    const id = ++requestId.current;
     setPayload(null);
+    setIsTimeout(false);
     setState("loading");
     if (scenario === "loading") return;
-    setTimeout(() => {
-      if (scenario === "error" || scenario === "timeout") return setState("error");
-      if (scenario === "session") return setState("session");
-      const nextPayload = mockPayload();
-      if (!isDisplayableEmail(nextPayload.profile.email)) return setState("error");
+    if (scenario) {
+      setTimeout(() => {
+        if (id !== requestId.current) return;
+        if (scenario === "error" || scenario === "timeout") return setState("error");
+        if (scenario === "session") return setState("session");
+        const nextPayload = mockPayload();
+        if (!isDisplayableEmail(nextPayload.profile.email)) return setState("error");
+        setPayload(nextPayload);
+        setState("ready");
+      }, 220);
+      return;
+    }
+    try {
+      const nextPayload = await profileGateway.read(sessionKey);
+      if (id !== requestId.current) return;
       setPayload(nextPayload);
       setState("ready");
-    }, 220);
-  }, [scenario]);
+    } catch (cause) {
+      if (id !== requestId.current) return;
+      setPayload(null);
+      if (cause instanceof ProfileGatewayError && cause.code === "INVALID_SESSION") {
+        setState("session");
+        void Promise.resolve(onSignOut());
+        return;
+      }
+      setIsTimeout(cause instanceof ProfileGatewayError && cause.code === "TIMEOUT");
+      setState("error");
+    }
+  }, [onSignOut, profileGateway, scenario, sessionKey]);
 
-  useEffect(() => { load(); }, [sessionKey, load]);
+  useEffect(() => { void load(); return () => { requestId.current += 1; }; }, [load]);
   const rentals = useMemo(() => sortActiveRentals(payload?.rentals ?? []), [payload]);
   const { width } = useWindowDimensions();
 
@@ -59,7 +85,7 @@ export function AccountScreen({ sessionKey, onBack, onEditProfile, onChangePassw
   return <SafeAreaView edges={["top", "left", "right"]} style={styles.safe}><ScrollView contentContainerStyle={styles.content}>
     <View style={styles.header}><HeaderButton accessibilityLabel="Quay lại" icon="left" onPress={onBack} /><Text accessibilityRole="header" style={styles.title}>Tài khoản</Text><HeaderButton accessibilityLabel="Chỉnh sửa thông tin cá nhân" icon="edit" onPress={onEditProfile} /></View>
     <View accessibilityRole="tablist" style={styles.tabs}><Tab label="Cá nhân" selected={tab === "personal"} onPress={() => setTab("personal")} /><Tab label="Chữ ký" selected={tab === "signature"} onPress={() => setTab("signature")} /></View>
-    {tab === "signature" ? <SignaturePlaceholder /> : <>{state === "loading" ? <LoadingCard /> : null}{state === "error" ? <ErrorState timeout={scenario === "timeout"} onRetry={load} /> : null}{state === "session" ? <SessionState onSignOut={onSignOut} /> : null}{state === "ready" && payload ? <><ProfileCard profile={payload.profile} />{rentals.length ? <RentalRegion rentals={rentals} width={width} /> : null}<View style={styles.actions}><Action label="Đổi mật khẩu" icon="lock" onPress={onChangePassword} /><Action label="Đăng xuất" icon="logout" onPress={() => setIsConfirmingSignOut(true)} danger /></View></> : null}</>}
+    {tab === "signature" ? <SignaturePlaceholder /> : <>{state === "loading" ? <LoadingCard /> : null}{state === "error" ? <ErrorState timeout={isTimeout || scenario === "timeout"} onRetry={() => { void load(); }} /> : null}{state === "session" ? <SessionState onSignOut={onSignOut} /> : null}{state === "ready" && payload ? <><ProfileCard profile={payload.profile} />{rentals.length ? <RentalRegion rentals={rentals} width={width} /> : null}<View style={styles.actions}><Action label="Đổi mật khẩu" icon="lock" onPress={onChangePassword} /><Action label="Đăng xuất" icon="logout" onPress={() => setIsConfirmingSignOut(true)} danger /></View></> : null}</>}
   </ScrollView>{isConfirmingSignOut ? <SignOutDialog busy={isSigningOut} onCancel={() => !isSigningOut && setIsConfirmingSignOut(false)} onConfirm={confirmSignOut} /> : null}</SafeAreaView>;
 }
 

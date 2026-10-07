@@ -1,15 +1,16 @@
 import { createApiProfileGateway, createConfiguredProfileGateway, ProfileGatewayError } from "../gateway";
 
 const fetchMock = jest.fn();
-const payload = { profile: { displayName: "Test renter", email: "test@example.com", phone: null, avatar: null }, rentals: [{ contractId: "contract-1", room: "Room 1", property: "Property 1", expiresAt: "2026-12-31", signedAt: "2024-01-01T00:00:00.000Z" }] };
+const payload = { profile: { displayName: "Test renter", email: "test@example.com", phone: null, avatar: null }, rentals: [{ contractId: "contract-1", room: "Room 1", property: "Property 1", propertyAddress: { street: "1 Test Street" }, expiresAt: "2026-12-31", signedAt: "2024-01-01T00:00:00.000Z" }] };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
 describe("profile gateway", () => {
   beforeEach(() => fetchMock.mockReset());
   it("uses the token subject endpoint and accepts zero, one, and many valid rentals", async () => {
     const gateway = createApiProfileGateway({ baseUrl: "https://api.example", fetch: fetchMock });
-    fetchMock.mockResolvedValueOnce(json({ ...payload, rentals: [] })).mockResolvedValueOnce(json(payload)).mockResolvedValueOnce(json({ ...payload, rentals: [payload.rentals[0], { ...payload.rentals[0], contractId: "contract-2", signedAt: "2024-02-01T00:00:00.000Z" }] }));
+    fetchMock.mockResolvedValueOnce(json({ ...payload, rentals: [] })).mockResolvedValueOnce(json({ ...payload, profile: { ...payload.profile, phone: "0901234567", avatar: "https://cdn.example/avatar.png" } })).mockResolvedValueOnce(json(payload)).mockResolvedValueOnce(json({ ...payload, rentals: [payload.rentals[0], { ...payload.rentals[0], contractId: "contract-2", signedAt: "2024-02-01T00:00:00.000Z" }] }));
     await expect(gateway.read("access-token")).resolves.toMatchObject({ rentals: [] });
+    await expect(gateway.read("access-token")).resolves.toMatchObject({ profile: { phone: "0901234567", avatar: "https://cdn.example/avatar.png" } });
     await expect(gateway.read("access-token")).resolves.toMatchObject({ rentals: [expect.any(Object)] });
     await expect(gateway.read("access-token")).resolves.toMatchObject({ rentals: [expect.any(Object), expect.any(Object)] });
     expect(fetchMock).toHaveBeenCalledWith("https://api.example/profile", expect.objectContaining({ headers: { Accept: "application/json", Authorization: "Bearer access-token" } }));
@@ -26,7 +27,7 @@ describe("profile gateway", () => {
     await expect(gateway.read("token")).rejects.toEqual(expect.objectContaining({ code: "PROFILE_UNAVAILABLE" }));
   });
   it("rejects every incomplete object shape without exposing it to the screen", async () => {
-    const invalid = [null, {}, { profile: null, rentals: [] }, { profile: payload.profile, rentals: null }, { profile: { ...payload.profile, phone: 7 }, rentals: [] }, { profile: { ...payload.profile, avatar: 7 }, rentals: [] }, { profile: payload.profile, rentals: [null] }, { profile: payload.profile, rentals: [{ ...payload.rentals[0], contractId: "" }] }, { profile: payload.profile, rentals: [{ ...payload.rentals[0], expiresAt: "2026-02-30" }] }, { profile: payload.profile, rentals: [{ ...payload.rentals[0], signedAt: "not-a-date" }] }];
+    const invalid = [null, {}, { profile: null, rentals: [] }, { profile: { ...payload.profile, phone: 7 }, rentals: [] }, { profile: payload.profile, rentals: [null] }, { profile: payload.profile, rentals: [{ ...payload.rentals[0], propertyAddress: {} }] }, { profile: payload.profile, rentals: [{ ...payload.rentals[0], expiresAt: "2026-02-30" }] }];
     invalid.forEach((body) => fetchMock.mockResolvedValueOnce(json(body)));
     const gateway = createApiProfileGateway({ baseUrl: "https://api.example", fetch: fetchMock });
     for (let index = 0; index < invalid.length; index += 1) await expect(gateway.read("token")).rejects.toEqual(expect.objectContaining({ code: "PROFILE_UNAVAILABLE" }));

@@ -1,11 +1,12 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { IconOutline } from "@ant-design/icons-react-native";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ActivityIndicator, FlatList, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { colors, radius, spacing } from "@/theme/tokens";
-import { actionsFor, carouselIndex, displayNameFor, homeDestinations, sortActiveContracts, type ActiveContract, type HomeAction, type HomeProfile } from "./homeModel";
+import { createConfiguredProfileGateway, ProfileGatewayError, type ProfileGateway } from "@/profile/gateway";
+import { actionsFor, addressFor, carouselIndex, displayNameFor, homeDestinations, sortActiveContracts, type ActiveContract, type HomeAction, type HomeProfile } from "./homeModel";
 
 type HomePayload = { profile: HomeProfile; contracts: ActiveContract[] };
 type LoadState = "loading" | "ready" | "error";
@@ -23,35 +24,54 @@ function mockPayload(): HomePayload {
 }
 
 function reviewScenario() {
-  if (Platform.OS !== "web" || process.env.EXPO_PUBLIC_HOME_REVIEW !== "true") return process.env.EXPO_PUBLIC_HOME_REVIEW_SCENARIO;
+  if (process.env.EXPO_PUBLIC_HOME_REVIEW !== "true") return undefined;
+  if (Platform.OS !== "web") return process.env.EXPO_PUBLIC_HOME_REVIEW_SCENARIO;
   const scenario = new URLSearchParams(globalThis.location?.search ?? "").get("home");
   return scenario === "none" || scenario === "single" || scenario === "multiple" || scenario === "error" ? scenario : "single";
 }
 
-export function HomeScreen({ sessionKey, onNavigate }: { sessionKey: string; onNavigate: (action: HomeAction) => void }) {
+function homePayloadFromProfile(payload: Awaited<ReturnType<ProfileGateway["read"]>>): HomePayload {
+  return { profile: payload.profile, contracts: payload.rentals.map((rental) => ({ id: rental.contractId, roomAndProperty: `${rental.room} - ${rental.property}`, address: addressFor(rental.propertyAddress), expiryDate: rental.expiresAt })) };
+}
+
+export function HomeScreen({ sessionKey, onNavigate, gateway }: { sessionKey: string; onNavigate: (action: HomeAction) => void; gateway?: ProfileGateway }) {
   const [state, setState] = useState<LoadState>("loading");
   const [payload, setPayload] = useState<HomePayload | null>(null);
   const [toast, setToast] = useState("");
+  const requestVersion = useRef(0);
+  const profileGateway = useMemo(() => gateway ?? createConfiguredProfileGateway(), [gateway]);
 
-  const load = (refresh = false) => {
-    setState("loading");
-    setTimeout(() => {
-      if (reviewScenario() === "error") {
-        setState("error");
-        setToast(refresh ? "Không thể làm mới dữ liệu. Đang hiển thị dữ liệu gần nhất." : "Bạn đang ngoại tuyến. Vui lòng thử lại.");
-        return;
-      }
-      setPayload(mockPayload());
+  const load = async (refresh = false) => {
+    const version = ++requestVersion.current;
+    if (!refresh || !payload) setState("loading");
+    setToast("");
+    try {
+      const scenario = reviewScenario();
+      if (scenario === "error") throw new ProfileGatewayError("NETWORK_ERROR");
+      const nextPayload = scenario ? mockPayload() : homePayloadFromProfile(await profileGateway.read(sessionKey));
+      if (version !== requestVersion.current) return;
+      setPayload(nextPayload);
       setState("ready");
-    }, 220);
+    } catch (error) {
+      if (version !== requestVersion.current) return;
+      const preserveLoadedData = refresh && Boolean(payload);
+      if (!preserveLoadedData) {
+        setPayload(null);
+        setState("error");
+      } else setState("ready");
+      const isSession = error instanceof ProfileGatewayError && error.code === "INVALID_SESSION";
+      setToast(preserveLoadedData ? "Không thể làm mới dữ liệu. Đang hiển thị dữ liệu gần nhất." : isSession ? "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại." : "Bạn đang ngoại tuyến. Vui lòng thử lại.");
+    }
   };
 
   useEffect(() => {
     // A new authenticated session must never inherit the previous renter's card.
     setPayload(null);
     setToast("");
-    load();
-  }, [sessionKey]);
+    void load();
+  // Session changes are the only load trigger; including load would re-fetch after every payload update.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionKey, profileGateway]);
 
   const contracts = useMemo(() => sortActiveContracts(payload?.contracts ?? []), [payload]);
   const actions = actionsFor(contracts);
@@ -59,14 +79,14 @@ export function HomeScreen({ sessionKey, onNavigate }: { sessionKey: string; onN
   const { width } = useWindowDimensions();
 
   return <SafeAreaView edges={["top", "left", "right"]} style={styles.safe}><LinearGradient colors={["#FF9800", "#FFB242", "#FFF2DB"]} locations={[0, 0.28, 0.62]} style={styles.page}>
-    <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl onRefresh={() => load(true)} refreshing={state === "loading" && !!payload} tintColor="#A84300" />}>
+    <ScrollView contentContainerStyle={styles.content} refreshControl={<RefreshControl onRefresh={() => { void load(true); }} refreshing={state === "loading" && !!payload} tintColor="#A84300" />}>
       <View style={styles.greeting}>
         <Text style={styles.hello}>Xin chào</Text>
         {profile ? <Text accessibilityLabel={displayNameFor(profile)} numberOfLines={1} style={styles.name}>{displayNameFor(profile)}</Text> : <View accessibilityLabel="Đang tải thông tin tài khoản" style={styles.nameSkeleton} />}
       </View>
       <View style={styles.contractRegion}>
         {state === "loading" && !payload ? <ContractSkeleton /> : null}
-        {state === "error" && !payload ? <InlineRetry onRetry={() => load()} /> : null}
+        {state === "error" && !payload ? <InlineRetry onRetry={() => { void load(); }} /> : null}
         {payload && contracts.length === 1 ? <ContractCard contract={contracts[0]!} /> : null}
         {payload && contracts.length > 1 ? <ContractCarousel contracts={contracts} width={width} /> : null}
       </View>

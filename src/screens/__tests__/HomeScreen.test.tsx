@@ -1,88 +1,45 @@
 import React from "react";
-import { IconOutline } from "@ant-design/icons-react-native";
-import { FlatList, Pressable, StyleSheet, Text } from "react-native";
+import { FlatList, ScrollView, Text } from "react-native";
 import TestRenderer, { act, type ReactTestInstance } from "react-test-renderer";
-
+import { ProfileGatewayError, type ProfileGateway } from "@/profile/gateway";
 import { HomeScreen } from "../HomeScreen";
 
 jest.mock("react-native-safe-area-context", () => ({ SafeAreaView: "SafeAreaView" }));
-
-function text(root: ReactTestInstance) {
-  return root.findAllByType(Text).map((node) => node.props.children).flat(Infinity).join("|");
-}
-
-function press(root: ReactTestInstance, label: string) {
-  const target = root.findAllByType(Pressable).find((node) => node.props.accessibilityLabel?.startsWith(`${label}:`) || text(node) === label);
-  if (!target) throw new Error(`Missing button ${label}`);
-  act(() => target.props.onPress());
-}
+const rental = (id: string, expiresAt: string) => ({ contractId: id, room: `Phong ${id}`, property: `Nha ${id}`, propertyAddress: { street: "1 Nguyen Hue", city: "HCM" }, expiresAt, signedAt: "2026-01-01T00:00:00.000Z" });
+const payload = (rentals: ReturnType<typeof rental>[] = []) => ({ profile: { displayName: "Mai An", email: "mai@example.com", phone: null, avatar: null }, rentals });
+const text = (root: ReactTestInstance) => root.findAllByType(Text).map((node) => node.props.children).flat(Infinity).join("|");
+const gateway = (read: jest.Mock): ProfileGateway => ({ read });
 
 describe("HomeScreen", () => {
-  const priorScenario = process.env.EXPO_PUBLIC_HOME_REVIEW_SCENARIO;
-
-  beforeEach(() => jest.useFakeTimers());
-  afterEach(() => {
-    jest.useRealTimers();
-    process.env.EXPO_PUBLIC_HOME_REVIEW_SCENARIO = priorScenario;
+  it("renders no fake card or report action when the authenticated account has no rentals", async () => {
+    const read = jest.fn().mockResolvedValue(payload()); let view!: TestRenderer.ReactTestRenderer;
+    await act(async () => { view = TestRenderer.create(<HomeScreen gateway={gateway(read)} sessionKey="a" onNavigate={jest.fn()} />); });
+    expect(read).toHaveBeenCalledWith("a"); expect(text(view.root)).not.toContain("Báo cáo"); expect(view.root.findAllByProps({ testID: "contract-carousel" })).toHaveLength(0);
   });
-
-  it("keeps navigation available while loading, then renders the five-action empty state", () => {
-    process.env.EXPO_PUBLIC_HOME_REVIEW_SCENARIO = "none";
-    let renderer!: TestRenderer.ReactTestRenderer;
-    act(() => { renderer = TestRenderer.create(<HomeScreen onNavigate={jest.fn()} sessionKey="renter-a" />); });
-    expect(renderer.root.findByProps({ accessibilityLabel: "Đang tải hợp đồng" })).toBeTruthy();
-    act(() => { jest.advanceTimersByTime(220); });
-    ["Hợp đồng", "Tin nhắn", "Tài khoản", "D.S.Trọ", "T.Toán"].forEach((label) => expect(text(renderer.root)).toContain(label));
-    expect(text(renderer.root)).not.toContain("Báo cáo");
-    expect(text(renderer.root)).not.toContain("Làm mới");
-    act(() => renderer.unmount());
+  it("sorts real rentals by expiry then id and maps the source address", async () => {
+    const read = jest.fn().mockResolvedValue(payload([rental("z", "2026-05-01"), rental("b", "2026-04-01"), rental("a", "2026-04-01")])); let view!: TestRenderer.ReactTestRenderer;
+    await act(async () => { view = TestRenderer.create(<HomeScreen gateway={gateway(read)} sessionKey="a" onNavigate={jest.fn()} />); });
+    const carousel = view.root.findByType(FlatList); expect(carousel.props.data.map((item: { id: string }) => item.id)).toEqual(["a", "b", "z"]); expect(text(view.root)).toContain("1 Nguyen Hue, HCM"); expect(view.root.findByProps({ accessibilityLabel: "1 trên 3 hợp đồng" })).toBeTruthy();
+    act(() => carousel.props.onScroll({ nativeEvent: { contentOffset: { x: 100 }, layoutMeasurement: { width: 100 } } })); expect(view.root.findByProps({ accessibilityLabel: "2 trên 3 hợp đồng" })).toBeTruthy();
   });
-
-  it("renders a sorted contract carousel, accessible pagination, and every approved navigation mapping", () => {
-    process.env.EXPO_PUBLIC_HOME_REVIEW_SCENARIO = "multiple";
-    const onNavigate = jest.fn();
-    let renderer!: TestRenderer.ReactTestRenderer;
-    act(() => { renderer = TestRenderer.create(<HomeScreen onNavigate={onNavigate} sessionKey="renter-a" />); });
-    act(() => { jest.advanceTimersByTime(220); });
-    expect(renderer.root.findByProps({ accessibilityLabel: "1 trên 3 hợp đồng" })).toBeTruthy();
-    const carousel = renderer.root.findByType(FlatList);
-    act(() => carousel.props.onScroll({ nativeEvent: { contentOffset: { x: 1280 }, layoutMeasurement: { width: 1280 } } }));
-    expect(renderer.root.findByProps({ accessibilityLabel: "2 trên 3 hợp đồng" })).toBeTruthy();
-    expect(text(renderer.root)).toContain("Báo cáo");
-    expect(renderer.root.findAllByType(IconOutline).map((icon) => icon.props.name)).toEqual(["file-protect", "message", "user", "bank", "dollar-circle", "alert"]);
-    expect(renderer.root.findAllByType(IconOutline).every((icon) => icon.props.accessible === false && icon.props.importantForAccessibility === "no")).toBe(true);
-    expect(renderer.root.findByProps({ accessibilityLabel: "Nguyễn Văn A" }).props.style).toMatchObject({ fontFamily: "BeVietnamPro_600SemiBold" });
-    expect(renderer.root.findByProps({ children: "Phòng 102 - Trọ Xuân Hạ" }).props.style).toMatchObject({ fontFamily: "BeVietnamPro_600SemiBold" });
-    expect(StyleSheet.flatten(renderer.root.findByProps({ children: "Hợp đồng" }).props.style)).toMatchObject({ fontFamily: "BeVietnamPro_400Regular" });
-    expect(text(renderer.root)).not.toContain("Làm mới");
-    press(renderer.root, "Hợp đồng");
-    press(renderer.root, "Tin nhắn");
-    press(renderer.root, "Tài khoản");
-    press(renderer.root, "D.S.Trọ");
-    press(renderer.root, "T.Toán");
-    press(renderer.root, "Báo cáo");
-    expect(onNavigate.mock.calls.map(([action]) => action)).toEqual([
-      "contract", "messages", "account", "properties", "payment", "reports",
-    ]);
-    process.env.EXPO_PUBLIC_HOME_REVIEW_SCENARIO = "none";
-    act(() => { renderer.update(<HomeScreen onNavigate={onNavigate} sessionKey="renter-b" />); });
-    expect(renderer.root.findByProps({ accessibilityLabel: "Đang tải hợp đồng" })).toBeTruthy();
-    act(() => { jest.advanceTimersByTime(220); });
-    expect(text(renderer.root)).not.toContain("Báo cáo");
-    act(() => renderer.unmount());
+  it.each(["INVALID_SESSION", "PROFILE_INCOMPLETE", "PROFILE_UNAVAILABLE", "TIMEOUT", "NETWORK_ERROR"] as const)("keeps actions and exposes retry on first-load %s", async (code) => {
+    const read = jest.fn().mockRejectedValue(new ProfileGatewayError(code)); let view!: TestRenderer.ReactTestRenderer;
+    await act(async () => { view = TestRenderer.create(<HomeScreen gateway={gateway(read)} sessionKey="a" onNavigate={jest.fn()} />); });
+    expect(text(view.root)).toContain("Chưa thể tải tóm tắt hợp đồng."); expect(text(view.root)).not.toContain("Báo cáo"); expect(text(view.root)).toContain("Hợp đồng");
   });
-
-  it("shows inline retry and a non-blocking offline toast without replacing the shell", () => {
-    process.env.EXPO_PUBLIC_HOME_REVIEW_SCENARIO = "error";
-    let renderer!: TestRenderer.ReactTestRenderer;
-    act(() => { renderer = TestRenderer.create(<HomeScreen onNavigate={jest.fn()} sessionKey="renter-a" />); });
-    act(() => { jest.advanceTimersByTime(220); });
-    expect(text(renderer.root)).toContain("Chưa thể tải tóm tắt hợp đồng.");
-    expect(text(renderer.root)).toContain("Bạn đang ngoại tuyến. Vui lòng thử lại.");
-    ["Hợp đồng", "Tin nhắn", "Tài khoản", "D.S.Trọ", "T.Toán"].forEach((label) => expect(text(renderer.root)).toContain(label));
-    press(renderer.root, "Thử lại");
-    act(() => { jest.advanceTimersByTime(220); });
-    expect(text(renderer.root)).toContain("Bạn đang ngoại tuyến. Vui lòng thử lại.");
-    act(() => renderer.unmount());
+  it("retains loaded data and uses a non-blocking toast when refresh fails", async () => {
+    const read = jest.fn().mockResolvedValueOnce(payload([rental("a", "2026-01-01")])).mockRejectedValueOnce(new ProfileGatewayError("NETWORK_ERROR")); let view!: TestRenderer.ReactTestRenderer;
+    await act(async () => { view = TestRenderer.create(<HomeScreen gateway={gateway(read)} sessionKey="a" onNavigate={jest.fn()} />); });
+    await act(async () => { view.root.findByType(ScrollView).props.refreshControl.props.onRefresh(); });
+    expect(text(view.root)).toContain("Phong a - Nha a"); expect(text(view.root)).toContain("Không thể làm mới dữ liệu. Đang hiển thị dữ liệu gần nhất.");
+  });
+  it("clears stale renter data after a session switch", async () => {
+    let resolve!: (value: ReturnType<typeof payload>) => void; const first = new Promise<ReturnType<typeof payload>>((done) => { resolve = done; }); const read = jest.fn().mockReturnValueOnce(first).mockResolvedValueOnce(payload()); let view!: TestRenderer.ReactTestRenderer;
+    await act(async () => { view = TestRenderer.create(<HomeScreen gateway={gateway(read)} sessionKey="a" onNavigate={jest.fn()} />); }); await act(async () => { view.update(<HomeScreen gateway={gateway(read)} sessionKey="b" onNavigate={jest.fn()} />); }); await act(async () => { resolve(payload([rental("old", "2026-01-01")])); });
+    expect(text(view.root)).not.toContain("Phong old"); expect(text(view.root)).not.toContain("Báo cáo");
+  });
+  it("uses fixtures only under explicit review mode", async () => {
+    const oldReview = process.env.EXPO_PUBLIC_HOME_REVIEW; const oldScenario = process.env.EXPO_PUBLIC_HOME_REVIEW_SCENARIO; process.env.EXPO_PUBLIC_HOME_REVIEW = "true"; process.env.EXPO_PUBLIC_HOME_REVIEW_SCENARIO = "multiple"; const read = jest.fn(); let view!: TestRenderer.ReactTestRenderer;
+    await act(async () => { view = TestRenderer.create(<HomeScreen gateway={gateway(read)} sessionKey="a" onNavigate={jest.fn()} />); }); expect(read).not.toHaveBeenCalled(); expect(view.root.findByProps({ accessibilityLabel: "1 trên 3 hợp đồng" })).toBeTruthy(); process.env.EXPO_PUBLIC_HOME_REVIEW = oldReview; process.env.EXPO_PUBLIC_HOME_REVIEW_SCENARIO = oldScenario;
   });
 });

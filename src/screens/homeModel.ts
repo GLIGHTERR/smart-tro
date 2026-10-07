@@ -9,6 +9,10 @@ export type ActiveContract = {
 
 export type HomeProfile = { displayName?: string | null; email: string };
 
+export function addressFor(address: Record<string, unknown>) {
+  return Object.values(address).filter((value): value is string => typeof value === "string" && value.trim().length > 0).map((value) => value.trim()).join(", ");
+}
+
 export const homeDestinations = {
   contract: "UC-07 — Hợp đồng điện tử của tôi",
   messages: "UC-15 — Tin nhắn",

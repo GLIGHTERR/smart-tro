@@ -5,7 +5,7 @@ export class ProfileGatewayError extends Error { constructor(public readonly cod
 
 export type ProfilePayload = {
   profile: { displayName: string; email: string; phone: string | null; avatar: string | null };
-  rentals: { contractId: string; room: string; property: string; expiresAt: string; signedAt: string }[];
+  rentals: { contractId: string; room: string; property: string; propertyAddress: Record<string, unknown>; expiresAt: string; signedAt: string }[];
 };
 export interface ProfileGateway { read(accessToken: string): Promise<ProfilePayload>; }
 type Dependencies = { baseUrl: string; fetch?: typeof fetch; requestTimeoutMs?: number; setTimeout?: typeof setTimeout; clearTimeout?: typeof clearTimeout; };
@@ -27,8 +27,11 @@ function isProfilePayload(value: unknown): value is ProfilePayload {
     && rentals.every((rental) => {
       if (!rental || typeof rental !== "object") return false;
       const item = rental as Record<string, unknown>;
-      return nonEmptyString(item.contractId) && nonEmptyString(item.room) && nonEmptyString(item.property) && isDate(item.expiresAt) && isDateTime(item.signedAt);
+      return nonEmptyString(item.contractId) && nonEmptyString(item.room) && nonEmptyString(item.property) && isDisplayableAddress(item.propertyAddress) && isDate(item.expiresAt) && isDateTime(item.signedAt);
     });
+}
+function isDisplayableAddress(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value) && Object.values(value as Record<string, unknown>).some((item) => nonEmptyString(item)));
 }
 function errorCode(status: number, body: unknown): ProfileErrorCode {
   const code = body && typeof body === "object" ? (body as { error?: { code?: unknown } }).error?.code : undefined;

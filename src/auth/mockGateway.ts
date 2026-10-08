@@ -1,7 +1,7 @@
 import { GatewayError, type AuthGateway } from "./gateway";
 export { GatewayError, type GatewayErrorCode } from "./gateway";
 
-type Account = { password: string; verified: boolean };
+type Account = { password: string; verified: boolean; displayName?: string; phone?: string | null };
 type Challenge = { email: string; expiresAt: number; attempts: number; resendAt: number };
 
 const OTP = "123456"; // Preview-only fixture; production policy belongs to the backend.
@@ -56,10 +56,10 @@ export function createMockAuthGateway(now: () => number = Date.now): AuthGateway
         throw new GatewayError(challenge.attempts >= MAX_ATTEMPTS ? "OTP_ATTEMPTS_EXHAUSTED" : "INVALID_OTP");
       }
     },
-    async createAccount(_email, attemptId, _otp, password) {
+    async createAccount(_email, attemptId, _otp, password, profile) {
       const challenge = challengeFor(attemptId);
       if (accounts.has(challenge.email)) throw new GatewayError("ACCOUNT_EXISTS");
-      accounts.set(challenge.email, { password, verified: true });
+      accounts.set(challenge.email, { password, verified: true, ...profile });
     },
     async signIn(email, password) {
       const account = accounts.get(email);

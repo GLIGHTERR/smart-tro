@@ -13,6 +13,25 @@ export function validatePassword(password: string): string | undefined {
   return undefined;
 }
 
+export function normalizeDisplayName(displayName: string): string {
+  return displayName.trim().replace(/\s+/g, " ");
+}
+
+export function validateDisplayName(displayName: unknown): string | undefined {
+  return typeof displayName === "string" && normalizeDisplayName(displayName) ? undefined : "Nhập họ và tên.";
+}
+
+export function normalizePhone(phone: string): string | null {
+  const normalized = phone.trim();
+  return normalized || null;
+}
+
+export function validatePhone(phone: unknown): string | undefined {
+  if (typeof phone !== "string" || !normalizePhone(phone)) return undefined;
+  // The approved UI contract permits common phone punctuation but rejects non-phone text.
+  return /^\+?[\d ()-]+$/.test(phone.trim()) ? undefined : "Nhập số điện thoại hợp lệ.";
+}
+
 export function validateAuthForm(form: AuthForm, requiresName = false): Partial<Record<keyof AuthForm, string>> {
   const errors: Partial<Record<keyof AuthForm, string>> = {};
   if (requiresName && !form.name?.trim()) errors.name = "Please enter your name.";

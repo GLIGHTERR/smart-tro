@@ -33,12 +33,13 @@ export type OtpAttempt = { attemptId: string; expiresAt: number; resendAvailable
 export type RecoveryChallenge = { challengeId: string; expiresAt: number; resendAvailableAt: number };
 export type RecoveryResetCredential = { resetToken: string; expiresAt: number };
 export type RecoveryCompletion = { email: string; next: "sign_in" };
+export type SignUpProfile = { displayName: string; phone: string | null };
 
 export interface AuthGateway {
   requestOtp(email: string): Promise<OtpAttempt>;
   resendOtp(email: string): Promise<OtpAttempt>;
   verifyOtp(email: string, attemptId: string, otp: string): Promise<void>;
-  createAccount(email: string, attemptId: string, otp: string, password: string): Promise<void>;
+  createAccount(email: string, attemptId: string, otp: string, password: string, profile: SignUpProfile): Promise<void>;
   signIn(email: string, password: string): Promise<AuthSession>;
   refresh(refreshToken: string): Promise<AuthSession>;
   me(accessToken: string): Promise<void>;
@@ -191,7 +192,7 @@ export function createApiAuthGateway({
     requestOtp: otpRequest,
     resendOtp: otpRequest,
     verifyOtp: async (email, attemptId, code) => { await request("/auth/signup/otp/verify", { method: "POST", body: JSON.stringify({ email, attemptId, code }) }); },
-    createAccount: async (email, attemptId, code, password) => { await request("/auth/signup/complete", { method: "POST", body: JSON.stringify({ email, attemptId, code, password }) }); },
+    createAccount: async (email, attemptId, code, password, profile) => { await request("/auth/signup/complete", { method: "POST", body: JSON.stringify({ email, attemptId, code, password, ...profile }) }); },
     signIn: (email, password) => request<TokenResponse>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
     refresh: (refreshToken) => request<TokenResponse>("/auth/token/refresh", { method: "POST", body: JSON.stringify({ refreshToken }) }),
     me: async (accessToken) => { await request("/auth/me", { method: "GET" }, accessToken); },

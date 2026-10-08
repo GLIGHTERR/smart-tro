@@ -1,4 +1,4 @@
-import { normalizeEmail, validateAuthForm, validateEmail, validatePassword } from "../validation";
+import { normalizeDisplayName, normalizeEmail, normalizePhone, validateAuthForm, validateDisplayName, validateEmail, validatePassword, validatePhone } from "../validation";
 
 describe("validateAuthForm", () => {
   it("requires valid sign-in credentials", () => {
@@ -13,6 +13,19 @@ describe("validateAuthForm", () => {
 });
 
 describe("signup validation", () => {
+  it("normalizes the required display name and permits one name", () => {
+    expect(normalizeDisplayName("  Mai   An  ")).toBe("Mai An");
+    expect(validateDisplayName(null)).toBeDefined();
+    expect(validateDisplayName("  ")).toBeDefined();
+    expect(validateDisplayName("Mai")).toBeUndefined();
+  });
+  it("permits an absent phone and validates supplied phone text only", () => {
+    expect(normalizePhone("  ")).toBeNull();
+    expect(normalizePhone(" 0901 234 567 ")).toBe("0901 234 567");
+    expect(validatePhone("")).toBeUndefined();
+    expect(validatePhone("+84 (901) 234-567")).toBeUndefined();
+    expect(validatePhone("not-a-phone")).toBeDefined();
+  });
   it("normalizes email and rejects empty or malformed email", () => {
     expect(normalizeEmail(" Mai@Example.COM ")).toBe("mai@example.com");
     expect(validateEmail("bad")).toBeDefined();

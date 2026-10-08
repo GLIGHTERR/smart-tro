@@ -57,6 +57,7 @@
       "src/auth/restoreSession.ts",
       "src/auth/mockGateway.ts",
       "src/auth/recoveryState.ts",
+      "src/auth/validation.ts",
       "src/profile/gateway.ts",
       "src/screens/accountModel.ts",
       "src/screens/homeModel.ts",
@@ -82,6 +83,12 @@
         "statements": 100
       },
       "./src/auth/recoveryState.ts": {
+        "branches": 100,
+        "functions": 100,
+        "lines": 100,
+        "statements": 100
+      },
+      "./src/auth/validation.ts": {
         "branches": 100,
         "functions": 100,
         "lines": 100,

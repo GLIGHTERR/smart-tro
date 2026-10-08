@@ -2,7 +2,7 @@ import { GatewayError, type AuthGateway } from "./gateway";
 export { GatewayError, type GatewayErrorCode } from "./gateway";
 
 type Account = { password: string; verified: boolean; displayName?: string; phone?: string | null };
-type Challenge = { email: string; expiresAt: number; attempts: number; resendAt: number };
+type Challenge = { active: boolean; attempts: number; consumed: boolean; email: string; expiresAt: number; purpose: "recovery" | "signup"; resendAt: number; verified: boolean };
 
 const OTP = "123456"; // Preview-only fixture; production policy belongs to the backend.
 const OTP_TTL_MS = 10 * 60 * 1000;
@@ -25,19 +25,27 @@ export function createMockAuthGateway(now: () => number = Date.now): AuthGateway
     if (!challenge || now() > challenge.expiresAt) throw new GatewayError("OTP_EXPIRED");
     return challenge;
   };
+  const signupChallengeFor = (email: string, attemptId: string) => {
+    const challenge = challengeFor(attemptId);
+    if (challenge.purpose !== "signup" || !challenge.active || challenge.consumed || challenge.email !== email) throw new GatewayError("INVALID_OTP");
+    return challenge;
+  };
 
   return {
     async requestOtp(email) {
       const current = now();
+      for (const challenge of challenges.values()) {
+        if (challenge.purpose === "signup" && challenge.active && challenge.email !== email) challenge.active = false;
+      }
       const attemptId = `preview-${++sequence}`;
       const expiresAt = current + OTP_TTL_MS;
       const resendAvailableAt = current + RESEND_COOLDOWN_MS;
-      challenges.set(attemptId, { email, expiresAt, attempts: 0, resendAt: resendAvailableAt });
+      challenges.set(attemptId, { active: true, attempts: 0, consumed: false, email, expiresAt, purpose: "signup", resendAt: resendAvailableAt, verified: false });
       return { attemptId, expiresAt, resendAvailableAt };
     },
     async resendOtp(email) {
-      const attemptId = [...challenges.entries()].find(([, challenge]) => challenge.email === email)?.[0] ?? "";
-      const challenge = challengeFor(attemptId);
+      const attemptId = [...challenges.entries()].find(([, challenge]) => challenge.purpose === "signup" && challenge.active && challenge.email === email)?.[0] ?? "";
+      const challenge = signupChallengeFor(email, attemptId);
       const current = now();
       if (current < challenge.resendAt) throw new GatewayError("RESEND_COOLDOWN");
       const history = (resendHistory.get(challenge.email) ?? []).filter((time) => current - time < 60 * 60 * 1000);
@@ -46,20 +54,25 @@ export function createMockAuthGateway(now: () => number = Date.now): AuthGateway
       challenge.expiresAt = current + OTP_TTL_MS;
       challenge.resendAt = current + RESEND_COOLDOWN_MS;
       challenge.attempts = 0;
+      challenge.verified = false;
       return { attemptId, expiresAt: challenge.expiresAt, resendAvailableAt: challenge.resendAt };
     },
-    async verifyOtp(_email, attemptId, otp) {
-      const challenge = challengeFor(attemptId);
+    async verifyOtp(email, attemptId, otp) {
+      const challenge = signupChallengeFor(email, attemptId);
       if (challenge.attempts >= MAX_ATTEMPTS) throw new GatewayError("OTP_ATTEMPTS_EXHAUSTED");
       if (otp !== OTP) {
         challenge.attempts += 1;
         throw new GatewayError(challenge.attempts >= MAX_ATTEMPTS ? "OTP_ATTEMPTS_EXHAUSTED" : "INVALID_OTP");
       }
+      challenge.verified = true;
     },
-    async createAccount(_email, attemptId, _otp, password, profile) {
-      const challenge = challengeFor(attemptId);
+    async createAccount(email, attemptId, otp, password, profile) {
+      const challenge = signupChallengeFor(email, attemptId);
+      if (!challenge.verified || otp !== OTP) throw new GatewayError("INVALID_OTP");
       if (accounts.has(challenge.email)) throw new GatewayError("ACCOUNT_EXISTS");
       accounts.set(challenge.email, { password, verified: true, ...profile });
+      challenge.consumed = true;
+      challenge.active = false;
     },
     async signIn(email, password) {
       const account = accounts.get(email);
@@ -75,7 +88,7 @@ export function createMockAuthGateway(now: () => number = Date.now): AuthGateway
       const challengeId = `recovery-${++sequence}`;
       const expiresAt = current + OTP_TTL_MS;
       const resendAvailableAt = current + RESEND_COOLDOWN_MS;
-      challenges.set(challengeId, { email, expiresAt, attempts: 0, resendAt: resendAvailableAt });
+      challenges.set(challengeId, { active: true, attempts: 0, consumed: false, email, expiresAt, purpose: "recovery", resendAt: resendAvailableAt, verified: false });
       return { challengeId, expiresAt, resendAvailableAt };
     },
     async verifyPasswordRecovery(email, challengeId, code) {

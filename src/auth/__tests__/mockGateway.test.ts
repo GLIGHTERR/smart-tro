@@ -43,6 +43,33 @@ describe("preview auth gateway", () => {
     await auth.verifyOtp("demo@smarttro.vn", attempt.attemptId, "123456");
     await expectCode(auth.createAccount("demo@smarttro.vn", attempt.attemptId, "123456", "NewPass!1", { displayName: "Mai An", phone: "0901234567" }), "ACCOUNT_EXISTS");
   });
+  it("rejects completion before an attempt has been verified", async () => {
+    const auth = gateway(); const attempt = await auth.requestOtp("mai@example.com");
+    await expectCode(auth.createAccount("mai@example.com", attempt.attemptId, "123456", "Strong!1", { displayName: "Mai", phone: null }), "INVALID_OTP");
+  });
+  it("binds verification and completion to the email that owns the attempt", async () => {
+    const auth = gateway(); const attempt = await auth.requestOtp("mai@example.com");
+    await expectCode(auth.verifyOtp("other@example.com", attempt.attemptId, "123456"), "INVALID_OTP");
+    await auth.verifyOtp("mai@example.com", attempt.attemptId, "123456");
+    await expectCode(auth.createAccount("other@example.com", attempt.attemptId, "123456", "Strong!1", { displayName: "Mai", phone: null }), "INVALID_OTP");
+  });
+  it("invalidates an old attempt when a changed email requests a new OTP", async () => {
+    const auth = gateway(); const oldAttempt = await auth.requestOtp("mai@example.com");
+    const newAttempt = await auth.requestOtp("an@example.com");
+    await expectCode(auth.verifyOtp("mai@example.com", oldAttempt.attemptId, "123456"), "INVALID_OTP");
+    await expect(auth.verifyOtp("an@example.com", newAttempt.attemptId, "123456")).resolves.toBeUndefined();
+  });
+  it("does not invalidate an active attempt when the request keeps the same email", async () => {
+    const auth = gateway(); const firstAttempt = await auth.requestOtp("mai@example.com");
+    await auth.requestOtp("mai@example.com");
+    await expect(auth.verifyOtp("mai@example.com", firstAttempt.attemptId, "123456")).resolves.toBeUndefined();
+  });
+  it("consumes a completed attempt so it cannot create a second account", async () => {
+    const auth = gateway(); const attempt = await auth.requestOtp("mai@example.com");
+    await auth.verifyOtp("mai@example.com", attempt.attemptId, "123456");
+    await auth.createAccount("mai@example.com", attempt.attemptId, "123456", "Strong!1", { displayName: "Mai", phone: null });
+    await expectCode(auth.createAccount("mai@example.com", attempt.attemptId, "123456", "Strong!1", { displayName: "Mai", phone: null }), "INVALID_OTP");
+  });
   it("keeps mock session methods available only for local previews", async () => {
     const auth = gateway();
     await expectCode(auth.resendOtp("missing@example.com"), "OTP_EXPIRED");

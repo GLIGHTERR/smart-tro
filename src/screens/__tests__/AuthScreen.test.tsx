@@ -26,6 +26,10 @@ function input(root: ReactTestInstance, label: string): ReactTestInstance {
   return root.findByProps({ accessibilityLabel: label }) as ReactTestInstance;
 }
 
+function buttonLabels(root: ReactTestInstance): string[] {
+  return root.findAllByType(Pressable).map(textOf);
+}
+
 function gateway(): AuthGateway {
   return {
     requestOtp: jest.fn().mockResolvedValue({ attemptId: "attempt-1", expiresAt: 601_000, resendAvailableAt: 0 }),
@@ -103,6 +107,28 @@ describe("AuthScreen signup", () => {
     act(() => button(renderer.root, "Tiếp tục").props.onPress());
     expect(input(renderer.root, "Mật khẩu").props.value).toBe("");
     expect(input(renderer.root, "Nhập lại mật khẩu").props.value).toBe("");
+    act(() => renderer.unmount());
+  });
+
+  it("uses the approved action order and keeps all three social buttons behind the review flag", async () => {
+    const auth = gateway();
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<AuthScreen gateway={auth} showSocials />); });
+
+    expect(buttonLabels(renderer.root)).toEqual(expect.arrayContaining(["Đăng nhập với Facebook", "Đăng nhập với Google", "Đăng nhập với Apple"]));
+    act(() => button(renderer.root, "Đăng ký").props.onPress());
+    act(() => input(renderer.root, "Email").props.onChangeText("mai@example.com"));
+    await act(async () => { button(renderer.root, "Gửi OTP").props.onPress(); await Promise.resolve(); });
+    const otpButtons = buttonLabels(renderer.root);
+    expect(otpButtons.indexOf("Đổi email")).toBeLessThan(otpButtons.indexOf("Tiếp tục"));
+    expect(otpButtons.indexOf("Tiếp tục")).toBeLessThan(otpButtons.findIndex((label) => label.startsWith("Gửi lại mã OTP")));
+
+    act(() => input(renderer.root, "Mã OTP").props.onChangeText("123456"));
+    await act(async () => { button(renderer.root, "Tiếp tục").props.onPress(); await Promise.resolve(); });
+    act(() => input(renderer.root, "Họ và tên (bắt buộc)").props.onChangeText("Mai"));
+    act(() => button(renderer.root, "Tiếp tục").props.onPress());
+    const passwordButtons = buttonLabels(renderer.root);
+    expect(passwordButtons.indexOf("Tạo tài khoản")).toBeLessThan(passwordButtons.indexOf("Quay lại"));
     act(() => renderer.unmount());
   });
 });

@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getDeviceId } from "@/auth/device";
-import { createConfiguredAuthGateway, GatewayError, type GatewayErrorCode } from "@/auth/gateway";
+import { createConfiguredAuthGateway, GatewayError, type AuthGateway, type GatewayErrorCode } from "@/auth/gateway";
 import { createMockAuthGateway } from "@/auth/mockGateway";
 import { useAuth } from "@/auth/AuthProvider";
 import { FONT_STARTUP_TIMEOUT_MS, getFontStartupDiagnostic, getFontStartupState } from "@/startup/fontState";
@@ -22,12 +22,12 @@ const showSocials = process.env.EXPO_PUBLIC_REVIEW_SOCIALS === "true";
 const showRecoveryReview = process.env.EXPO_PUBLIC_UC03_REVIEW === "true";
 const isDebugBuild = process.env.EXPO_PUBLIC_DEBUG_REVISION === "true";
 
-export function AuthScreen() {
+export function AuthScreen({ gateway: injectedGateway }: { gateway?: AuthGateway } = {}) {
   const recoveryReviewStep = useMemo(getRecoveryReviewStep, []);
   const [fontsLoaded, fontError] = useFonts({ BeVietnamPro_400Regular, BeVietnamPro_600SemiBold });
   const [fontTimedOut, setFontTimedOut] = useState(false);
   const { signIn } = useAuth();
-  const { width, height } = useWindowDimensions(); const gateway = useMemo(() => process.env.EXPO_PUBLIC_AUTH_USE_MOCK === "true" ? createMockAuthGateway() : createConfiguredAuthGateway(getDeviceId), []);
+  const { width, height } = useWindowDimensions(); const gateway = useMemo(() => injectedGateway ?? (process.env.EXPO_PUBLIC_AUTH_USE_MOCK === "true" ? createMockAuthGateway() : createConfiguredAuthGateway(getDeviceId)), [injectedGateway]);
   const [screen, setScreen] = useState<Screen>(recoveryReviewStep ? "forgotPassword" : "signIn"); const [email, setEmail] = useState(""); const [otp, setOtp] = useState(""); const [displayName, setDisplayName] = useState(""); const [phone, setPhone] = useState(""); const [password, setPassword] = useState(""); const [confirm, setConfirm] = useState(""); const [attemptId, setAttemptId] = useState(""); const [resendAt, setResendAt] = useState(0); const [seconds, setSeconds] = useState(0); const [error, setError] = useState(""); const [notice, setNotice] = useState(""); const [submitting, setSubmitting] = useState(false); const [showPassword, setShowPassword] = useState(false); const [showConfirm, setShowConfirm] = useState(false);
   useEffect(() => { if (fontsLoaded || fontError) return; const timeout = setTimeout(() => setFontTimedOut(true), FONT_STARTUP_TIMEOUT_MS); return () => clearTimeout(timeout); }, [fontsLoaded, fontError]);
   useEffect(() => { const diagnostic = getFontStartupDiagnostic(fontError, fontTimedOut, isDebugBuild); if (diagnostic) console.warn(diagnostic); }, [fontError, fontTimedOut]);

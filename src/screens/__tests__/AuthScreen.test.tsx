@@ -110,6 +110,37 @@ describe("AuthScreen signup", () => {
     act(() => renderer.unmount());
   });
 
+  it.each(["before resend", "after resend"]) ("requests and verifies a new OTP for a changed email %s", async (variant) => {
+    const auth = gateway();
+    const requestOtp = auth.requestOtp as jest.Mock;
+    const resendOtp = auth.resendOtp as jest.Mock;
+    requestOtp
+      .mockResolvedValueOnce({ attemptId: "old-attempt", expiresAt: 601_000, resendAvailableAt: 0 })
+      .mockResolvedValueOnce({ attemptId: "new-attempt", expiresAt: 601_000, resendAvailableAt: 0 });
+    resendOtp.mockResolvedValue({ attemptId: "old-attempt", expiresAt: 601_000, resendAvailableAt: 0 });
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<AuthScreen gateway={auth} />); });
+
+    act(() => button(renderer.root, "Đăng ký").props.onPress());
+    act(() => input(renderer.root, "Email").props.onChangeText("qa-original@example.com"));
+    await act(async () => { button(renderer.root, "Gửi OTP").props.onPress(); await Promise.resolve(); });
+    act(() => input(renderer.root, "Mã OTP").props.onChangeText("12"));
+    if (variant === "after resend") await act(async () => { button(renderer.root, "Gửi lại mã OTP").props.onPress(); await Promise.resolve(); });
+    act(() => button(renderer.root, "Đổi email").props.onPress());
+    expect(input(renderer.root, "Email").props.value).toBe("qa-original@example.com");
+    act(() => input(renderer.root, "Email").props.onChangeText("zz-changed@example.com"));
+    await act(async () => { button(renderer.root, "Gửi OTP").props.onPress(); await Promise.resolve(); });
+
+    expect(auth.requestOtp).toHaveBeenNthCalledWith(2, "zz-changed@example.com");
+    expect(auth.resendOtp).toHaveBeenCalledTimes(variant === "after resend" ? 1 : 0);
+    expect(input(renderer.root, "Mã OTP").props.value).toBe("");
+    act(() => input(renderer.root, "Mã OTP").props.onChangeText("123456"));
+    await act(async () => { button(renderer.root, "Tiếp tục").props.onPress(); await Promise.resolve(); });
+    expect(auth.verifyOtp).toHaveBeenLastCalledWith("zz-changed@example.com", "new-attempt", "123456");
+    expect(input(renderer.root, "Họ và tên (bắt buộc)")).toBeTruthy();
+    act(() => renderer.unmount());
+  });
+
   it("uses the approved action order and keeps all three social buttons behind the review flag", async () => {
     const auth = gateway();
     let renderer!: TestRenderer.ReactTestRenderer;

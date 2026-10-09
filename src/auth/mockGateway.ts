@@ -6,7 +6,8 @@ type Challenge = { active: boolean; attempts: number; consumed: boolean; email: 
 
 const OTP = "123456"; // Preview-only fixture; production policy belongs to the backend.
 const OTP_TTL_MS = 10 * 60 * 1000;
-const RESEND_COOLDOWN_MS = 60 * 1000;
+const configuredResendCooldown = Number(process.env.EXPO_PUBLIC_AUTH_MOCK_RESEND_COOLDOWN_MS);
+const RESEND_COOLDOWN_MS = Number.isFinite(configuredResendCooldown) && configuredResendCooldown > 0 ? configuredResendCooldown : 60 * 1000;
 const MAX_ATTEMPTS = 5;
 const MAX_RESENDS_PER_HOUR = 5;
 

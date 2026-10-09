@@ -31,6 +31,21 @@ describe("preview auth gateway", () => {
     const attempt = await createMockAuthGateway().requestOtp("clock@example.com");
     expect(attempt.expiresAt - attempt.resendAvailableAt).toBe(540000);
   });
+  it("allows the Web review build to shorten the mock resend cooldown", async () => {
+    const originalCooldown = process.env.EXPO_PUBLIC_AUTH_MOCK_RESEND_COOLDOWN_MS;
+    try {
+      process.env.EXPO_PUBLIC_AUTH_MOCK_RESEND_COOLDOWN_MS = "25";
+      jest.resetModules();
+      const { createMockAuthGateway: createReviewGateway } = jest.requireActual<typeof import("../mockGateway")>("../mockGateway");
+      const auth = createReviewGateway(() => now);
+      const attempt = await auth.requestOtp("review@example.com");
+      expect(attempt.resendAvailableAt).toBe(1_025);
+    } finally {
+      if (originalCooldown === undefined) delete process.env.EXPO_PUBLIC_AUTH_MOCK_RESEND_COOLDOWN_MS;
+      else process.env.EXPO_PUBLIC_AUTH_MOCK_RESEND_COOLDOWN_MS = originalCooldown;
+      jest.resetModules();
+    }
+  });
   it("enforces resend cooldown and five resends per hour", async () => {
     const auth = gateway(); const attempt = await auth.requestOtp("mai@example.com");
     await expectCode(auth.resendOtp("mai@example.com"), "RESEND_COOLDOWN");

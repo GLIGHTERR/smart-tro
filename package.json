@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit",
     "test": "jest --runInBand",
     "test:coverage": "jest --runInBand --coverage",
-    "test:web": "expo export --platform web --clear && playwright test"
+    "test:web": "expo export --platform web --clear && playwright test",
+    "test:web:auth": "EXPO_PUBLIC_AUTH_USE_MOCK=true EXPO_PUBLIC_REVIEW_SOCIALS=true EXPO_PUBLIC_AUTH_MOCK_RESEND_COOLDOWN_MS=25 expo export --platform web --clear && AUTH_VISUAL_REVIEW=true AUTH_CHANGE_EMAIL_REVIEW=true playwright test tests/web/auth-visual.spec.ts tests/web/auth-change-email.spec.ts"
   },
   "dependencies": {
     "@ant-design/icons-react-native": "^2.3.2",

@@ -131,13 +131,39 @@ describe("AuthScreen signup", () => {
     act(() => input(renderer.root, "Email").props.onChangeText("zz-changed@example.com"));
     await act(async () => { button(renderer.root, "Gửi OTP").props.onPress(); await Promise.resolve(); });
 
-    expect(auth.requestOtp).toHaveBeenNthCalledWith(2, "zz-changed@example.com");
+    expect(auth.requestOtp).toHaveBeenNthCalledWith(2, "zz-changed@example.com", "old-attempt");
     expect(auth.resendOtp).toHaveBeenCalledTimes(variant === "after resend" ? 1 : 0);
     expect(input(renderer.root, "Mã OTP").props.value).toBe("");
     act(() => input(renderer.root, "Mã OTP").props.onChangeText("123456"));
     await act(async () => { button(renderer.root, "Tiếp tục").props.onPress(); await Promise.resolve(); });
     expect(auth.verifyOtp).toHaveBeenLastCalledWith("zz-changed@example.com", "new-attempt", "123456");
     expect(input(renderer.root, "Họ và tên (bắt buộc)")).toBeTruthy();
+    act(() => renderer.unmount());
+  });
+
+  it("keeps the live attempt when a changed-email replacement request fails", async () => {
+    const auth = gateway();
+    const requestOtp = auth.requestOtp as jest.Mock;
+    requestOtp
+      .mockResolvedValueOnce({ attemptId: "old-attempt", expiresAt: 601_000, resendAvailableAt: 0 })
+      .mockRejectedValueOnce(new Error("offline"));
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<AuthScreen gateway={auth} />); });
+
+    act(() => button(renderer.root, "Đăng ký").props.onPress());
+    act(() => input(renderer.root, "Email").props.onChangeText("old@example.com"));
+    await act(async () => { button(renderer.root, "Gửi OTP").props.onPress(); await Promise.resolve(); });
+    act(() => button(renderer.root, "Đổi email").props.onPress());
+    act(() => input(renderer.root, "Email").props.onChangeText("new@example.com"));
+    await act(async () => { button(renderer.root, "Gửi OTP").props.onPress(); await Promise.resolve(); });
+
+    expect(requestOtp).toHaveBeenLastCalledWith("new@example.com", "old-attempt");
+    expect(input(renderer.root, "Email").props.value).toBe("new@example.com");
+    expect(button(renderer.root, "Gửi OTP")).toBeTruthy();
+    act(() => input(renderer.root, "Email").props.onChangeText("old@example.com"));
+    await act(async () => { button(renderer.root, "Gửi OTP").props.onPress(); await Promise.resolve(); });
+    expect(requestOtp).toHaveBeenCalledTimes(2);
+    expect(input(renderer.root, "Mã OTP").props.value).toBe("");
     act(() => renderer.unmount());
   });
 

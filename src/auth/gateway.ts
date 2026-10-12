@@ -36,7 +36,7 @@ export type RecoveryCompletion = { email: string; next: "sign_in" };
 export type SignUpProfile = { displayName: string; phone: string | null };
 
 export interface AuthGateway {
-  requestOtp(email: string): Promise<OtpAttempt>;
+  requestOtp(email: string, previousAttemptId?: string): Promise<OtpAttempt>;
   resendOtp(email: string): Promise<OtpAttempt>;
   verifyOtp(email: string, attemptId: string, otp: string): Promise<void>;
   createAccount(email: string, attemptId: string, otp: string, password: string, profile: SignUpProfile): Promise<void>;
@@ -66,7 +66,9 @@ type GatewayDependencies = {
   setTimeout?: (callback: () => void, ms: number) => ReturnType<typeof setTimeout>;
 };
 type ErrorPayload = { code?: string; details?: { retryAfterSeconds?: number }; error?: { code?: string }; message?: string };
-type OtpResponse = { attemptId: string; expiresInSeconds: number; resendAfterSeconds?: number };
+type OtpResponse = { accepted: true; attemptId: string; expiresInSeconds: number; resendAfterSeconds: number };
+type SignupVerificationResponse = { verified: true; attemptId: string; expiresInSeconds: number };
+type SignupCompletionResponse = { created: true; next: "sign_in" };
 type TokenResponse = { accessToken: string; refreshToken: string };
 type RecoveryChallengeResponse = { accepted: true; challengeId: string; expiresInSeconds: number; resendAfterSeconds: number };
 type RecoveryVerificationResponse = { verified: true; resetToken: string; expiresInSeconds: number };
@@ -75,8 +77,6 @@ type RecoveryCompletionResponse = { reset: true; next: "sign_in"; email: string 
 const knownCodes = new Set<GatewayErrorCode>([
   "INVALID_CREDENTIALS", "ACCOUNT_UNVERIFIED", "ACCOUNT_INACTIVE", "INVALID_OTP", "OTP_EXPIRED", "OTP_ATTEMPTS_EXHAUSTED", "RESEND_COOLDOWN", "RESEND_LIMIT", "ACCOUNT_EXISTS", "AUTH_RATE_LIMITED", "OTP_PROVIDER_UNAVAILABLE", "SIGNUP_UNAVAILABLE", "PASSWORD_RECOVERY_OTP_INVALID", "PASSWORD_RESET_TOKEN_INVALID", "PASSWORD_CONFIRMATION_MISMATCH", "PASSWORD_UNCHANGED", "INVALID_SESSION"
 ]);
-// Legacy servers may omit the field; current API responses define it explicitly.
-const DEFAULT_RESEND_AFTER_SECONDS = 60;
 const DEFAULT_DEVICE_ID_TIMEOUT_MS = 5_000;
 const DEFAULT_REQUEST_TIMEOUT_MS = 60_000;
 
@@ -114,13 +114,21 @@ function gatewayError(status: number, payload: ErrorPayload | undefined): Gatewa
 }
 
 function asOtpAttempt(response: OtpResponse, now: () => number): OtpAttempt {
-  if (!response.attemptId || !Number.isFinite(response.expiresInSeconds)) throw new GatewayError("SERVER_ERROR");
+  if (response.accepted !== true || !response.attemptId || !Number.isFinite(response.expiresInSeconds) || !Number.isFinite(response.resendAfterSeconds)) throw new GatewayError("SERVER_ERROR");
   const current = now();
   return {
     attemptId: response.attemptId,
     expiresAt: current + response.expiresInSeconds * 1000,
-    resendAvailableAt: current + (response.resendAfterSeconds ?? DEFAULT_RESEND_AFTER_SECONDS) * 1000
+    resendAvailableAt: current + response.resendAfterSeconds * 1000
   };
+}
+
+function asSignupVerification(response: SignupVerificationResponse, attemptId: string): void {
+  if (response.verified !== true || response.attemptId !== attemptId || !Number.isFinite(response.expiresInSeconds)) throw new GatewayError("SERVER_ERROR");
+}
+
+function asSignupCompletion(response: SignupCompletionResponse): void {
+  if (response.created !== true || response.next !== "sign_in") throw new GatewayError("SERVER_ERROR");
 }
 
 function asRecoveryChallenge(response: RecoveryChallengeResponse, now: () => number): RecoveryChallenge {
@@ -187,12 +195,12 @@ export function createApiAuthGateway({
     if (response.status === 204) return undefined as T;
     try { return (await response.json()) as T; } catch (cause) { report("parse", cause); throw new GatewayError("SERVER_ERROR"); }
   };
-  const otpRequest = async (email: string) => asOtpAttempt(await request<OtpResponse>("/auth/signup/otp/request", { method: "POST", body: JSON.stringify({ email }) }), now);
+  const otpRequest = async (email: string, previousAttemptId?: string) => asOtpAttempt(await request<OtpResponse>("/auth/signup/otp/request", { method: "POST", body: JSON.stringify({ email, ...(previousAttemptId ? { previousAttemptId } : {}) }) }), now);
   return {
     requestOtp: otpRequest,
     resendOtp: otpRequest,
-    verifyOtp: async (email, attemptId, code) => { await request("/auth/signup/otp/verify", { method: "POST", body: JSON.stringify({ email, attemptId, code }) }); },
-    createAccount: async (email, attemptId, code, password, profile) => { await request("/auth/signup/complete", { method: "POST", body: JSON.stringify({ email, attemptId, code, password, ...profile }) }); },
+    verifyOtp: async (email, attemptId, code) => { asSignupVerification(await request<SignupVerificationResponse>("/auth/signup/otp/verify", { method: "POST", body: JSON.stringify({ email, attemptId, code }) }), attemptId); },
+    createAccount: async (email, attemptId, code, password, profile) => { asSignupCompletion(await request<SignupCompletionResponse>("/auth/signup/complete", { method: "POST", body: JSON.stringify({ email, attemptId, code, password, ...profile }) })); },
     signIn: (email, password) => request<TokenResponse>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }),
     refresh: (refreshToken) => request<TokenResponse>("/auth/token/refresh", { method: "POST", body: JSON.stringify({ refreshToken }) }),
     me: async (accessToken) => { await request("/auth/me", { method: "GET" }, accessToken); },

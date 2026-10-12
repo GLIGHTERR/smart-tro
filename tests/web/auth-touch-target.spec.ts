@@ -1,4 +1,5 @@
 import { expect, test, type Locator } from "@playwright/test";
+import { mockSignupApi } from "./auth-api-fixture";
 
 test.skip(process.env.AUTH_TOUCH_TARGET_REVIEW !== "true", "Touch-target coverage uses the dedicated mock-auth export.");
 
@@ -18,6 +19,7 @@ async function expectTouchTarget(control: Locator) {
 
 for (const viewport of viewports) {
   test(`keeps auth link targets and keyboard navigation accessible at ${viewport.name}`, async ({ page }) => {
+    await mockSignupApi(page);
     await page.setViewportSize(viewport);
     await page.goto("");
 

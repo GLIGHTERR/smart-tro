@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { mockSignupApi } from "./auth-api-fixture";
 
 test.skip(process.env.AUTH_CHANGE_EMAIL_REVIEW !== "true", "Change-email coverage uses the dedicated mock-auth export.");
 
@@ -12,6 +13,7 @@ const viewports = [
 for (const viewport of viewports) {
   for (const variant of ["before resend", "after resend"] as const) {
     test(`verifies the changed-email OTP ${variant} at ${viewport.name}`, async ({ page }) => {
+      await mockSignupApi(page);
       await page.setViewportSize(viewport);
       await page.goto("");
       await page.getByRole("button", { name: "Đăng ký" }).click();

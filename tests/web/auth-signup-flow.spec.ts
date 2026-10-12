@@ -1,8 +1,10 @@
 import { expect, test } from "@playwright/test";
+import { mockSignupApi } from "./auth-api-fixture";
 
 test.skip(process.env.AUTH_SIGNUP_FLOW_REVIEW !== "true", "Signup flow coverage uses the dedicated mock-auth export.");
 
 test("completes the mock signup fixture without creating a session", async ({ page }) => {
+  await mockSignupApi(page);
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto("");
   await expect(page.getByRole("button", { name: "Đăng nhập", exact: true })).toBeVisible();

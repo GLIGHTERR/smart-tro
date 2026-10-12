@@ -1,8 +1,10 @@
 import { expect, test } from "@playwright/test";
+import { mockSignupApi } from "./auth-api-fixture";
 
 test.skip(process.env.AUTH_VISUAL_REVIEW !== "true", "Auth visual evidence uses the dedicated mock-auth export.");
 
 test("captures the approved sign-in and OTP layouts", async ({ page }) => {
+  await mockSignupApi(page);
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto("");
   await expect(page.getByRole("button", { name: "Đăng nhập với Facebook" })).toBeVisible();

@@ -79,6 +79,24 @@ describe("AuthScreen signup", () => {
     act(() => renderer.unmount());
   });
 
+  it("sends one OTP request for two synchronous taps and permits retry after failure", async () => {
+    const auth = gateway();
+    let rejectRequest!: (reason: Error) => void;
+    (auth.requestOtp as jest.Mock).mockImplementationOnce(() => new Promise((_, reject) => { rejectRequest = reject; }));
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<AuthScreen gateway={auth} />); });
+
+    act(() => button(renderer.root, "Đăng ký").props.onPress());
+    act(() => input(renderer.root, "Email").props.onChangeText("race@example.com"));
+    act(() => { button(renderer.root, "Gửi OTP").props.onPress(); button(renderer.root, "Gửi OTP").props.onPress(); });
+    expect(auth.requestOtp).toHaveBeenCalledTimes(1);
+
+    await act(async () => { rejectRequest(new Error("offline")); await Promise.resolve(); });
+    await act(async () => { button(renderer.root, "Gửi OTP").props.onPress(); await Promise.resolve(); });
+    expect(auth.requestOtp).toHaveBeenCalledTimes(2);
+    act(() => renderer.unmount());
+  });
+
   it("clears entered OTP on email change and clears passwords while retaining personal data on Back", async () => {
     const auth = gateway();
     let renderer!: TestRenderer.ReactTestRenderer;

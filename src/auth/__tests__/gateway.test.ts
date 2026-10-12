@@ -11,9 +11,9 @@ describe("email auth gateway", () => {
   beforeEach(() => { fetchMock.mockReset(); getDeviceId.mockClear(); });
 
   it("uses the approved signup payloads and the API cooldown for an initial request", async () => {
-    fetchMock.mockResolvedValueOnce(json({ attemptId: "attempt-1", expiresInSeconds: 300, resendAfterSeconds: 41 }));
-    fetchMock.mockResolvedValueOnce(noContent());
-    fetchMock.mockResolvedValueOnce(noContent());
+    fetchMock.mockResolvedValueOnce(json({ accepted: true, attemptId: "attempt-1", expiresInSeconds: 300, resendAfterSeconds: 41 }, 202));
+    fetchMock.mockResolvedValueOnce(json({ verified: true, attemptId: "attempt-1", expiresInSeconds: 300 }));
+    fetchMock.mockResolvedValueOnce(json({ created: true, next: "sign_in" }, 201));
     const auth = gateway();
     await expect(auth.requestOtp("mai@example.com")).resolves.toEqual({ attemptId: "attempt-1", expiresAt: 301000, resendAvailableAt: 42000 });
     await auth.verifyOtp("mai@example.com", "attempt-1", "123456");
@@ -25,13 +25,14 @@ describe("email auth gateway", () => {
   });
 
   it("uses the request endpoint to resend with the returned remaining cooldown", async () => {
-    fetchMock.mockResolvedValue(json({ attemptId: "attempt-2", expiresInSeconds: 600, resendAfterSeconds: 6 }));
+    fetchMock.mockResolvedValue(json({ accepted: true, attemptId: "attempt-2", expiresInSeconds: 600, resendAfterSeconds: 6 }, 202));
     await expect(gateway().resendOtp("mai@example.com")).resolves.toEqual({ attemptId: "attempt-2", expiresAt: 601000, resendAvailableAt: 7000 });
   });
 
-  it("uses the legacy 60-second fallback only when the cooldown is absent", async () => {
-    fetchMock.mockResolvedValue(json({ attemptId: "attempt-2", expiresInSeconds: 600 }));
-    await expect(gateway().resendOtp("mai@example.com")).resolves.toEqual({ attemptId: "attempt-2", expiresAt: 601000, resendAvailableAt: 61000 });
+  it("sends the previous attempt only when replacing an email attempt", async () => {
+    fetchMock.mockResolvedValueOnce(json({ accepted: true, attemptId: "attempt-2", expiresInSeconds: 600, resendAfterSeconds: 60 }, 202));
+    await expect(gateway().requestOtp("new@example.com", "attempt-1")).resolves.toEqual({ attemptId: "attempt-2", expiresAt: 601000, resendAvailableAt: 61000 });
+    expect(fetchMock).toHaveBeenCalledWith("https://api.example/auth/signup/otp/request", expect.objectContaining({ body: JSON.stringify({ email: "new@example.com", previousAttemptId: "attempt-1" }) }));
   });
 
   it("logs in, verifies the authenticated session, refreshes both tokens, and logs out", async () => {
@@ -63,6 +64,15 @@ describe("email auth gateway", () => {
   });
 
   it.each([
+    ["signup accepted", "requestOtp", { accepted: false, attemptId: "attempt", expiresInSeconds: 600, resendAfterSeconds: 60 }],
+    ["signup attempt", "requestOtp", { accepted: true, attemptId: "", expiresInSeconds: 600, resendAfterSeconds: 60 }],
+    ["signup expiry", "requestOtp", { accepted: true, attemptId: "attempt", expiresInSeconds: "bad", resendAfterSeconds: 60 }],
+    ["signup cooldown", "requestOtp", { accepted: true, attemptId: "attempt", expiresInSeconds: 600, resendAfterSeconds: "bad" }],
+    ["signup verification flag", "verifyOtp", { verified: false, attemptId: "attempt", expiresInSeconds: 600 }],
+    ["signup verification attempt", "verifyOtp", { verified: true, attemptId: "other", expiresInSeconds: 600 }],
+    ["signup verification expiry", "verifyOtp", { verified: true, attemptId: "attempt", expiresInSeconds: "bad" }],
+    ["signup completion created", "createAccount", { created: false, next: "sign_in" }],
+    ["signup completion next", "createAccount", { created: true, next: "other" }],
     ["challenge accepted", "requestPasswordRecovery", { accepted: false, challengeId: "challenge", expiresInSeconds: 600, resendAfterSeconds: 60 }],
     ["challenge id", "requestPasswordRecovery", { accepted: true, challengeId: "", expiresInSeconds: 600, resendAfterSeconds: 60 }],
     ["challenge expiry", "requestPasswordRecovery", { accepted: true, challengeId: "challenge", expiresInSeconds: "bad", resendAfterSeconds: 60 }],
@@ -76,11 +86,17 @@ describe("email auth gateway", () => {
   ] as const)("rejects a malformed recovery %s response", async (_label, method, body) => {
     fetchMock.mockResolvedValue(json(body));
     const auth = gateway();
-    const operation = method === "requestPasswordRecovery"
-      ? auth.requestPasswordRecovery("mai@example.com")
-      : method === "verifyPasswordRecovery"
-        ? auth.verifyPasswordRecovery("mai@example.com", "challenge", "123456")
-        : auth.resetPassword("token", "Changed!1", "Changed!1");
+    const operation = method === "requestOtp"
+      ? auth.requestOtp("mai@example.com")
+      : method === "verifyOtp"
+        ? auth.verifyOtp("mai@example.com", "attempt", "123456")
+        : method === "createAccount"
+          ? auth.createAccount("mai@example.com", "attempt", "123456", "Strong!1", { displayName: "Mai", phone: null })
+          : method === "requestPasswordRecovery"
+            ? auth.requestPasswordRecovery("mai@example.com")
+            : method === "verifyPasswordRecovery"
+              ? auth.verifyPasswordRecovery("mai@example.com", "challenge", "123456")
+              : auth.resetPassword("token", "Changed!1", "Changed!1");
     await expect(operation).rejects.toEqual(expect.objectContaining({ code: "SERVER_ERROR" }));
   });
 
@@ -99,7 +115,7 @@ describe("email auth gateway", () => {
   it("maps nested backend errors, invalid JSON, invalid successful payloads, and fetch failures", async () => {
     fetchMock.mockResolvedValueOnce(json({ error: { code: "ACCOUNT_UNVERIFIED" } }, 401));
     fetchMock.mockResolvedValueOnce(new Response("not json", { status: 500 }));
-    fetchMock.mockResolvedValueOnce(json({ expiresInSeconds: 3 }));
+    fetchMock.mockResolvedValueOnce(json({ accepted: true, expiresInSeconds: 3, resendAfterSeconds: 60 }));
     fetchMock.mockRejectedValueOnce(new Error("offline"));
     const auth = gateway();
     await expect(auth.requestOtp("mai@example.com")).rejects.toEqual(expect.objectContaining({ code: "ACCOUNT_UNVERIFIED" }));

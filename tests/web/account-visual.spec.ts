@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+test.use({ hasTouch: true });
+
 const scenarios = ["zero", "one", "multiple", "loading", "error", "timeout", "session", "long"] as const;
 
 async function openAccount(page: import("@playwright/test").Page, scenario: typeof scenarios[number], viewport: { width: number; height: number }) {
@@ -37,6 +39,28 @@ test("Personal and Signature tabs switch without a Home action", async ({ page }
   await page.screenshot({ path: "evidence/uc04-account/signature-1280x900.png", fullPage: true });
   await page.getByRole("tab", { name: "Cá nhân" }).click();
   await expect(page.getByText("Nguyễn Văn A")).toBeVisible();
+});
+
+test("UC-04 tabs expose exactly one selected DOM state after pointer, touch, and keyboard activation", async ({ page }) => {
+  await openAccount(page, "one", { width: 375, height: 812 });
+  const personal = page.getByRole("tab", { name: "Cá nhân" });
+  const signature = page.getByRole("tab", { name: "Chữ ký" });
+  await expect(personal).toHaveAttribute("aria-selected", "true");
+  await expect(signature).toHaveAttribute("aria-selected", "false");
+
+  await signature.click();
+  await expect(personal).toHaveAttribute("aria-selected", "false");
+  await expect(signature).toHaveAttribute("aria-selected", "true");
+
+  await personal.focus();
+  await page.keyboard.press("Enter");
+  await expect(personal).toHaveAttribute("aria-selected", "true");
+  await expect(signature).toHaveAttribute("aria-selected", "false");
+
+  await signature.tap();
+  await expect(personal).toHaveAttribute("aria-selected", "false");
+  await expect(signature).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByText("UC-32/UC-33 — Xem chữ ký điện tử.")).toBeVisible();
 });
 
 test("logout confirmation can cancel before confirming the existing flow", async ({ page }) => {

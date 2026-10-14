@@ -15,7 +15,7 @@ for (const viewport of [
     const email = page.getByLabel("Email");
     const password = page.getByLabel("Mật khẩu", { exact: true });
     const container = password.locator("..");
-    const reveal = page.getByLabel("Hiện mật khẩu");
+    const reveal = page.getByRole("button", { name: "Hiện mật khẩu", exact: true });
     const expectedField = { radius: "24px", height: "48px", background: "rgb(251, 201, 126)" };
 
     await expect(email).toHaveCSS("border-radius", expectedField.radius);
@@ -27,10 +27,16 @@ for (const viewport of [
     await expect(container).toHaveCSS("overflow", "hidden");
 
     await password.fill("Strong!1");
-    await password.focus();
+    await reveal.focus();
+    await expect(reveal).toBeFocused();
+    await page.keyboard.press("Space");
+    const conceal = page.getByRole("button", { name: "Ẩn mật khẩu", exact: true });
+    await expect(conceal).toBeFocused();
+    await page.keyboard.press("Space");
+    await expect(reveal).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expect(conceal).toBeFocused();
     await expect(container).toHaveCSS("border-radius", expectedField.radius);
-    await reveal.click();
-    const conceal = page.getByLabel("Ẩn mật khẩu");
     await expect(conceal).toBeVisible();
     await expect(container).toHaveCSS("border-radius", expectedField.radius);
     const revealBox = await conceal.boundingBox();

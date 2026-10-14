@@ -220,8 +220,14 @@ describe("AuthScreen sign in password field", () => {
 
     expect(StyleSheet.flatten(container?.props.style)).toMatchObject({ backgroundColor: "#FBC97E", borderRadius: 24, height: 48, overflow: "hidden" });
     expect(StyleSheet.flatten(reveal.props.style)).toMatchObject({ alignItems: "center", height: 48, right: 0, width: 54 });
+    expect(reveal.props.accessibilityRole).toBe("button");
+    expect(reveal.props.accessibilityState).toEqual({ expanded: false });
     act(() => reveal.props.onPress());
-    expect(renderer.root.findByProps({ accessibilityLabel: "Ẩn mật khẩu" })).toBeTruthy();
+    const hide = renderer.root.findByProps({ accessibilityLabel: "Ẩn mật khẩu" });
+    expect(hide.props.accessibilityRole).toBe("button");
+    expect(hide.props.accessibilityState).toEqual({ expanded: true });
+    act(() => hide.props.onPress());
+    expect(renderer.root.findByProps({ accessibilityLabel: "Hiện mật khẩu" }).props.accessibilityState).toEqual({ expanded: false });
     act(() => renderer.unmount());
   });
 });

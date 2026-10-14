@@ -8,9 +8,10 @@ import { ScreenState } from "@/ui/components";
 import { AuthScreen } from "@/screens/AuthScreen";
 import { HomeScreen } from "@/screens/HomeScreen";
 import { AccountScreen } from "@/screens/AccountScreen";
+import { EditPersonalInformationScreen } from "@/screens/EditPersonalInformationScreen";
 import { homeDestinations, type HomeAction } from "@/screens/homeModel";
 
-type RootStackParamList = { Auth: undefined; Home: undefined; Account: undefined; Destination: { action: Exclude<HomeAction, "account"> | "edit-profile" | "change-password" } };
+type RootStackParamList = { Auth: undefined; Home: undefined; Account: undefined; EditProfile: undefined; Destination: { action: Exclude<HomeAction, "account"> | "change-password" } };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const isWebReview = process.env.EXPO_PUBLIC_HOME_REVIEW === "true" || process.env.EXPO_PUBLIC_ACCOUNT_REVIEW === "true";
@@ -23,20 +24,26 @@ const linking = {
 
 function AuthenticatedHome({ navigation }: { navigation: { navigate: (screen: "Account") => void } & { navigate: (screen: "Destination", params: { action: Exclude<HomeAction, "account"> }) => void } }) { const { token } = useAuth(); return <HomeScreen sessionKey={token ?? ""} onNavigate={(action) => action === "account" ? navigation.navigate("Account") : navigation.navigate("Destination", { action })} />; }
 
-function AuthenticatedAccount({ navigation }: { navigation: { canGoBack: () => boolean; goBack: () => void; navigate: (screen: "Destination", params: { action: "edit-profile" | "change-password" }) => void; reset: (state: { index: number; routes: { name: "Home" }[] }) => void } }) {
+function AuthenticatedAccount({ navigation }: { navigation: { canGoBack: () => boolean; goBack: () => void; navigate: ((screen: "EditProfile") => void) & ((screen: "Destination", params: { action: "change-password" }) => void); reset: (state: { index: number; routes: { name: "Home" }[] }) => void } }) {
   const { token, signOut } = useAuth();
-  return <AccountScreen sessionKey={token ?? ""} onBack={() => navigation.canGoBack() ? navigation.goBack() : navigation.reset({ index: 0, routes: [{ name: "Home" }] })} onChangePassword={() => navigation.navigate("Destination", { action: "change-password" })} onEditProfile={() => navigation.navigate("Destination", { action: "edit-profile" })} onSignOut={signOut} />;
+  return <AccountScreen sessionKey={token ?? ""} onBack={() => navigation.canGoBack() ? navigation.goBack() : navigation.reset({ index: 0, routes: [{ name: "Home" }] })} onChangePassword={() => navigation.navigate("Destination", { action: "change-password" })} onEditProfile={() => navigation.navigate("EditProfile")} onSignOut={signOut} />;
+}
+
+function AuthenticatedEditProfile({ navigation }: { navigation: { canGoBack: () => boolean; goBack: () => void; reset: (state: { index: number; routes: { name: "Home" }[] }) => void } }) {
+  const { signOut } = useAuth();
+  const exit = () => navigation.canGoBack() ? navigation.goBack() : navigation.reset({ index: 0, routes: [{ name: "Home" }] });
+  return <EditPersonalInformationScreen onExit={exit} onSaved={exit} onSessionError={signOut} />;
 }
 
 function DestinationScreen({ navigation, route }: { navigation: { goBack: () => void }; route: { params: RootStackParamList["Destination"] } }) {
-  const destination = route.params.action === "edit-profile" ? "UC-05 — Chỉnh sửa thông tin cá nhân" : route.params.action === "change-password" ? "UC-06 — Đổi mật khẩu" : homeDestinations[route.params.action];
+  const destination = route.params.action === "change-password" ? "UC-06 — Đổi mật khẩu" : homeDestinations[route.params.action];
   return <SafeAreaView style={styles.safe}><View style={styles.content}><Text accessibilityRole="header" style={styles.title}>{destination}</Text><Text style={styles.copy}>Bạn đã đến điểm điều hướng được chọn từ Trang chủ.</Text><Pressable accessibilityRole="button" accessibilityLabel="Quay lại Trang chủ" onPress={navigation.goBack} style={styles.back}><Text style={styles.backText}>Quay lại Trang chủ</Text></Pressable></View></SafeAreaView>;
 }
 
 export function RootNavigator() {
   const { token, isRestoring } = useAuth();
   if (isRestoring) return <ScreenState kind="loading" />;
-  return <NavigationContainer linking={linking}>{token || isWebReview ? <Stack.Navigator screenOptions={{ headerShown: false }}><Stack.Screen name="Home" component={AuthenticatedHome} /><Stack.Screen name="Account" component={AuthenticatedAccount} /><Stack.Screen name="Destination" component={DestinationScreen} /></Stack.Navigator> : <Stack.Navigator screenOptions={{ headerShown: false }}><Stack.Screen name="Auth" component={AuthScreen} /></Stack.Navigator>}</NavigationContainer>;
+  return <NavigationContainer linking={linking}>{token || isWebReview ? <Stack.Navigator screenOptions={{ headerShown: false }}><Stack.Screen name="Home" component={AuthenticatedHome} /><Stack.Screen name="Account" component={AuthenticatedAccount} /><Stack.Screen name="EditProfile" component={AuthenticatedEditProfile} /><Stack.Screen name="Destination" component={DestinationScreen} /></Stack.Navigator> : <Stack.Navigator screenOptions={{ headerShown: false }}><Stack.Screen name="Auth" component={AuthScreen} /></Stack.Navigator>}</NavigationContainer>;
 }
 
 const styles = StyleSheet.create({

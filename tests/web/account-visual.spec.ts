@@ -29,6 +29,25 @@ test("the Account back control falls back to Home for direct entry", async ({ pa
   await expect(page.getByText("Xin chào")).toBeVisible();
 });
 
+test("web history back preserves a dirty UC-05 form until the renter discards it", async ({ page }) => {
+  await openAccount(page, "one", { width: 375, height: 812 });
+  await page.getByRole("button", { name: "Chỉnh sửa thông tin cá nhân" }).click();
+  await expect(page.getByRole("heading", { name: "Cập nhật thông tin cá nhân" })).toBeVisible();
+  const name = page.getByRole("textbox", { name: "Họ và tên" });
+  await name.fill("Mai An");
+  await page.goBack();
+  await expect(page.getByText("Hủy thay đổi?")).toBeVisible();
+  await page.screenshot({ path: "evidence/uc05-edit-profile/web-back-dirty-dialog-375x812.png", fullPage: true });
+  await page.goBack();
+  await expect(page.getByText("Hủy thay đổi?")).toHaveCount(1);
+  await page.getByRole("button", { name: "Tiếp tục chỉnh sửa" }).click();
+  await expect(name).toHaveValue("Mai An");
+  await expect(page.getByRole("heading", { name: "Cập nhật thông tin cá nhân" })).toBeVisible();
+  await page.goBack();
+  await page.getByRole("button", { name: "Bỏ thay đổi" }).click();
+  await expect(page.getByRole("heading", { name: "Tài khoản" })).toBeVisible();
+});
+
 test("Personal and Signature tabs switch without a Home action", async ({ page }) => {
   await openAccount(page, "one", { width: 375, height: 812 });
   await page.getByRole("tab", { name: "Chữ ký" }).click();

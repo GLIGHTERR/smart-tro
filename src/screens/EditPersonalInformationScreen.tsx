@@ -7,10 +7,12 @@ import { maskEmail } from "./accountModel";
 import { canonicalPhoneFromDomestic, domesticPhoneFromCanonical, isDirty, type EditableProfile, validateEditableProfile } from "./editPersonalInformationModel";
 
 type SaveResult = "success" | "validation" | "retryable" | "session";
-export type EditProfileProps = { profile?: EditableProfile; onExit: () => void; onSessionError: () => void; onSaved: () => void; reviewResult?: SaveResult };
+type NavigationAction = { type: string };
+type EditProfileNavigation = { addListener: (event: "beforeRemove", listener: (event: { preventDefault: () => void; data: { action: NavigationAction } }) => void) => () => void; dispatch: (action: NavigationAction) => void };
+export type EditProfileProps = { profile?: EditableProfile; onExit: () => void; onSessionError: () => void; onSaved: () => void; reviewResult?: SaveResult; navigation?: EditProfileNavigation };
 const fixture: EditableProfile = { displayName: "Nguyễn Văn A", phone: "+84901234567", email: "nguyen.van.a.renter@example.com" };
 
-export function EditPersonalInformationScreen({ profile = fixture, onExit, onSessionError, onSaved, reviewResult = "success" }: EditProfileProps) {
+export function EditPersonalInformationScreen({ profile = fixture, onExit, onSessionError, onSaved, reviewResult = "success", navigation }: EditProfileProps) {
   const [name, setName] = useState(profile.displayName);
   const [phone, setPhone] = useState(domesticPhoneFromCanonical(profile.phone));
   const [saving, setSaving] = useState(false);
@@ -23,6 +25,8 @@ export function EditPersonalInformationScreen({ profile = fixture, onExit, onSes
   const canSave = dirty && valid && !saving;
   const dirtyRef = useRef(dirty);
   const savingRef = useRef(saving);
+  const pendingBackAction = useRef<NavigationAction | null>(null);
+  const replayingBackAction = useRef(false);
   useEffect(() => { dirtyRef.current = dirty; savingRef.current = saving; }, [dirty, saving]);
   useEffect(() => {
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
@@ -32,7 +36,22 @@ export function EditPersonalInformationScreen({ profile = fixture, onExit, onSes
     });
     return () => subscription.remove();
   }, []);
+  useEffect(() => navigation?.addListener("beforeRemove", (event) => {
+    if (replayingBackAction.current || savingRef.current || !dirtyRef.current) return;
+    event.preventDefault();
+    pendingBackAction.current = event.data.action;
+    setDialog(true);
+  }), [navigation]);
   const requestExit = () => { if (saving) return; if (dirty) setDialog(true); else onExit(); };
+  const stay = () => { pendingBackAction.current = null; setDialog(false); setTimeout(() => stayRef.current?.focus(), 0); };
+  const discard = () => {
+    const action = pendingBackAction.current;
+    pendingBackAction.current = null;
+    if (!action || !navigation) return onExit();
+    replayingBackAction.current = true;
+    navigation.dispatch(action);
+    setTimeout(() => { replayingBackAction.current = false; }, 0);
+  };
   const save = () => {
     if (!canSave) return;
     setNotice(null); setSaving(true);
@@ -60,7 +79,7 @@ export function EditPersonalInformationScreen({ profile = fixture, onExit, onSes
       <View style={styles.actions}><Pressable accessibilityRole="button" accessibilityLabel="Hủy chỉnh sửa" disabled={saving} onPress={requestExit} style={({ pressed }) => [styles.secondary, (pressed || saving) && styles.pressed]}><Text style={styles.secondaryText}>Hủy</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Lưu" accessibilityState={{ disabled: !canSave }} disabled={!canSave} onPress={save} style={({ pressed }) => [styles.primary, (!canSave || pressed) && styles.pressed]}>{saving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryText}>Lưu</Text>}</Pressable></View>
     </KeyboardAvoidingView>
     <Modal visible={dialog} transparent animationType="fade" onRequestClose={() => setDialog(false)}>
-      <View accessibilityViewIsModal style={styles.backdrop}><View accessibilityRole="alert" style={styles.dialog}><Text accessibilityRole="header" style={styles.dialogTitle}>Hủy thay đổi?</Text><Text style={styles.dialogCopy}>Các thay đổi chưa lưu sẽ bị mất. Bạn có chắc muốn rời khỏi màn hình này?</Text><View style={styles.dialogActions}><Pressable ref={stayRef} accessibilityRole="button" onPress={() => { setDialog(false); setTimeout(() => stayRef.current?.focus(), 0); }} style={styles.stay}><Text style={styles.stayText}>Tiếp tục chỉnh sửa</Text></Pressable><Pressable accessibilityRole="button" onPress={onExit} style={styles.discard}><Text style={styles.discardText}>Bỏ thay đổi</Text></Pressable></View></View></View>
+      <View accessibilityViewIsModal style={styles.backdrop}><View accessibilityRole="alert" style={styles.dialog}><Text accessibilityRole="header" style={styles.dialogTitle}>Hủy thay đổi?</Text><Text style={styles.dialogCopy}>Các thay đổi chưa lưu sẽ bị mất. Bạn có chắc muốn rời khỏi màn hình này?</Text><View style={styles.dialogActions}><Pressable ref={stayRef} accessibilityRole="button" onPress={stay} style={styles.stay}><Text style={styles.stayText}>Tiếp tục chỉnh sửa</Text></Pressable><Pressable accessibilityRole="button" onPress={discard} style={styles.discard}><Text style={styles.discardText}>Bỏ thay đổi</Text></Pressable></View></View></View>
     </Modal>
   </SafeAreaView>;
 }

@@ -62,4 +62,34 @@ describe("EditPersonalInformationScreen", () => {
     act(() => renderer.root.findAllByType(TextInput)[0]!.props.onChangeText("Mai An")); act(() => button(renderer.root, "Lưu").props.onPress()); act(() => jest.advanceTimersByTime(500));
     expect(onSessionError).toHaveBeenCalledTimes(1);
   });
+
+  it("intercepts dirty web history back once, preserves state on stay, and replays its pending action on discard", () => {
+    let beforeRemove!: (event: { preventDefault: () => void; data: { action: { type: string } } }) => void;
+    const navigation = { addListener: jest.fn((_event, listener) => { beforeRemove = listener; return jest.fn(); }), dispatch: jest.fn() };
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<EditPersonalInformationScreen navigation={navigation} onExit={jest.fn()} onSaved={jest.fn()} onSessionError={jest.fn()} />); });
+    const fields = renderer.root.findAllByType(TextInput);
+    act(() => fields[0]!.props.onChangeText("Mai An"));
+    const firstBack = { preventDefault: jest.fn(), data: { action: { type: "GO_BACK" } } };
+    act(() => { beforeRemove(firstBack); beforeRemove({ preventDefault: jest.fn(), data: { action: { type: "GO_BACK" } } }); });
+    expect(firstBack.preventDefault).toHaveBeenCalledTimes(1);
+    expect(copy(renderer.root).match(/Hủy thay đổi\?/g)).toHaveLength(1);
+    act(() => button(renderer.root, "Tiếp tục chỉnh sửa").props.onPress());
+    expect(renderer.root.findAllByType(TextInput)[0]!.props.value).toBe("Mai An");
+    expect(copy(renderer.root)).not.toContain("Hủy thay đổi?");
+    act(() => beforeRemove({ preventDefault: jest.fn(), data: { action: { type: "GO_BACK" } } }));
+    act(() => button(renderer.root, "Bỏ thay đổi").props.onPress());
+    expect(navigation.dispatch).toHaveBeenCalledTimes(1);
+    expect(navigation.dispatch).toHaveBeenCalledWith({ type: "GO_BACK" });
+  });
+
+  it("does not block a clean web history back", () => {
+    let beforeRemove!: (event: { preventDefault: () => void; data: { action: { type: string } } }) => void;
+    const navigation = { addListener: jest.fn((_event, listener) => { beforeRemove = listener; return jest.fn(); }), dispatch: jest.fn() };
+    act(() => { TestRenderer.create(<EditPersonalInformationScreen navigation={navigation} onExit={jest.fn()} onSaved={jest.fn()} onSessionError={jest.fn()} />); });
+    const event = { preventDefault: jest.fn(), data: { action: { type: "GO_BACK" } } };
+    act(() => beforeRemove(event));
+    expect(event.preventDefault).not.toHaveBeenCalled();
+    expect(navigation.dispatch).not.toHaveBeenCalled();
+  });
 });

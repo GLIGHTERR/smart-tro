@@ -17,7 +17,7 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 const isWebReview = process.env.EXPO_PUBLIC_HOME_REVIEW === "true" || process.env.EXPO_PUBLIC_ACCOUNT_REVIEW === "true";
 const linking = {
   prefixes: [],
-  config: { screens: { Home: "", Account: "account", Destination: "destination/:action" } },
+  config: { screens: { Home: "", Account: "account", EditProfile: "edit-profile", Destination: "destination/:action" } },
   getPathFromState: (state: Parameters<typeof getPathFromState>[0], config: Parameters<typeof getPathFromState>[1]) => `/smart-tro${getPathFromState(state, config)}`,
   getStateFromPath: (path: string, config: Parameters<typeof getStateFromPath>[1]) => getStateFromPath(path.replace(/^\/?smart-tro\/?/, ""), config),
 };
@@ -29,10 +29,10 @@ function AuthenticatedAccount({ navigation }: { navigation: { canGoBack: () => b
   return <AccountScreen sessionKey={token ?? ""} onBack={() => navigation.canGoBack() ? navigation.goBack() : navigation.reset({ index: 0, routes: [{ name: "Home" }] })} onChangePassword={() => navigation.navigate("Destination", { action: "change-password" })} onEditProfile={() => navigation.navigate("EditProfile")} onSignOut={signOut} />;
 }
 
-function AuthenticatedEditProfile({ navigation }: { navigation: { canGoBack: () => boolean; goBack: () => void; reset: (state: { index: number; routes: { name: "Home" }[] }) => void } }) {
+function AuthenticatedEditProfile({ navigation }: { navigation: { canGoBack: () => boolean; goBack: () => void; reset: (state: { index: number; routes: { name: "Home" }[] }) => void; addListener: (event: "beforeRemove", listener: (event: { preventDefault: () => void; data: { action: { type: string } } }) => void) => () => void; dispatch: (action: { type: string }) => void } }) {
   const { signOut } = useAuth();
   const exit = () => navigation.canGoBack() ? navigation.goBack() : navigation.reset({ index: 0, routes: [{ name: "Home" }] });
-  return <EditPersonalInformationScreen onExit={exit} onSaved={exit} onSessionError={signOut} />;
+  return <EditPersonalInformationScreen navigation={navigation} onExit={exit} onSaved={exit} onSessionError={signOut} />;
 }
 
 function DestinationScreen({ navigation, route }: { navigation: { goBack: () => void }; route: { params: RootStackParamList["Destination"] } }) {

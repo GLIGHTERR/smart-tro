@@ -63,6 +63,7 @@
       "src/auth/validation.ts",
       "src/profile/gateway.ts",
       "src/screens/accountModel.ts",
+      "src/screens/editPersonalInformationModel.ts",
       "src/screens/homeModel.ts",
       "src/startup/fontState.ts"
     ],
@@ -104,6 +105,12 @@
         "statements": 100
       },
       "./src/screens/accountModel.ts": {
+        "branches": 100,
+        "functions": 100,
+        "lines": 100,
+        "statements": 100
+      },
+      "./src/screens/editPersonalInformationModel.ts": {
         "branches": 100,
         "functions": 100,
         "lines": 100,

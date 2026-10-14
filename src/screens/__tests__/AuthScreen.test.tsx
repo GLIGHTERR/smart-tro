@@ -1,5 +1,5 @@
 import React from "react";
-import { Pressable, Text } from "react-native";
+import { Pressable, StyleSheet, Text } from "react-native";
 import TestRenderer, { act, type ReactTestInstance } from "react-test-renderer";
 
 import type { AuthGateway } from "../../auth/gateway";
@@ -204,6 +204,24 @@ describe("AuthScreen signup", () => {
     act(() => button(renderer.root, "Tiếp tục").props.onPress());
     const passwordButtons = buttonLabels(renderer.root);
     expect(passwordButtons.indexOf("Tạo tài khoản")).toBeLessThan(passwordButtons.indexOf("Quay lại"));
+    act(() => renderer.unmount());
+  });
+});
+
+describe("AuthScreen sign in password field", () => {
+  it("clips the password container to the same 48px pill treatment and keeps the reveal control touch-sized", () => {
+    const auth = gateway();
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<AuthScreen gateway={auth} />); });
+
+    const passwordInput = input(renderer.root, "Mật khẩu");
+    const container = passwordInput.parent;
+    const reveal = renderer.root.findByProps({ accessibilityLabel: "Hiện mật khẩu" });
+
+    expect(StyleSheet.flatten(container?.props.style)).toMatchObject({ backgroundColor: "#FBC97E", borderRadius: 24, height: 48, overflow: "hidden" });
+    expect(StyleSheet.flatten(reveal.props.style)).toMatchObject({ alignItems: "center", height: 48, right: 0, width: 54 });
+    act(() => reveal.props.onPress());
+    expect(renderer.root.findByProps({ accessibilityLabel: "Ẩn mật khẩu" })).toBeTruthy();
     act(() => renderer.unmount());
   });
 });

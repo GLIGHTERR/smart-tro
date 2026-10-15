@@ -1,4 +1,4 @@
-import { accountReviewScenario, isDisplayableEmail, maskEmail, maskPhone, sortActiveRentals } from "../accountModel";
+import { accountReviewScenario, domesticPhoneForDisplay, isDisplayableEmail, maskEmail, maskPhone, sortActiveRentals } from "../accountModel";
 
 describe("account model", () => {
   it("masks each approved email local-part length without changing its domain", () => {
@@ -15,6 +15,13 @@ describe("account model", () => {
     expect(maskPhone("0901 234 567")).toBeNull();
     expect(maskPhone("12")).toBeNull();
     expect(maskPhone("abc")).toBeNull();
+  });
+
+  it("converts canonical profile phones to the approved domestic display format", () => {
+    expect(domesticPhoneForDisplay("+84901234567")).toBe("0901234567");
+    expect(domesticPhoneForDisplay("0901234567")).toBe("0901234567");
+    expect(domesticPhoneForDisplay(null)).toBeNull();
+    expect(domesticPhoneForDisplay("+8490123")).toBeNull();
   });
 
   it("requires a non-empty valid email before rendering approved PII", () => {

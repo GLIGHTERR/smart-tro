@@ -5,7 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { createConfiguredProfileGateway, ProfileGatewayError, type ProfileGateway } from "@/profile/gateway";
 import { colors, radius } from "@/theme/tokens";
-import { accountReviewScenario, isDisplayableEmail, maskEmail, maskPhone, sortActiveRentals, type AccountProfile, type ActiveRental } from "./accountModel";
+import { accountReviewScenario, domesticPhoneForDisplay, isDisplayableEmail, maskEmail, sortActiveRentals, type AccountProfile, type ActiveRental } from "./accountModel";
 import type { EditableProfile } from "./editPersonalInformationModel";
 
 type AccountState = "loading" | "ready" | "error" | "session";
@@ -93,7 +93,7 @@ export function AccountScreen({ sessionKey, onBack, onEditProfile, onChangePassw
 
 function ProfileCard({ profile }: { profile: AccountProfile }) {
   const [avatarFailed, setAvatarFailed] = useState(!profile.avatar?.trim());
-  const phone = profile.phone ? maskPhone(profile.phone) : null;
+  const phone = domesticPhoneForDisplay(profile.phone);
   return <View style={styles.profileCard}><Avatar source={avatarFailed ? null : profile.avatar} onError={() => setAvatarFailed(true)} /><View style={styles.profileText}><Text numberOfLines={2} style={styles.name}>{profile.displayName}</Text><Text accessibilityLabel={phone ? `Số điện thoại kết thúc bằng ${profile.phone!.slice(-3)}` : "Số điện thoại chưa cập nhật"} numberOfLines={2} style={styles.contact}>{phone ?? "Chưa cập nhật"}</Text><Text accessibilityLabel={`Email ${maskEmail(profile.email!)}`} ellipsizeMode="middle" numberOfLines={2} style={styles.contact}>{maskEmail(profile.email!)}</Text></View></View>;
 }
 

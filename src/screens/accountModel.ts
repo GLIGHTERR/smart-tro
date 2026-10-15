@@ -5,6 +5,12 @@ export function maskPhone(phone: string) {
   return /^\d{10}$/.test(phone) ? `•••••••${phone.slice(-3)}` : null;
 }
 
+export function domesticPhoneForDisplay(phone: string | null) {
+  if (!phone) return null;
+  const canonical = /^\+84(\d{9})$/.exec(phone);
+  return canonical ? `0${canonical[1]}` : /^0\d{9}$/.test(phone) ? phone : null;
+}
+
 export function isDisplayableEmail(email: string | null) { return typeof email === "string" && email.trim().length > 0 && /^[^@\s]+@[^@\s]+$/.test(email); }
 
 export function maskEmail(email: string) {

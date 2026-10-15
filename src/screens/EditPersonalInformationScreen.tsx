@@ -67,7 +67,20 @@ export function EditPersonalInformationScreen({ profile = fixture, onExit, onSes
       setNotice("Đã lưu thông tin cá nhân.");
       setTimeout(onSaved, 450);
     } catch (cause) {
-      if (cause instanceof ProfileGatewayError && cause.code === "INVALID_SESSION") return onSessionError();
+      if (cause instanceof ProfileGatewayError && cause.code === "INVALID_SESSION") {
+        let sessionWasVerified = false;
+        try {
+          // A successful authenticated read proves this PATCH rejection was not a lost session.
+          await profileGateway.read(sessionKey);
+          sessionWasVerified = true;
+          await profileGateway.update(sessionKey, { displayName: validation.name, phone: canonicalPhoneFromDomestic(phone) });
+          setNotice("Đã lưu thông tin cá nhân.");
+          setTimeout(onSaved, 450);
+          return;
+        } catch (verificationCause) {
+          if (!sessionWasVerified && verificationCause instanceof ProfileGatewayError && verificationCause.code === "INVALID_SESSION") return onSessionError();
+        }
+      }
       setNotice(cause instanceof ProfileGatewayError && cause.code === "VALIDATION_ERROR" ? "Một số thông tin chưa hợp lệ. Vui lòng kiểm tra lại." : "Chưa thể lưu thay đổi. Vui lòng thử lại.");
     } finally { saveInFlight.current = false; setSaving(false); }
   };

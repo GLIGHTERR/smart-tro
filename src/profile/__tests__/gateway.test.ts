@@ -25,8 +25,13 @@ describe("profile gateway", () => {
     fetchMock.mockResolvedValue(json({ error: { code: "untrusted_server_detail" } }, status));
     await expect(createApiProfileGateway({ baseUrl: "https://api.example", fetch: fetchMock }).update("token", { displayName: "Mai", phone: null })).rejects.toEqual(expect.objectContaining({ code }));
   });
+  it("accepts the authoritative profile mapping returned by PATCH, including a non-null avatar", async () => {
+    const gateway = createApiProfileGateway({ baseUrl: "https://api.example", fetch: fetchMock });
+    fetchMock.mockResolvedValue(json({ profile: { ...payload.profile, avatar: "https://cdn.example/avatar.png" } }));
+    await expect(gateway.update("token", { displayName: "Mai", phone: null })).resolves.toEqual({ profile: { ...payload.profile, avatar: "https://cdn.example/avatar.png" } });
+  });
   it("fails closed when PATCH does not return an authoritative profile", async () => {
-    [null, {}, { profile: null }, { profile: { displayName: "Mai", email: "", phone: null, avatar: null } }, { profile: { ...payload.profile, phone: 7 } }, { profile: { ...payload.profile, avatar: "https://untrusted.example/avatar.png" } }].forEach((body) => fetchMock.mockResolvedValueOnce(json(body)));
+    [null, {}, { profile: null }, { profile: { displayName: "Mai", email: "", phone: null, avatar: null } }, { profile: { ...payload.profile, phone: 7 } }, { profile: { ...payload.profile, avatar: undefined } }].forEach((body) => fetchMock.mockResolvedValueOnce(json(body)));
     const gateway = createApiProfileGateway({ baseUrl: "https://api.example", fetch: fetchMock });
     for (let index = 0; index < 6; index += 1) await expect(gateway.update("token", { displayName: "Mai", phone: null })).rejects.toEqual(expect.objectContaining({ code: "PROFILE_UNAVAILABLE" }));
   });

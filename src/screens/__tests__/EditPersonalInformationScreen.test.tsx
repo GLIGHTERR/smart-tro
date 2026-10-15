@@ -42,6 +42,7 @@ describe("EditPersonalInformationScreen", () => {
     expect(copy(renderer.root)).toContain("Đã lưu thông tin cá nhân.");
     act(() => jest.advanceTimersByTime(450));
     expect(onSaved).toHaveBeenCalledTimes(1);
+    expect(onSaved).toHaveBeenCalledWith({ displayName: "Mai An", email: "mai@example.com", phone: "+84901234567", avatar: null });
   });
 
   it("retains edits for retryable and validation failures and presents a single discard dialog", async () => {
@@ -113,6 +114,17 @@ describe("EditPersonalInformationScreen", () => {
     await act(async () => { await button(renderer.root, "Lưu").props.onPress(); });
     expect(renderer.root.findAllByType(TextInput)[1]!.props.value).toBe("0912345678");
     expect(copy(renderer.root)).toContain(code === "VALIDATION_ERROR" ? "Một số thông tin chưa hợp lệ." : "Chưa thể lưu thay đổi.");
+  });
+
+  it("renders a red accessible error alert and retains input after a real save failure", async () => {
+    const update = jest.fn().mockRejectedValue(new ProfileGatewayError("PROFILE_UNAVAILABLE")); let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<EditPersonalInformationScreen gateway={gateway(update)} onExit={jest.fn()} onSaved={jest.fn()} onSessionError={jest.fn()} />); });
+    act(() => renderer.root.findAllByType(TextInput)[0]!.props.onChangeText("Mai An"));
+    await act(async () => { await button(renderer.root, "Lưu").props.onPress(); });
+    const alert = renderer.root.findAllByType(Text).find((node) => copy(node).includes("Chưa thể lưu thay đổi"));
+    expect(alert?.props.accessibilityRole).toBe("alert");
+    expect(alert?.props.style).toEqual(expect.arrayContaining([expect.objectContaining({ backgroundColor: "#FBE2E2" })]));
+    expect(renderer.root.findAllByType(TextInput)[0]!.props.value).toBe("Mai An");
   });
 
   it("serializes rapid saves so an older response cannot replace a newer UI state", async () => {

@@ -107,6 +107,17 @@ describe("AccountScreen", () => {
     act(() => renderer.unmount());
   });
 
+  it("keeps the authoritative saved profile visible when its follow-up refetch fails", async () => {
+    process.env.EXPO_PUBLIC_ACCOUNT_REVIEW = "false";
+    const gateway = { read: jest.fn().mockRejectedValue(new Error("offline")), update: jest.fn() };
+    let renderer!: TestRenderer.ReactTestRenderer;
+    await act(async () => { renderer = TestRenderer.create(<AccountScreen authoritativeProfile={{ displayName: "Mai An", email: "mai@example.com", phone: "+84901234567", avatar: null }} gateway={gateway} onBack={jest.fn()} onChangePassword={jest.fn()} onEditProfile={jest.fn()} onSignOut={jest.fn()} sessionKey="renter-a" />); });
+    expect(text(renderer.root)).toContain("Mai An");
+    expect(text(renderer.root)).not.toContain("Chưa thể tải thông tin tài khoản.");
+    expect(gateway.read).toHaveBeenCalledTimes(1);
+    act(() => renderer.unmount());
+  });
+
   it("wraps long profile and rental text to two lines", () => {
     process.env.EXPO_PUBLIC_ACCOUNT_REVIEW_SCENARIO = "long";
     let renderer!: TestRenderer.ReactTestRenderer;

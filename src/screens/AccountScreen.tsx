@@ -25,9 +25,10 @@ function mockPayload(): AccountPayload {
   return { profile: { displayName: "Nguyễn Văn A", email: "nguyen.van.a.renter@example.com", phone: scenario === "phone-empty" ? null : "0901234567", avatar: null }, rentals };
 }
 
-export function AccountScreen({ sessionKey, onBack, onEditProfile, onChangePassword, onSignOut, gateway }: { sessionKey: string; onBack: () => void; onEditProfile: (profile: EditableProfile) => void; onChangePassword: () => void; onSignOut: () => void | Promise<void>; gateway?: ProfileGateway }) {
-  const [state, setState] = useState<AccountState>("loading");
-  const [payload, setPayload] = useState<AccountPayload | null>(null);
+export function AccountScreen({ sessionKey, onBack, onEditProfile, onChangePassword, onSignOut, gateway, authoritativeProfile }: { sessionKey: string; onBack: () => void; onEditProfile: (profile: EditableProfile) => void; onChangePassword: () => void; onSignOut: () => void | Promise<void>; gateway?: ProfileGateway; authoritativeProfile?: AccountProfile }) {
+  const authoritativeFallback = useRef<AccountPayload | null>(authoritativeProfile ? { profile: authoritativeProfile, rentals: [] } : null);
+  const [state, setState] = useState<AccountState>(authoritativeProfile ? "ready" : "loading");
+  const [payload, setPayload] = useState<AccountPayload | null>(authoritativeFallback.current);
   const [isTimeout, setIsTimeout] = useState(false);
   const [tab, setTab] = useState<"personal" | "signature">("personal");
   const [isConfirmingSignOut, setIsConfirmingSignOut] = useState(false);
@@ -38,9 +39,8 @@ export function AccountScreen({ sessionKey, onBack, onEditProfile, onChangePassw
   const profileGateway = useMemo(() => gateway ?? createConfiguredProfileGateway(), [gateway]);
   const load = useCallback(async () => {
     const id = ++requestId.current;
-    setPayload(null);
     setIsTimeout(false);
-    setState("loading");
+    if (!authoritativeFallback.current) { setPayload(null); setState("loading"); }
     if (scenario === "loading") return;
     if (scenario) {
       setTimeout(() => {
@@ -57,6 +57,7 @@ export function AccountScreen({ sessionKey, onBack, onEditProfile, onChangePassw
     try {
       const nextPayload = await profileGateway.read(sessionKey);
       if (id !== requestId.current) return;
+      authoritativeFallback.current = null;
       setPayload(nextPayload);
       setState("ready");
     } catch (cause) {
@@ -65,6 +66,11 @@ export function AccountScreen({ sessionKey, onBack, onEditProfile, onChangePassw
       if (cause instanceof ProfileGatewayError && cause.code === "INVALID_SESSION") {
         setState("session");
         void Promise.resolve(onSignOut());
+        return;
+      }
+      if (authoritativeFallback.current) {
+        setPayload(authoritativeFallback.current);
+        setState("ready");
         return;
       }
       setIsTimeout(cause instanceof ProfileGatewayError && cause.code === "TIMEOUT");

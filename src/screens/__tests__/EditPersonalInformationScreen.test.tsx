@@ -62,9 +62,48 @@ describe("EditPersonalInformationScreen", () => {
 
   it("presents session expiry through the common session handler", async () => {
     const onSessionError = jest.fn(); let renderer!: TestRenderer.ReactTestRenderer;
-    act(() => { renderer = TestRenderer.create(<EditPersonalInformationScreen onExit={jest.fn()} onSaved={jest.fn()} onSessionError={onSessionError} reviewResult="session" />); });
+    act(() => { renderer = TestRenderer.create(<EditPersonalInformationScreen gateway={{ read: jest.fn().mockRejectedValue(new ProfileGatewayError("INVALID_SESSION")), update: jest.fn() }} onExit={jest.fn()} onSaved={jest.fn()} onSessionError={onSessionError} reviewResult="session" />); });
     act(() => renderer.root.findAllByType(TextInput)[0]!.props.onChangeText("Mai An")); await act(async () => { await button(renderer.root, "Lưu").props.onPress(); });
     expect(onSessionError).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps a verified session and retries when PATCH alone rejects it", async () => {
+    const onSaved = jest.fn(); const onSessionError = jest.fn();
+    const update = jest.fn().mockRejectedValueOnce(new ProfileGatewayError("INVALID_SESSION")).mockResolvedValueOnce({ profile: { displayName: "Mai An", email: "mai@example.com", phone: "+84901234567", avatar: null } });
+    const read = jest.fn().mockResolvedValue({ profile: { displayName: "Mai An", email: "mai@example.com", phone: "+84901234567", avatar: null }, rentals: [] });
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<EditPersonalInformationScreen gateway={{ read, update }} onExit={jest.fn()} onSaved={onSaved} onSessionError={onSessionError} sessionKey="renter-token" />); });
+    act(() => renderer.root.findAllByType(TextInput)[0]!.props.onChangeText("Mai An"));
+    await act(async () => { await button(renderer.root, "Lưu").props.onPress(); });
+    expect(read).toHaveBeenCalledWith("renter-token");
+    expect(update).toHaveBeenCalledTimes(2);
+    expect(onSessionError).not.toHaveBeenCalled();
+    act(() => jest.advanceTimersByTime(450));
+    expect(onSaved).toHaveBeenCalledTimes(1);
+  });
+
+  it("retains edits instead of signing out when a retried PATCH remains rejected after session verification", async () => {
+    const onSessionError = jest.fn(); const update = jest.fn().mockRejectedValue(new ProfileGatewayError("INVALID_SESSION"));
+    const read = jest.fn().mockResolvedValue({ profile: { displayName: "Mai An", email: "mai@example.com", phone: "+84901234567", avatar: null }, rentals: [] });
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<EditPersonalInformationScreen gateway={{ read, update }} onExit={jest.fn()} onSaved={jest.fn()} onSessionError={onSessionError} sessionKey="renter-token" />); });
+    act(() => renderer.root.findAllByType(TextInput)[0]!.props.onChangeText("Mai An"));
+    await act(async () => { await button(renderer.root, "Lưu").props.onPress(); });
+    expect(update).toHaveBeenCalledTimes(2);
+    expect(onSessionError).not.toHaveBeenCalled();
+    expect(renderer.root.findAllByType(TextInput)[0]!.props.value).toBe("Mai An");
+    expect(copy(renderer.root)).toContain("Chưa thể lưu thay đổi. Vui lòng thử lại.");
+  });
+
+  it("signs out only when the confirming profile read also reports an invalid session", async () => {
+    const onSessionError = jest.fn(); const update = jest.fn().mockRejectedValue(new ProfileGatewayError("INVALID_SESSION"));
+    const read = jest.fn().mockRejectedValue(new ProfileGatewayError("INVALID_SESSION"));
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<EditPersonalInformationScreen gateway={{ read, update }} onExit={jest.fn()} onSaved={jest.fn()} onSessionError={onSessionError} sessionKey="renter-token" />); });
+    act(() => renderer.root.findAllByType(TextInput)[0]!.props.onChangeText("Mai An"));
+    await act(async () => { await button(renderer.root, "Lưu").props.onPress(); });
+    expect(onSessionError).toHaveBeenCalledTimes(1);
+    expect(update).toHaveBeenCalledTimes(1);
   });
 
   it.each(["VALIDATION_ERROR", "PROFILE_UNAVAILABLE", "NETWORK_ERROR", "TIMEOUT"] as const)("retains input for recoverable %s save failures", async (code) => {

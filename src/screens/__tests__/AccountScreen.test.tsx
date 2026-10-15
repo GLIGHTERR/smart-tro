@@ -97,6 +97,16 @@ describe("AccountScreen", () => {
     act(() => renderer.unmount());
   });
 
+  it("renders an authoritative canonical phone in domestic format", async () => {
+    process.env.EXPO_PUBLIC_ACCOUNT_REVIEW = "false";
+    const gateway = { read: jest.fn().mockResolvedValue({ profile: { displayName: "Mai An", email: "mai@example.com", phone: "+84901234567", avatar: null }, rentals: [] }), update: jest.fn() };
+    let renderer!: TestRenderer.ReactTestRenderer;
+    await act(async () => { renderer = TestRenderer.create(<AccountScreen gateway={gateway} onBack={jest.fn()} onChangePassword={jest.fn()} onEditProfile={jest.fn()} onSignOut={jest.fn()} sessionKey="renter-a" />); });
+    expect(text(renderer.root)).toContain("0901234567");
+    expect(text(renderer.root)).not.toContain("Chưa cập nhật");
+    act(() => renderer.unmount());
+  });
+
   it("wraps long profile and rental text to two lines", () => {
     process.env.EXPO_PUBLIC_ACCOUNT_REVIEW_SCENARIO = "long";
     let renderer!: TestRenderer.ReactTestRenderer;

@@ -37,7 +37,7 @@ function isProfileUpdatePayload(value: unknown): value is ProfileUpdatePayload {
   const { profile } = value as Record<string, unknown>;
   if (!profile || typeof profile !== "object") return false;
   const subject = profile as Record<string, unknown>;
-  return nonEmptyString(subject.displayName) && nonEmptyString(subject.email) && (subject.phone === null || typeof subject.phone === "string") && subject.avatar === null;
+  return nonEmptyString(subject.displayName) && nonEmptyString(subject.email) && (subject.phone === null || typeof subject.phone === "string") && (subject.avatar === null || typeof subject.avatar === "string");
 }
 function isDisplayableAddress(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value) && Object.values(value as Record<string, unknown>).some((item) => nonEmptyString(item)));

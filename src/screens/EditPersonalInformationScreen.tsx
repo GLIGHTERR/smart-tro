@@ -3,14 +3,14 @@ import { ActivityIndicator, BackHandler, KeyboardAvoidingView, Modal, Platform, 
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { colors, radius } from "@/theme/tokens";
-import { createConfiguredProfileGateway, ProfileGatewayError, type ProfileGateway } from "@/profile/gateway";
+import { createConfiguredProfileGateway, ProfileGatewayError, type ProfileGateway, type ProfileUpdatePayload } from "@/profile/gateway";
 import { maskEmail } from "./accountModel";
 import { canonicalPhoneFromDomestic, domesticPhoneFromCanonical, isDirty, type EditableProfile, validateEditableProfile } from "./editPersonalInformationModel";
 
 type SaveResult = "success" | "validation" | "retryable" | "session";
 type NavigationAction = { type: string };
 type EditProfileNavigation = { addListener: (event: "beforeRemove", listener: (event: { preventDefault: () => void; data: { action: NavigationAction } }) => void) => () => void; dispatch: (action: NavigationAction) => void };
-export type EditProfileProps = { profile?: EditableProfile; onExit: () => void; onSessionError: () => void; onSaved: () => void; sessionKey?: string; gateway?: ProfileGateway; reviewResult?: SaveResult; navigation?: EditProfileNavigation };
+export type EditProfileProps = { profile?: EditableProfile; onExit: () => void; onSessionError: () => void; onSaved: (profile: ProfileUpdatePayload["profile"]) => void; sessionKey?: string; gateway?: ProfileGateway; reviewResult?: SaveResult; navigation?: EditProfileNavigation };
 const fixture: EditableProfile = { displayName: "Nguyễn Văn A", phone: "+84901234567", email: "nguyen.van.a.renter@example.com" };
 
 export function EditPersonalInformationScreen({ profile = fixture, onExit, onSessionError, onSaved, sessionKey = "", gateway, reviewResult, navigation }: EditProfileProps) {
@@ -18,7 +18,7 @@ export function EditPersonalInformationScreen({ profile = fixture, onExit, onSes
   const [phone, setPhone] = useState(domesticPhoneFromCanonical(profile.phone));
   const [saving, setSaving] = useState(false);
   const [dialog, setDialog] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<{ kind: "success" | "error"; message: string } | null>(null);
   const stayRef = useRef<View>(null);
   const validation = useMemo(() => validateEditableProfile(name, phone), [name, phone]);
   const dirty = isDirty(profile, name, phone);
@@ -55,6 +55,10 @@ export function EditPersonalInformationScreen({ profile = fixture, onExit, onSes
     navigation.dispatch(action);
     setTimeout(() => { replayingBackAction.current = false; }, 0);
   };
+  const completeSave = (result: ProfileUpdatePayload) => {
+    setNotice({ kind: "success", message: "Đã lưu thông tin cá nhân." });
+    setTimeout(() => onSaved(result.profile), 450);
+  };
   const save = async () => {
     if (!canSave || saveInFlight.current) return;
     saveInFlight.current = true;
@@ -63,9 +67,7 @@ export function EditPersonalInformationScreen({ profile = fixture, onExit, onSes
       if (reviewResult === "validation") throw new ProfileGatewayError("VALIDATION_ERROR");
       if (reviewResult === "retryable") throw new ProfileGatewayError("PROFILE_UNAVAILABLE");
       if (reviewResult === "session") throw new ProfileGatewayError("INVALID_SESSION");
-      await profileGateway.update(sessionKey, { displayName: validation.name, phone: canonicalPhoneFromDomestic(phone) });
-      setNotice("Đã lưu thông tin cá nhân.");
-      setTimeout(onSaved, 450);
+      completeSave(await profileGateway.update(sessionKey, { displayName: validation.name, phone: canonicalPhoneFromDomestic(phone) }));
     } catch (cause) {
       if (cause instanceof ProfileGatewayError && cause.code === "INVALID_SESSION") {
         let sessionWasVerified = false;
@@ -73,15 +75,13 @@ export function EditPersonalInformationScreen({ profile = fixture, onExit, onSes
           // A successful authenticated read proves this PATCH rejection was not a lost session.
           await profileGateway.read(sessionKey);
           sessionWasVerified = true;
-          await profileGateway.update(sessionKey, { displayName: validation.name, phone: canonicalPhoneFromDomestic(phone) });
-          setNotice("Đã lưu thông tin cá nhân.");
-          setTimeout(onSaved, 450);
+          completeSave(await profileGateway.update(sessionKey, { displayName: validation.name, phone: canonicalPhoneFromDomestic(phone) }));
           return;
         } catch (verificationCause) {
           if (!sessionWasVerified && verificationCause instanceof ProfileGatewayError && verificationCause.code === "INVALID_SESSION") return onSessionError();
         }
       }
-      setNotice(cause instanceof ProfileGatewayError && cause.code === "VALIDATION_ERROR" ? "Một số thông tin chưa hợp lệ. Vui lòng kiểm tra lại." : "Chưa thể lưu thay đổi. Vui lòng thử lại.");
+      setNotice({ kind: "error", message: cause instanceof ProfileGatewayError && cause.code === "VALIDATION_ERROR" ? "Một số thông tin chưa hợp lệ. Vui lòng kiểm tra lại." : "Chưa thể lưu thay đổi. Vui lòng thử lại." });
     } finally { saveInFlight.current = false; setSaving(false); }
   };
   return <SafeAreaView edges={["top", "left", "right", "bottom"]} style={styles.safe}>
@@ -92,7 +92,7 @@ export function EditPersonalInformationScreen({ profile = fixture, onExit, onSes
         <Field label="Họ và tên" value={name} onChangeText={setName} error={validation.nameError} required disabled={saving} />
         <Field label="Số điện thoại" value={phone} onChangeText={setPhone} error={validation.phoneError} keyboardType="phone-pad" hint="Không bắt buộc. Ví dụ: 0901234567" disabled={saving} />
         <View style={styles.field}><Text style={styles.label}>Email</Text><Text accessibilityLabel="Email chỉ đọc" style={styles.readonly}>{maskEmail(profile.email)}</Text><Text style={styles.hint}>Email không thể chỉnh sửa.</Text></View>
-        {notice ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.notice}>{notice}</Text> : null}
+        {notice ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={[styles.notice, notice.kind === "error" && styles.errorNotice]}>{notice.message}</Text> : null}
       </ScrollView>
       <View style={styles.actions}><Pressable accessibilityRole="button" accessibilityLabel="Hủy chỉnh sửa" disabled={saving} onPress={requestExit} style={({ pressed }) => [styles.secondary, (pressed || saving) && styles.pressed]}><Text style={styles.secondaryText}>Hủy</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Lưu" accessibilityState={{ disabled: !canSave }} disabled={!canSave} onPress={save} style={({ pressed }) => [styles.primary, (!canSave || pressed) && styles.pressed]}>{saving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryText}>Lưu</Text>}</Pressable></View>
     </KeyboardAvoidingView>
@@ -107,5 +107,5 @@ function Field({ label, value, onChangeText, error, required, hint, keyboardType
 }
 
 const styles = StyleSheet.create({
-  safe: { backgroundColor: "#FFF2DB", flex: 1 }, flex: { flex: 1 }, content: { flexGrow: 1, padding: 24, paddingBottom: 32 }, header: { marginBottom: 12 }, title: { color: "#2E2E2E", fontFamily: "BeVietnamPro_600SemiBold", fontSize: 28, lineHeight: 36 }, intro: { color: "#675440", fontFamily: "BeVietnamPro_400Regular", fontSize: 15, lineHeight: 23, marginBottom: 28 }, field: { marginBottom: 22 }, label: { color: "#2E2E2E", fontFamily: "BeVietnamPro_600SemiBold", fontSize: 16, marginBottom: 8 }, input: { backgroundColor: "#FFFFFF", borderColor: "#D9C4A4", borderRadius: radius.sm, borderWidth: 1, color: "#2E2E2E", fontFamily: "BeVietnamPro_400Regular", fontSize: 16, minHeight: 50, paddingHorizontal: 14 }, inputError: { borderColor: colors.danger, borderWidth: 2 }, readonly: { backgroundColor: "#F2E8D8", borderColor: "#D9C4A4", borderRadius: radius.sm, borderWidth: 1, color: "#675440", fontFamily: "BeVietnamPro_400Regular", fontSize: 16, minHeight: 50, paddingHorizontal: 14, paddingTop: 14 }, hint: { color: "#675440", fontFamily: "BeVietnamPro_400Regular", fontSize: 13, lineHeight: 19, marginTop: 6 }, error: { color: colors.danger, fontFamily: "BeVietnamPro_600SemiBold", fontSize: 13, lineHeight: 19, marginTop: 6 }, notice: { backgroundColor: "#FFFFFF", borderRadius: radius.sm, color: "#2E2E2E", fontFamily: "BeVietnamPro_600SemiBold", lineHeight: 22, marginTop: 2, padding: 14 }, actions: { backgroundColor: "#FFFFFF", borderTopColor: "#E6CDA8", borderTopWidth: 1, flexDirection: "row", gap: 12, padding: 16 }, secondary: { alignItems: "center", borderColor: "#A84300", borderRadius: radius.sm, borderWidth: 1, flex: 1, justifyContent: "center", minHeight: 50 }, secondaryText: { color: "#A84300", fontFamily: "BeVietnamPro_600SemiBold", fontSize: 16 }, primary: { alignItems: "center", backgroundColor: "#A84300", borderRadius: radius.sm, flex: 1, justifyContent: "center", minHeight: 50 }, primaryText: { color: "#FFFFFF", fontFamily: "BeVietnamPro_600SemiBold", fontSize: 16 }, pressed: { opacity: 0.55 }, backdrop: { alignItems: "center", backgroundColor: "rgba(46, 46, 46, 0.42)", flex: 1, justifyContent: "center", padding: 24 }, dialog: { backgroundColor: "#FFFFFF", borderRadius: radius.md, maxWidth: 480, padding: 24, width: "100%" }, dialogTitle: { color: "#2E2E2E", fontFamily: "BeVietnamPro_600SemiBold", fontSize: 21 }, dialogCopy: { color: "#675440", fontFamily: "BeVietnamPro_400Regular", fontSize: 15, lineHeight: 23, marginTop: 12 }, dialogActions: { flexDirection: "row", flexWrap: "wrap", gap: 10, justifyContent: "flex-end", marginTop: 22 }, stay: { borderColor: "#A84300", borderRadius: radius.sm, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 11 }, stayText: { color: "#A84300", fontFamily: "BeVietnamPro_600SemiBold" }, discard: { backgroundColor: colors.danger, borderRadius: radius.sm, paddingHorizontal: 14, paddingVertical: 11 }, discardText: { color: "#FFFFFF", fontFamily: "BeVietnamPro_600SemiBold" },
+  safe: { backgroundColor: "#FFF2DB", flex: 1 }, flex: { flex: 1 }, content: { flexGrow: 1, padding: 24, paddingBottom: 32 }, header: { marginBottom: 12 }, title: { color: "#2E2E2E", fontFamily: "BeVietnamPro_600SemiBold", fontSize: 28, lineHeight: 36 }, intro: { color: "#675440", fontFamily: "BeVietnamPro_400Regular", fontSize: 15, lineHeight: 23, marginBottom: 28 }, field: { marginBottom: 22 }, label: { color: "#2E2E2E", fontFamily: "BeVietnamPro_600SemiBold", fontSize: 16, marginBottom: 8 }, input: { backgroundColor: "#FFFFFF", borderColor: "#D9C4A4", borderRadius: radius.sm, borderWidth: 1, color: "#2E2E2E", fontFamily: "BeVietnamPro_400Regular", fontSize: 16, minHeight: 50, paddingHorizontal: 14 }, inputError: { borderColor: colors.danger, borderWidth: 2 }, readonly: { backgroundColor: "#F2E8D8", borderColor: "#D9C4A4", borderRadius: radius.sm, borderWidth: 1, color: "#675440", fontFamily: "BeVietnamPro_400Regular", fontSize: 16, minHeight: 50, paddingHorizontal: 14, paddingTop: 14 }, hint: { color: "#675440", fontFamily: "BeVietnamPro_400Regular", fontSize: 13, lineHeight: 19, marginTop: 6 }, error: { color: colors.danger, fontFamily: "BeVietnamPro_600SemiBold", fontSize: 13, lineHeight: 19, marginTop: 6 }, notice: { backgroundColor: "#FFFFFF", borderRadius: radius.sm, color: "#2E2E2E", fontFamily: "BeVietnamPro_600SemiBold", lineHeight: 22, marginTop: 2, padding: 14 }, errorNotice: { backgroundColor: "#FBE2E2", color: colors.danger }, actions: { backgroundColor: "#FFFFFF", borderTopColor: "#E6CDA8", borderTopWidth: 1, flexDirection: "row", gap: 12, padding: 16 }, secondary: { alignItems: "center", borderColor: "#A84300", borderRadius: radius.sm, borderWidth: 1, flex: 1, justifyContent: "center", minHeight: 50 }, secondaryText: { color: "#A84300", fontFamily: "BeVietnamPro_600SemiBold", fontSize: 16 }, primary: { alignItems: "center", backgroundColor: "#A84300", borderRadius: radius.sm, flex: 1, justifyContent: "center", minHeight: 50 }, primaryText: { color: "#FFFFFF", fontFamily: "BeVietnamPro_600SemiBold", fontSize: 16 }, pressed: { opacity: 0.55 }, backdrop: { alignItems: "center", backgroundColor: "rgba(46, 46, 46, 0.42)", flex: 1, justifyContent: "center", padding: 24 }, dialog: { backgroundColor: "#FFFFFF", borderRadius: radius.md, maxWidth: 480, padding: 24, width: "100%" }, dialogTitle: { color: "#2E2E2E", fontFamily: "BeVietnamPro_600SemiBold", fontSize: 21 }, dialogCopy: { color: "#675440", fontFamily: "BeVietnamPro_400Regular", fontSize: 15, lineHeight: 23, marginTop: 12 }, dialogActions: { flexDirection: "row", flexWrap: "wrap", gap: 10, justifyContent: "flex-end", marginTop: 22 }, stay: { borderColor: "#A84300", borderRadius: radius.sm, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 11 }, stayText: { color: "#A84300", fontFamily: "BeVietnamPro_600SemiBold" }, discard: { backgroundColor: colors.danger, borderRadius: radius.sm, paddingHorizontal: 14, paddingVertical: 11 }, discardText: { color: "#FFFFFF", fontFamily: "BeVietnamPro_600SemiBold" },
 });

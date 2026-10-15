@@ -11,9 +11,10 @@ import { HomeScreen } from "@/screens/HomeScreen";
 import { AccountScreen } from "@/screens/AccountScreen";
 import { EditPersonalInformationScreen } from "@/screens/EditPersonalInformationScreen";
 import type { EditableProfile } from "@/screens/editPersonalInformationModel";
+import type { ProfileUpdatePayload } from "@/profile/gateway";
 import { homeDestinations, type HomeAction } from "@/screens/homeModel";
 
-type RootStackParamList = { Auth: undefined; Home: undefined; Account: undefined; EditProfile: { profile: EditableProfile }; Destination: { action: Exclude<HomeAction, "account"> | "change-password" } };
+type RootStackParamList = { Auth: undefined; Home: undefined; Account: { authoritativeProfile?: ProfileUpdatePayload["profile"] } | undefined; EditProfile: { profile: EditableProfile }; Destination: { action: Exclude<HomeAction, "account"> | "change-password" } };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const isWebReview = process.env.EXPO_PUBLIC_HOME_REVIEW === "true" || process.env.EXPO_PUBLIC_ACCOUNT_REVIEW === "true";
@@ -26,18 +27,18 @@ const linking = {
 
 function AuthenticatedHome({ navigation }: { navigation: { navigate: (screen: "Account") => void } & { navigate: (screen: "Destination", params: { action: Exclude<HomeAction, "account"> }) => void } }) { const { token } = useAuth(); return <HomeScreen sessionKey={token ?? ""} onNavigate={(action) => action === "account" ? navigation.navigate("Account") : navigation.navigate("Destination", { action })} />; }
 
-function AuthenticatedAccount({ navigation }: { navigation: { canGoBack: () => boolean; goBack: () => void; navigate: ((screen: "EditProfile", params: RootStackParamList["EditProfile"]) => void) & ((screen: "Destination", params: { action: "change-password" }) => void); reset: (state: { index: number; routes: { name: "Home" }[] }) => void; addListener: (event: "focus", listener: () => void) => () => void } }) {
+function AuthenticatedAccount({ navigation, route }: { navigation: { canGoBack: () => boolean; goBack: () => void; navigate: ((screen: "EditProfile", params: RootStackParamList["EditProfile"]) => void) & ((screen: "Destination", params: { action: "change-password" }) => void); reset: (state: { index: number; routes: { name: "Home" }[] }) => void; addListener: (event: "focus", listener: () => void) => () => void }; route: { params?: RootStackParamList["Account"] } }) {
   const { token, signOut } = useAuth();
   const refreshKey = useRef(0);
   const [, forceRefresh] = useState(0);
   useEffect(() => navigation.addListener("focus", () => { refreshKey.current += 1; forceRefresh(refreshKey.current); }), [navigation]);
-  return <AccountScreen key={refreshKey.current} sessionKey={token ?? ""} onBack={() => navigation.canGoBack() ? navigation.goBack() : navigation.reset({ index: 0, routes: [{ name: "Home" }] })} onChangePassword={() => navigation.navigate("Destination", { action: "change-password" })} onEditProfile={(profile) => navigation.navigate("EditProfile", { profile })} onSignOut={signOut} />;
+  return <AccountScreen authoritativeProfile={route.params?.authoritativeProfile} key={refreshKey.current} sessionKey={token ?? ""} onBack={() => navigation.canGoBack() ? navigation.goBack() : navigation.reset({ index: 0, routes: [{ name: "Home" }] })} onChangePassword={() => navigation.navigate("Destination", { action: "change-password" })} onEditProfile={(profile) => navigation.navigate("EditProfile", { profile })} onSignOut={signOut} />;
 }
 
-function AuthenticatedEditProfile({ navigation, route }: { navigation: { canGoBack: () => boolean; goBack: () => void; reset: (state: { index: number; routes: { name: "Home" }[] }) => void; addListener: (event: "beforeRemove", listener: (event: { preventDefault: () => void; data: { action: { type: string } } }) => void) => () => void; dispatch: (action: { type: string }) => void }; route: { params: RootStackParamList["EditProfile"] } }) {
+function AuthenticatedEditProfile({ navigation, route }: { navigation: { canGoBack: () => boolean; goBack: () => void; navigate: (screen: "Account", params: NonNullable<RootStackParamList["Account"]>) => void; reset: (state: { index: number; routes: { name: "Home" }[] }) => void; addListener: (event: "beforeRemove", listener: (event: { preventDefault: () => void; data: { action: { type: string } } }) => void) => () => void; dispatch: (action: { type: string }) => void }; route: { params: RootStackParamList["EditProfile"] } }) {
   const { token, signOut } = useAuth();
   const exit = () => navigation.canGoBack() ? navigation.goBack() : navigation.reset({ index: 0, routes: [{ name: "Home" }] });
-  return <EditPersonalInformationScreen navigation={navigation} profile={route.params.profile} sessionKey={token ?? ""} onExit={exit} onSaved={exit} onSessionError={signOut} />;
+  return <EditPersonalInformationScreen navigation={navigation} profile={route.params.profile} sessionKey={token ?? ""} onExit={exit} onSaved={(authoritativeProfile) => navigation.navigate("Account", { authoritativeProfile })} onSessionError={signOut} />;
 }
 
 function DestinationScreen({ navigation, route }: { navigation: { goBack: () => void }; route: { params: RootStackParamList["Destination"] } }) {

@@ -118,6 +118,36 @@ describe("AccountScreen", () => {
     act(() => renderer.unmount());
   });
 
+  it("shows the one-shot destination success toast for about five seconds without blocking controls", () => {
+    process.env.EXPO_PUBLIC_ACCOUNT_REVIEW_SCENARIO = "one";
+    const onUpdateSuccessToastShown = jest.fn();
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<AccountScreen updateSuccess={{ id: "saved-1", message: "Đã cập nhật thông tin cá nhân." }} onUpdateSuccessConsumed={onUpdateSuccessToastShown} onBack={jest.fn()} onChangePassword={jest.fn()} onEditProfile={jest.fn()} onSignOut={jest.fn()} sessionKey="renter-a" />); });
+    const toast = renderer.root.findByProps({ role: "status" });
+    expect(text(toast)).toContain("Đã cập nhật thông tin cá nhân.");
+    expect(toast.props.accessibilityLiveRegion).toBe("polite");
+    expect(toast.props.pointerEvents).toBe("none");
+    expect(toast.props.style).toEqual(expect.objectContaining({ backgroundColor: "#E2F3E7" }));
+    expect(onUpdateSuccessToastShown).toHaveBeenCalledWith("saved-1");
+    act(() => { jest.advanceTimersByTime(4999); });
+    expect(renderer.root.findByProps({ role: "status" })).toBeTruthy();
+    act(() => { jest.advanceTimersByTime(1); });
+    expect(renderer.root.findAllByProps({ role: "status" })).toHaveLength(0);
+    act(() => renderer.unmount());
+  });
+
+  it("does not replay a consumed success toast when the destination re-renders or opens without a save event", () => {
+    process.env.EXPO_PUBLIC_ACCOUNT_REVIEW_SCENARIO = "one";
+    const props = { onBack: jest.fn(), onChangePassword: jest.fn(), onEditProfile: jest.fn(), onSignOut: jest.fn(), sessionKey: "renter-a" };
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<AccountScreen {...props} updateSuccess={{ id: "saved-1", message: "Đã cập nhật thông tin cá nhân." }} />); });
+    act(() => { renderer.update(<AccountScreen {...props} />); });
+    act(() => { jest.advanceTimersByTime(5000); });
+    act(() => { renderer.update(<AccountScreen {...props} updateSuccess={{ id: "saved-1", message: "Đã cập nhật thông tin cá nhân." }} />); });
+    expect(renderer.root.findAllByProps({ role: "status" })).toHaveLength(0);
+    act(() => renderer.unmount());
+  });
+
   it("wraps long profile and rental text to two lines", () => {
     process.env.EXPO_PUBLIC_ACCOUNT_REVIEW_SCENARIO = "long";
     let renderer!: TestRenderer.ReactTestRenderer;

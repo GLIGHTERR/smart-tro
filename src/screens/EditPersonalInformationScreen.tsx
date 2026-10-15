@@ -56,8 +56,7 @@ export function EditPersonalInformationScreen({ profile = fixture, onExit, onSes
     setTimeout(() => { replayingBackAction.current = false; }, 0);
   };
   const completeSave = (result: ProfileUpdatePayload) => {
-    setNotice({ kind: "success", message: "Đã lưu thông tin cá nhân." });
-    setTimeout(() => onSaved(result.profile), 450);
+    onSaved(result.profile);
   };
   const save = async () => {
     if (!canSave || saveInFlight.current) return;
@@ -92,7 +91,7 @@ export function EditPersonalInformationScreen({ profile = fixture, onExit, onSes
         <Field label="Họ và tên" value={name} onChangeText={setName} error={validation.nameError} required disabled={saving} />
         <Field label="Số điện thoại" value={phone} onChangeText={setPhone} error={validation.phoneError} keyboardType="phone-pad" hint="Không bắt buộc. Ví dụ: 0901234567" disabled={saving} />
         <View style={styles.field}><Text style={styles.label}>Email</Text><Text accessibilityLabel="Email chỉ đọc" style={styles.readonly}>{maskEmail(profile.email)}</Text><Text style={styles.hint}>Email không thể chỉnh sửa.</Text></View>
-        {notice ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={[styles.notice, notice.kind === "error" && styles.errorNotice]}>{notice.message}</Text> : null}
+        {notice?.kind === "error" ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={[styles.notice, styles.errorNotice]}>{notice.message}</Text> : null}
       </ScrollView>
       <View style={styles.actions}><Pressable accessibilityRole="button" accessibilityLabel="Hủy chỉnh sửa" disabled={saving} onPress={requestExit} style={({ pressed }) => [styles.secondary, (pressed || saving) && styles.pressed]}><Text style={styles.secondaryText}>Hủy</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Lưu" accessibilityState={{ disabled: !canSave }} disabled={!canSave} onPress={save} style={({ pressed }) => [styles.primary, (!canSave || pressed) && styles.pressed]}>{saving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryText}>Lưu</Text>}</Pressable></View>
     </KeyboardAvoidingView>

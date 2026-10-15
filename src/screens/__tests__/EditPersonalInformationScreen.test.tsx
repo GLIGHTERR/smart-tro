@@ -28,7 +28,7 @@ describe("EditPersonalInformationScreen", () => {
     expect(button(renderer.root, "Lưu").props.accessibilityState).toEqual({ disabled: true });
   });
 
-  it("normalizes valid dirty data, PATCHes the strict allowlist once, and calls the success exit once", async () => {
+  it("normalizes valid dirty data, PATCHes the strict allowlist once, and hands off success immediately without an inline notice", async () => {
     const onSaved = jest.fn(); let complete!: (value: { profile: { displayName: string; email: string; phone: string | null; avatar: null } }) => void;
     const update = jest.fn().mockImplementation(() => new Promise((resolve) => { complete = resolve; })); let renderer!: TestRenderer.ReactTestRenderer;
     act(() => { renderer = TestRenderer.create(<EditPersonalInformationScreen gateway={gateway(update)} onExit={jest.fn()} onSaved={onSaved} onSessionError={jest.fn()} sessionKey="renter-token" />); });
@@ -39,10 +39,9 @@ describe("EditPersonalInformationScreen", () => {
     act(() => { save = button(renderer.root, "Lưu").props.onPress(); });
     expect(update).toHaveBeenCalledWith("renter-token", { displayName: "Mai An", phone: "+84901234567" });
     await act(async () => { complete({ profile: { displayName: "Mai An", email: "mai@example.com", phone: "+84901234567", avatar: null } }); await save; });
-    expect(copy(renderer.root)).toContain("Đã lưu thông tin cá nhân.");
-    act(() => jest.advanceTimersByTime(450));
     expect(onSaved).toHaveBeenCalledTimes(1);
     expect(onSaved).toHaveBeenCalledWith({ displayName: "Mai An", email: "mai@example.com", phone: "+84901234567", avatar: null });
+    expect(copy(renderer.root)).not.toContain("Đã lưu thông tin cá nhân.");
   });
 
   it("retains edits for retryable and validation failures and presents a single discard dialog", async () => {
@@ -129,14 +128,15 @@ describe("EditPersonalInformationScreen", () => {
 
   it("serializes rapid saves so an older response cannot replace a newer UI state", async () => {
     let complete!: (value: { profile: { displayName: string; email: string; phone: string | null; avatar: null } }) => void;
-    const update = jest.fn().mockImplementation(() => new Promise((resolve) => { complete = resolve; })); let renderer!: TestRenderer.ReactTestRenderer;
-    act(() => { renderer = TestRenderer.create(<EditPersonalInformationScreen gateway={gateway(update)} onExit={jest.fn()} onSaved={jest.fn()} onSessionError={jest.fn()} />); });
+    const onSaved = jest.fn(); const update = jest.fn().mockImplementation(() => new Promise((resolve) => { complete = resolve; })); let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<EditPersonalInformationScreen gateway={gateway(update)} onExit={jest.fn()} onSaved={onSaved} onSessionError={jest.fn()} />); });
     act(() => renderer.root.findAllByType(TextInput)[0]!.props.onChangeText("Mai An"));
     let save!: Promise<void>;
     act(() => { save = button(renderer.root, "Lưu").props.onPress(); button(renderer.root, "Lưu").props.onPress(); });
     expect(update).toHaveBeenCalledTimes(1);
     await act(async () => { complete({ profile: { displayName: "Mai An", email: "mai@example.com", phone: "+84901234567", avatar: null } }); await save; });
-    expect(copy(renderer.root)).toContain("Đã lưu thông tin cá nhân.");
+    expect(onSaved).toHaveBeenCalledTimes(1);
+    expect(copy(renderer.root)).not.toContain("Đã lưu thông tin cá nhân.");
   });
 
   it("intercepts dirty web history back once, preserves state on stay, and replays its pending action on discard", () => {

@@ -6,6 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { createConfiguredProfileGateway, ProfileGatewayError, type ProfileGateway } from "@/profile/gateway";
 import { colors, radius } from "@/theme/tokens";
 import { accountReviewScenario, isDisplayableEmail, maskEmail, maskPhone, sortActiveRentals, type AccountProfile, type ActiveRental } from "./accountModel";
+import type { EditableProfile } from "./editPersonalInformationModel";
 
 type AccountState = "loading" | "ready" | "error" | "session";
 type AccountPayload = { profile: AccountProfile; rentals: ActiveRental[] };
@@ -24,7 +25,7 @@ function mockPayload(): AccountPayload {
   return { profile: { displayName: "Nguyễn Văn A", email: "nguyen.van.a.renter@example.com", phone: scenario === "phone-empty" ? null : "0901234567", avatar: null }, rentals };
 }
 
-export function AccountScreen({ sessionKey, onBack, onEditProfile, onChangePassword, onSignOut, gateway }: { sessionKey: string; onBack: () => void; onEditProfile: () => void; onChangePassword: () => void; onSignOut: () => void | Promise<void>; gateway?: ProfileGateway }) {
+export function AccountScreen({ sessionKey, onBack, onEditProfile, onChangePassword, onSignOut, gateway }: { sessionKey: string; onBack: () => void; onEditProfile: (profile: EditableProfile) => void; onChangePassword: () => void; onSignOut: () => void | Promise<void>; gateway?: ProfileGateway }) {
   const [state, setState] = useState<AccountState>("loading");
   const [payload, setPayload] = useState<AccountPayload | null>(null);
   const [isTimeout, setIsTimeout] = useState(false);
@@ -71,7 +72,8 @@ export function AccountScreen({ sessionKey, onBack, onEditProfile, onChangePassw
     }
   }, [onSignOut, profileGateway, scenario, sessionKey]);
 
-  useEffect(() => { void load(); return () => { requestId.current += 1; }; }, [load]);
+  useEffect(() => { void load(); }, [load]);
+  useEffect(() => () => { requestId.current += 1; }, []);
   const rentals = useMemo(() => sortActiveRentals(payload?.rentals ?? []), [payload]);
   const { width } = useWindowDimensions();
 
@@ -83,7 +85,7 @@ export function AccountScreen({ sessionKey, onBack, onEditProfile, onChangePassw
   };
 
   return <SafeAreaView edges={["top", "left", "right"]} style={styles.safe}><ScrollView contentContainerStyle={styles.content}>
-    <View style={styles.header}><HeaderButton accessibilityLabel="Quay lại" icon="left" onPress={onBack} /><Text accessibilityRole="header" style={styles.title}>Tài khoản</Text><HeaderButton accessibilityLabel="Chỉnh sửa thông tin cá nhân" icon="edit" onPress={onEditProfile} /></View>
+    <View style={styles.header}><HeaderButton accessibilityLabel="Quay lại" icon="left" onPress={onBack} /><Text accessibilityRole="header" style={styles.title}>Tài khoản</Text><HeaderButton accessibilityLabel="Chỉnh sửa thông tin cá nhân" icon="edit" onPress={() => { if (payload?.profile.email) onEditProfile({ ...payload.profile, email: payload.profile.email }); }} /></View>
     <View accessibilityRole="tablist" style={styles.tabs}><Tab label="Cá nhân" selected={tab === "personal"} onPress={() => setTab("personal")} /><Tab label="Chữ ký" selected={tab === "signature"} onPress={() => setTab("signature")} /></View>
     {tab === "signature" ? <SignaturePlaceholder /> : <>{state === "loading" ? <LoadingCard /> : null}{state === "error" ? <ErrorState timeout={isTimeout || scenario === "timeout"} onRetry={() => { void load(); }} /> : null}{state === "session" ? <SessionState onSignOut={onSignOut} /> : null}{state === "ready" && payload ? <><ProfileCard profile={payload.profile} />{rentals.length ? <RentalRegion rentals={rentals} width={width} /> : null}<View style={styles.actions}><Action label="Đổi mật khẩu" icon="lock" onPress={onChangePassword} /><Action label="Đăng xuất" icon="logout" onPress={() => setIsConfirmingSignOut(true)} danger /></View></> : null}</>}
   </ScrollView>{isConfirmingSignOut ? <SignOutDialog busy={isSigningOut} onCancel={() => !isSigningOut && setIsConfirmingSignOut(false)} onConfirm={confirmSignOut} /> : null}</SafeAreaView>;

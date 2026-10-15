@@ -15,6 +15,21 @@ describe("profile gateway", () => {
     await expect(gateway.read("access-token")).resolves.toMatchObject({ rentals: [expect.any(Object), expect.any(Object)] });
     expect(fetchMock).toHaveBeenCalledWith("https://api.example/profile", expect.objectContaining({ headers: { Accept: "application/json", Authorization: "Bearer access-token" } }));
   });
+  it("PATCHes only the approved fields and consumes the authoritative update profile", async () => {
+    const gateway = createApiProfileGateway({ baseUrl: "https://api.example", fetch: fetchMock });
+    fetchMock.mockResolvedValue(json({ profile: { ...payload.profile, displayName: "Mai An", phone: "+84912345678" } }));
+    await expect(gateway.update("access-token", { displayName: "Mai An", phone: "+84912345678" })).resolves.toEqual({ profile: { ...payload.profile, displayName: "Mai An", phone: "+84912345678" } });
+    expect(fetchMock).toHaveBeenCalledWith("https://api.example/profile", expect.objectContaining({ method: "PATCH", headers: { Accept: "application/json", Authorization: "Bearer access-token", "Content-Type": "application/json" }, body: JSON.stringify({ displayName: "Mai An", phone: "+84912345678" }) }));
+  });
+  it.each([[400, "VALIDATION_ERROR"], [401, "INVALID_SESSION"], [403, "PROFILE_UNAVAILABLE"], [503, "PROFILE_UNAVAILABLE"]] as const)("maps PATCH HTTP %i safely", async (status, code) => {
+    fetchMock.mockResolvedValue(json({ error: { code: "untrusted_server_detail" } }, status));
+    await expect(createApiProfileGateway({ baseUrl: "https://api.example", fetch: fetchMock }).update("token", { displayName: "Mai", phone: null })).rejects.toEqual(expect.objectContaining({ code }));
+  });
+  it("fails closed when PATCH does not return an authoritative profile", async () => {
+    [null, {}, { profile: null }, { profile: { displayName: "Mai", email: "", phone: null, avatar: null } }, { profile: { ...payload.profile, phone: 7 } }, { profile: { ...payload.profile, avatar: "https://untrusted.example/avatar.png" } }].forEach((body) => fetchMock.mockResolvedValueOnce(json(body)));
+    const gateway = createApiProfileGateway({ baseUrl: "https://api.example", fetch: fetchMock });
+    for (let index = 0; index < 6; index += 1) await expect(gateway.update("token", { displayName: "Mai", phone: null })).rejects.toEqual(expect.objectContaining({ code: "PROFILE_UNAVAILABLE" }));
+  });
   it.each([[401, { error: { code: "INVALID_SESSION" } }, "INVALID_SESSION"], [409, { error: { code: "PROFILE_INCOMPLETE" } }, "PROFILE_INCOMPLETE"], [503, { error: { code: "PROFILE_UNAVAILABLE" } }, "PROFILE_UNAVAILABLE"], [500, {}, "PROFILE_UNAVAILABLE"], [500, null, "PROFILE_UNAVAILABLE"]] as const)("maps HTTP %i safely", async (status, body, code) => {
     fetchMock.mockResolvedValue(json(body, status));
     await expect(createApiProfileGateway({ baseUrl: "https://api.example", fetch: fetchMock }).read("token")).rejects.toEqual(expect.objectContaining({ code }));
@@ -38,6 +53,7 @@ describe("profile gateway", () => {
     await expect(createApiProfileGateway({ baseUrl: "https://api.example", fetch: fetchMock }).read("token")).rejects.toEqual(expect.objectContaining({ code: "NETWORK_ERROR" }));
     await expect(createApiProfileGateway({ baseUrl: "https://api.example", fetch: fetchMock, setTimeout: timeoutTimer }).read("token")).rejects.toEqual(expect.objectContaining({ code: "TIMEOUT" }));
     await expect(createConfiguredProfileGateway("").read("token")).rejects.toEqual(expect.objectContaining({ code: "CONFIGURATION_ERROR" }));
+    await expect(createConfiguredProfileGateway("").update("token", { displayName: "Mai", phone: null })).rejects.toEqual(expect.objectContaining({ code: "CONFIGURATION_ERROR" }));
     expect(createConfiguredProfileGateway("https://api.example")).toEqual(expect.objectContaining({ read: expect.any(Function) }));
     expect(new ProfileGatewayError("NETWORK_ERROR").message).toBe("NETWORK_ERROR");
   });

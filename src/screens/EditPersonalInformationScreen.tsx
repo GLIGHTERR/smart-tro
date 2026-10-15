@@ -3,16 +3,17 @@ import { ActivityIndicator, BackHandler, KeyboardAvoidingView, Modal, Platform, 
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { colors, radius } from "@/theme/tokens";
+import { createConfiguredProfileGateway, ProfileGatewayError, type ProfileGateway } from "@/profile/gateway";
 import { maskEmail } from "./accountModel";
 import { canonicalPhoneFromDomestic, domesticPhoneFromCanonical, isDirty, type EditableProfile, validateEditableProfile } from "./editPersonalInformationModel";
 
 type SaveResult = "success" | "validation" | "retryable" | "session";
 type NavigationAction = { type: string };
 type EditProfileNavigation = { addListener: (event: "beforeRemove", listener: (event: { preventDefault: () => void; data: { action: NavigationAction } }) => void) => () => void; dispatch: (action: NavigationAction) => void };
-export type EditProfileProps = { profile?: EditableProfile; onExit: () => void; onSessionError: () => void; onSaved: () => void; reviewResult?: SaveResult; navigation?: EditProfileNavigation };
+export type EditProfileProps = { profile?: EditableProfile; onExit: () => void; onSessionError: () => void; onSaved: () => void; sessionKey?: string; gateway?: ProfileGateway; reviewResult?: SaveResult; navigation?: EditProfileNavigation };
 const fixture: EditableProfile = { displayName: "Nguyễn Văn A", phone: "+84901234567", email: "nguyen.van.a.renter@example.com" };
 
-export function EditPersonalInformationScreen({ profile = fixture, onExit, onSessionError, onSaved, reviewResult = "success", navigation }: EditProfileProps) {
+export function EditPersonalInformationScreen({ profile = fixture, onExit, onSessionError, onSaved, sessionKey = "", gateway, reviewResult, navigation }: EditProfileProps) {
   const [name, setName] = useState(profile.displayName);
   const [phone, setPhone] = useState(domesticPhoneFromCanonical(profile.phone));
   const [saving, setSaving] = useState(false);
@@ -27,6 +28,8 @@ export function EditPersonalInformationScreen({ profile = fixture, onExit, onSes
   const savingRef = useRef(saving);
   const pendingBackAction = useRef<NavigationAction | null>(null);
   const replayingBackAction = useRef(false);
+  const saveInFlight = useRef(false);
+  const profileGateway = useMemo(() => gateway ?? createConfiguredProfileGateway(), [gateway]);
   useEffect(() => { dirtyRef.current = dirty; savingRef.current = saving; }, [dirty, saving]);
   useEffect(() => {
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
@@ -52,27 +55,29 @@ export function EditPersonalInformationScreen({ profile = fixture, onExit, onSes
     navigation.dispatch(action);
     setTimeout(() => { replayingBackAction.current = false; }, 0);
   };
-  const save = () => {
-    if (!canSave) return;
+  const save = async () => {
+    if (!canSave || saveInFlight.current) return;
+    saveInFlight.current = true;
     setNotice(null); setSaving(true);
-    setTimeout(() => {
-      setSaving(false);
-      if (reviewResult === "validation") return setNotice("Một số thông tin chưa hợp lệ. Vui lòng kiểm tra lại.");
-      if (reviewResult === "retryable") return setNotice("Chưa thể lưu thay đổi. Vui lòng thử lại.");
-      if (reviewResult === "session") return onSessionError();
-      // The G1 mock boundary deliberately sends only the approved editable fields.
-      void { displayName: validation.name, phone: canonicalPhoneFromDomestic(phone) };
+    try {
+      if (reviewResult === "validation") throw new ProfileGatewayError("VALIDATION_ERROR");
+      if (reviewResult === "retryable") throw new ProfileGatewayError("PROFILE_UNAVAILABLE");
+      if (reviewResult === "session") throw new ProfileGatewayError("INVALID_SESSION");
+      await profileGateway.update(sessionKey, { displayName: validation.name, phone: canonicalPhoneFromDomestic(phone) });
       setNotice("Đã lưu thông tin cá nhân.");
       setTimeout(onSaved, 450);
-    }, 500);
+    } catch (cause) {
+      if (cause instanceof ProfileGatewayError && cause.code === "INVALID_SESSION") return onSessionError();
+      setNotice(cause instanceof ProfileGatewayError && cause.code === "VALIDATION_ERROR" ? "Một số thông tin chưa hợp lệ. Vui lòng kiểm tra lại." : "Chưa thể lưu thay đổi. Vui lòng thử lại.");
+    } finally { saveInFlight.current = false; setSaving(false); }
   };
   return <SafeAreaView edges={["top", "left", "right", "bottom"]} style={styles.safe}>
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.flex}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.header}><Text accessibilityRole="header" style={styles.title}>Cập nhật thông tin cá nhân</Text></View>
         <Text style={styles.intro}>Kiểm tra và cập nhật thông tin liên hệ của bạn.</Text>
-        <Field label="Họ và tên" value={name} onChangeText={setName} error={validation.nameError} required />
-        <Field label="Số điện thoại" value={phone} onChangeText={setPhone} error={validation.phoneError} keyboardType="phone-pad" hint="Không bắt buộc. Ví dụ: 0901234567" />
+        <Field label="Họ và tên" value={name} onChangeText={setName} error={validation.nameError} required disabled={saving} />
+        <Field label="Số điện thoại" value={phone} onChangeText={setPhone} error={validation.phoneError} keyboardType="phone-pad" hint="Không bắt buộc. Ví dụ: 0901234567" disabled={saving} />
         <View style={styles.field}><Text style={styles.label}>Email</Text><Text accessibilityLabel="Email chỉ đọc" style={styles.readonly}>{maskEmail(profile.email)}</Text><Text style={styles.hint}>Email không thể chỉnh sửa.</Text></View>
         {notice ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.notice}>{notice}</Text> : null}
       </ScrollView>
@@ -84,8 +89,8 @@ export function EditPersonalInformationScreen({ profile = fixture, onExit, onSes
   </SafeAreaView>;
 }
 
-function Field({ label, value, onChangeText, error, required, hint, keyboardType = "default" }: { label: string; value: string; onChangeText: (value: string) => void; error?: string; required?: boolean; hint?: string; keyboardType?: "default" | "phone-pad" }) {
-  return <View style={styles.field}><Text style={styles.label}>{label}{required ? " *" : ""}</Text><TextInput accessibilityLabel={label} accessibilityHint={hint} autoCapitalize="words" keyboardType={keyboardType} maxLength={required ? 240 : 10} onChangeText={onChangeText} style={[styles.input, error && styles.inputError]} value={value} />{hint ? <Text style={styles.hint}>{hint}</Text> : null}{error ? <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text> : null}</View>;
+function Field({ label, value, onChangeText, error, required, hint, keyboardType = "default", disabled = false }: { label: string; value: string; onChangeText: (value: string) => void; error?: string; required?: boolean; hint?: string; keyboardType?: "default" | "phone-pad"; disabled?: boolean }) {
+  return <View style={styles.field}><Text style={styles.label}>{label}{required ? " *" : ""}</Text><TextInput accessibilityLabel={label} accessibilityHint={hint} autoCapitalize="words" editable={!disabled} keyboardType={keyboardType} maxLength={required ? 240 : 10} onChangeText={onChangeText} style={[styles.input, error && styles.inputError]} value={value} />{hint ? <Text style={styles.hint}>{hint}</Text> : null}{error ? <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text> : null}</View>;
 }
 
 const styles = StyleSheet.create({

@@ -8,7 +8,7 @@ jest.mock("react-native-safe-area-context", () => ({ SafeAreaView: "SafeAreaView
 const rental = (id: string, expiresAt: string) => ({ contractId: id, room: `Phong ${id}`, property: `Nha ${id}`, propertyAddress: { street: "1 Nguyen Hue", city: "HCM" }, expiresAt, signedAt: "2026-01-01T00:00:00.000Z" });
 const payload = (rentals: ReturnType<typeof rental>[] = []) => ({ profile: { displayName: "Mai An", email: "mai@example.com", phone: null, avatar: null }, rentals });
 const text = (root: ReactTestInstance) => root.findAllByType(Text).map((node) => node.props.children).flat(Infinity).join("|");
-const gateway = (read: jest.Mock): ProfileGateway => ({ read });
+const gateway = (read: jest.Mock): ProfileGateway => ({ read, update: jest.fn() });
 const rendered: TestRenderer.ReactTestRenderer[] = [];
 
 afterEach(() => {

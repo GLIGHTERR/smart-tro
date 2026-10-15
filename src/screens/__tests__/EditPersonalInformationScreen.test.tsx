@@ -3,11 +3,13 @@ import { Pressable, Text, TextInput } from "react-native";
 import TestRenderer, { act, type ReactTestInstance } from "react-test-renderer";
 
 import { EditPersonalInformationScreen } from "../EditPersonalInformationScreen";
+import { ProfileGatewayError, type ProfileGateway } from "@/profile/gateway";
 
 jest.mock("react-native-safe-area-context", () => ({ SafeAreaView: "SafeAreaView" }));
 
 function copy(root: ReactTestInstance) { return root.findAllByType(Text).map((node) => node.props.children).flat(Infinity).join("|"); }
 function button(root: ReactTestInstance, label: string) { const found = root.findAllByType(Pressable).find((node) => copy(node).includes(label)); if (!found) throw new Error(`Missing ${label}`); return found; }
+const gateway = (update = jest.fn().mockResolvedValue({ profile: { displayName: "Mai An", email: "mai@example.com", phone: "+84901234567", avatar: null } })): ProfileGateway => ({ read: jest.fn(), update });
 
 describe("EditPersonalInformationScreen", () => {
   beforeEach(() => jest.useFakeTimers());
@@ -26,26 +28,28 @@ describe("EditPersonalInformationScreen", () => {
     expect(button(renderer.root, "Lưu").props.accessibilityState).toEqual({ disabled: true });
   });
 
-  it("normalizes valid dirty data, shows saving, and calls the success exit once", () => {
-    const onSaved = jest.fn(); let renderer!: TestRenderer.ReactTestRenderer;
-    act(() => { renderer = TestRenderer.create(<EditPersonalInformationScreen onExit={jest.fn()} onSaved={onSaved} onSessionError={jest.fn()} />); });
+  it("normalizes valid dirty data, PATCHes the strict allowlist once, and calls the success exit once", async () => {
+    const onSaved = jest.fn(); let complete!: (value: { profile: { displayName: string; email: string; phone: string | null; avatar: null } }) => void;
+    const update = jest.fn().mockImplementation(() => new Promise((resolve) => { complete = resolve; })); let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<EditPersonalInformationScreen gateway={gateway(update)} onExit={jest.fn()} onSaved={onSaved} onSessionError={jest.fn()} sessionKey="renter-token" />); });
     const fields = renderer.root.findAllByType(TextInput);
     act(() => fields[0]!.props.onChangeText("  Mai   An  "));
     expect(button(renderer.root, "Lưu").props.accessibilityState).toEqual({ disabled: false });
-    act(() => button(renderer.root, "Lưu").props.onPress());
-    expect(renderer.root.findByProps({ accessibilityLabel: "Lưu" }).props.disabled).toBe(true);
-    act(() => jest.advanceTimersByTime(500));
+    let save!: Promise<void>;
+    act(() => { save = button(renderer.root, "Lưu").props.onPress(); });
+    expect(update).toHaveBeenCalledWith("renter-token", { displayName: "Mai An", phone: "+84901234567" });
+    await act(async () => { complete({ profile: { displayName: "Mai An", email: "mai@example.com", phone: "+84901234567", avatar: null } }); await save; });
     expect(copy(renderer.root)).toContain("Đã lưu thông tin cá nhân.");
     act(() => jest.advanceTimersByTime(450));
     expect(onSaved).toHaveBeenCalledTimes(1);
   });
 
-  it("retains edits for retryable and validation failures and presents a single discard dialog", () => {
+  it("retains edits for retryable and validation failures and presents a single discard dialog", async () => {
     const onExit = jest.fn(); let renderer!: TestRenderer.ReactTestRenderer;
     act(() => { renderer = TestRenderer.create(<EditPersonalInformationScreen onExit={onExit} onSaved={jest.fn()} onSessionError={jest.fn()} reviewResult="retryable" />); });
     const fields = renderer.root.findAllByType(TextInput);
     act(() => fields[1]!.props.onChangeText("0912345678"));
-    act(() => button(renderer.root, "Lưu").props.onPress()); act(() => jest.advanceTimersByTime(500));
+    await act(async () => { await button(renderer.root, "Lưu").props.onPress(); });
     expect(copy(renderer.root)).toContain("Chưa thể lưu thay đổi. Vui lòng thử lại.");
     expect(renderer.root.findAllByType(TextInput)[1]!.props.value).toBe("0912345678");
     act(() => button(renderer.root, "Hủy").props.onPress());
@@ -56,11 +60,32 @@ describe("EditPersonalInformationScreen", () => {
     expect(onExit).toHaveBeenCalledTimes(1);
   });
 
-  it("presents session expiry through the common session handler", () => {
+  it("presents session expiry through the common session handler", async () => {
     const onSessionError = jest.fn(); let renderer!: TestRenderer.ReactTestRenderer;
     act(() => { renderer = TestRenderer.create(<EditPersonalInformationScreen onExit={jest.fn()} onSaved={jest.fn()} onSessionError={onSessionError} reviewResult="session" />); });
-    act(() => renderer.root.findAllByType(TextInput)[0]!.props.onChangeText("Mai An")); act(() => button(renderer.root, "Lưu").props.onPress()); act(() => jest.advanceTimersByTime(500));
+    act(() => renderer.root.findAllByType(TextInput)[0]!.props.onChangeText("Mai An")); await act(async () => { await button(renderer.root, "Lưu").props.onPress(); });
     expect(onSessionError).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["VALIDATION_ERROR", "PROFILE_UNAVAILABLE", "NETWORK_ERROR", "TIMEOUT"] as const)("retains input for recoverable %s save failures", async (code) => {
+    const update = jest.fn().mockRejectedValue(new ProfileGatewayError(code)); let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<EditPersonalInformationScreen gateway={gateway(update)} onExit={jest.fn()} onSaved={jest.fn()} onSessionError={jest.fn()} />); });
+    act(() => renderer.root.findAllByType(TextInput)[1]!.props.onChangeText("0912345678"));
+    await act(async () => { await button(renderer.root, "Lưu").props.onPress(); });
+    expect(renderer.root.findAllByType(TextInput)[1]!.props.value).toBe("0912345678");
+    expect(copy(renderer.root)).toContain(code === "VALIDATION_ERROR" ? "Một số thông tin chưa hợp lệ." : "Chưa thể lưu thay đổi.");
+  });
+
+  it("serializes rapid saves so an older response cannot replace a newer UI state", async () => {
+    let complete!: (value: { profile: { displayName: string; email: string; phone: string | null; avatar: null } }) => void;
+    const update = jest.fn().mockImplementation(() => new Promise((resolve) => { complete = resolve; })); let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<EditPersonalInformationScreen gateway={gateway(update)} onExit={jest.fn()} onSaved={jest.fn()} onSessionError={jest.fn()} />); });
+    act(() => renderer.root.findAllByType(TextInput)[0]!.props.onChangeText("Mai An"));
+    let save!: Promise<void>;
+    act(() => { save = button(renderer.root, "Lưu").props.onPress(); button(renderer.root, "Lưu").props.onPress(); });
+    expect(update).toHaveBeenCalledTimes(1);
+    await act(async () => { complete({ profile: { displayName: "Mai An", email: "mai@example.com", phone: "+84901234567", avatar: null } }); await save; });
+    expect(copy(renderer.root)).toContain("Đã lưu thông tin cá nhân.");
   });
 
   it("intercepts dirty web history back once, preserves state on stay, and replays its pending action on discard", () => {

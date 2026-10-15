@@ -122,13 +122,13 @@ describe("AccountScreen", () => {
     process.env.EXPO_PUBLIC_ACCOUNT_REVIEW_SCENARIO = "one";
     const onUpdateSuccessToastShown = jest.fn();
     let renderer!: TestRenderer.ReactTestRenderer;
-    act(() => { renderer = TestRenderer.create(<AccountScreen showUpdateSuccess onUpdateSuccessToastShown={onUpdateSuccessToastShown} onBack={jest.fn()} onChangePassword={jest.fn()} onEditProfile={jest.fn()} onSignOut={jest.fn()} sessionKey="renter-a" />); });
+    act(() => { renderer = TestRenderer.create(<AccountScreen updateSuccess={{ id: "saved-1", message: "Đã cập nhật thông tin cá nhân." }} onUpdateSuccessConsumed={onUpdateSuccessToastShown} onBack={jest.fn()} onChangePassword={jest.fn()} onEditProfile={jest.fn()} onSignOut={jest.fn()} sessionKey="renter-a" />); });
     const toast = renderer.root.findByProps({ role: "status" });
     expect(text(toast)).toContain("Đã cập nhật thông tin cá nhân.");
     expect(toast.props.accessibilityLiveRegion).toBe("polite");
     expect(toast.props.pointerEvents).toBe("none");
     expect(toast.props.style).toEqual(expect.objectContaining({ backgroundColor: "#E2F3E7" }));
-    expect(onUpdateSuccessToastShown).toHaveBeenCalledTimes(1);
+    expect(onUpdateSuccessToastShown).toHaveBeenCalledWith("saved-1");
     act(() => { jest.advanceTimersByTime(4999); });
     expect(renderer.root.findByProps({ role: "status" })).toBeTruthy();
     act(() => { jest.advanceTimersByTime(1); });
@@ -140,8 +140,10 @@ describe("AccountScreen", () => {
     process.env.EXPO_PUBLIC_ACCOUNT_REVIEW_SCENARIO = "one";
     const props = { onBack: jest.fn(), onChangePassword: jest.fn(), onEditProfile: jest.fn(), onSignOut: jest.fn(), sessionKey: "renter-a" };
     let renderer!: TestRenderer.ReactTestRenderer;
-    act(() => { renderer = TestRenderer.create(<AccountScreen {...props} />); });
-    act(() => { renderer.update(<AccountScreen {...props} showUpdateSuccess />); });
+    act(() => { renderer = TestRenderer.create(<AccountScreen {...props} updateSuccess={{ id: "saved-1", message: "Đã cập nhật thông tin cá nhân." }} />); });
+    act(() => { renderer.update(<AccountScreen {...props} />); });
+    act(() => { jest.advanceTimersByTime(5000); });
+    act(() => { renderer.update(<AccountScreen {...props} updateSuccess={{ id: "saved-1", message: "Đã cập nhật thông tin cá nhân." }} />); });
     expect(renderer.root.findAllByProps({ role: "status" })).toHaveLength(0);
     act(() => renderer.unmount());
   });

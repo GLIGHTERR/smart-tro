@@ -48,6 +48,16 @@ test("web history back preserves a dirty UC-05 form until the renter discards it
   await expect(page.getByRole("heading", { name: "Tài khoản" })).toBeVisible();
 });
 
+test("direct cancel discard leaves dirty UC-05 for Account without a profile PATCH", async ({ page }) => {
+  await openAccount(page, "one", { width: 375, height: 812 });
+  await page.getByRole("button", { name: "Chỉnh sửa thông tin cá nhân" }).click();
+  await page.getByRole("textbox", { name: "Họ và tên" }).fill("Mai An");
+  await page.getByRole("button", { name: "Hủy chỉnh sửa" }).click();
+  await expect(page.getByText("Hủy thay đổi?")).toBeVisible();
+  await page.getByRole("button", { name: "Bỏ thay đổi" }).click();
+  await expect(page.getByRole("heading", { name: "Tài khoản" })).toBeVisible();
+});
+
 test("Personal and Signature tabs switch without a Home action", async ({ page }) => {
   await openAccount(page, "one", { width: 375, height: 812 });
   await page.getByRole("tab", { name: "Chữ ký" }).click();

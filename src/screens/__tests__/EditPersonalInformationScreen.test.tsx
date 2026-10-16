@@ -61,6 +61,23 @@ describe("EditPersonalInformationScreen", () => {
     expect(copy(renderer.root)).not.toContain("Hủy thay đổi?");
   });
 
+  it("replays a direct dirty cancel exit once instead of letting beforeRemove reopen the dialog", () => {
+    let beforeRemove!: (event: { preventDefault: () => void; data: { action: { type: string } } }) => void;
+    const navigation = { addListener: jest.fn((_event, listener) => { beforeRemove = listener; return jest.fn(); }), dispatch: jest.fn() };
+    const onExit = jest.fn(() => beforeRemove({ preventDefault: jest.fn(), data: { action: { type: "GO_BACK" } } }));
+    const update = jest.fn();
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<EditPersonalInformationScreen gateway={gateway(update)} navigation={navigation} onExit={onExit} onSaved={jest.fn()} onSessionError={jest.fn()} />); });
+    act(() => renderer.root.findAllByType(TextInput)[0]!.props.onChangeText("Mai An"));
+    act(() => button(renderer.root, "Hủy").props.onPress());
+    expect(copy(renderer.root)).toContain("Hủy thay đổi?");
+    act(() => button(renderer.root, "Bỏ thay đổi").props.onPress());
+    expect(onExit).toHaveBeenCalledTimes(1);
+    expect(copy(renderer.root)).not.toContain("Hủy thay đổi?");
+    expect(navigation.dispatch).not.toHaveBeenCalled();
+    expect(update).not.toHaveBeenCalled();
+  });
+
   it("presents session expiry through the common session handler", async () => {
     const onSessionError = jest.fn(); let renderer!: TestRenderer.ReactTestRenderer;
     act(() => { renderer = TestRenderer.create(<EditPersonalInformationScreen gateway={{ read: jest.fn().mockRejectedValue(new ProfileGatewayError("INVALID_SESSION")), update: jest.fn() }} onExit={jest.fn()} onSaved={jest.fn()} onSessionError={onSessionError} reviewResult="session" />); });

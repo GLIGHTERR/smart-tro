@@ -51,9 +51,9 @@ export function EditPersonalInformationScreen({ profile = fixture, onExit, onSes
     const action = pendingBackAction.current;
     pendingBackAction.current = null;
     setDialog(false);
-    if (!action || !navigation) return onExit();
     replayingBackAction.current = true;
-    navigation.dispatch(action);
+    if (action && navigation) navigation.dispatch(action);
+    else onExit();
     setTimeout(() => { replayingBackAction.current = false; }, 0);
   };
   const completeSave = (result: ProfileUpdatePayload) => {

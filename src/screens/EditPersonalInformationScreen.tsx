@@ -50,6 +50,7 @@ export function EditPersonalInformationScreen({ profile = fixture, onExit, onSes
   const discard = () => {
     const action = pendingBackAction.current;
     pendingBackAction.current = null;
+    setDialog(false);
     if (!action || !navigation) return onExit();
     replayingBackAction.current = true;
     navigation.dispatch(action);

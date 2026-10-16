@@ -58,6 +58,7 @@ describe("EditPersonalInformationScreen", () => {
     expect(copy(renderer.root)).not.toContain("Hủy thay đổi?");
     act(() => button(renderer.root, "Hủy").props.onPress()); act(() => button(renderer.root, "Bỏ thay đổi").props.onPress());
     expect(onExit).toHaveBeenCalledTimes(1);
+    expect(copy(renderer.root)).not.toContain("Hủy thay đổi?");
   });
 
   it("presents session expiry through the common session handler", async () => {

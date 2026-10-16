@@ -1,6 +1,6 @@
 import { getPathFromState, getStateFromPath, NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -12,12 +12,14 @@ import { AccountScreen } from "@/screens/AccountScreen";
 import { EditPersonalInformationScreen } from "@/screens/EditPersonalInformationScreen";
 import type { EditableProfile } from "@/screens/editPersonalInformationModel";
 import type { ProfileUpdatePayload } from "@/profile/gateway";
-import type { SuccessToastEvent } from "@/ui/SuccessToastAdapter";
+import { SuccessToastAdapter, type SuccessToastEvent } from "@/ui/SuccessToastAdapter";
 import { homeDestinations, type HomeAction } from "@/screens/homeModel";
 
-type RootStackParamList = { Auth: undefined; Home: undefined; Account: { authoritativeProfile?: ProfileUpdatePayload["profile"]; updateSuccess?: SuccessToastEvent } | undefined; EditProfile: { profile: EditableProfile }; Destination: { action: Exclude<HomeAction, "account"> | "change-password" } };
+type RootStackParamList = { Auth: undefined; Home: undefined; Account: { authoritativeProfile?: ProfileUpdatePayload["profile"] } | undefined; EditProfile: { profile: EditableProfile }; Destination: { action: Exclude<HomeAction, "account"> | "change-password" } };
+type ProfileUpdateToast = { show: () => void };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+const ProfileUpdateToastContext = createContext<ProfileUpdateToast | null>(null);
 const isWebReview = process.env.EXPO_PUBLIC_HOME_REVIEW === "true" || process.env.EXPO_PUBLIC_ACCOUNT_REVIEW === "true";
 const linking = {
   prefixes: [],
@@ -26,6 +28,20 @@ const linking = {
   getStateFromPath: (path: string, config: Parameters<typeof getStateFromPath>[1]) => getStateFromPath(path.replace(/^\/?smart-tro\/?/, ""), config),
 };
 
+function ProfileUpdateToastProvider({ children }: { children: ReactNode }) {
+  const [event, setEvent] = useState<SuccessToastEvent>();
+  const show = useCallback(() => setEvent({ id: `profile-update-${Date.now()}`, message: "Đã cập nhật thông tin cá nhân." }), []);
+  const consume = useCallback((eventId: string) => setEvent((current) => current?.id === eventId ? undefined : current), []);
+  // Keep this mounted above the stack so an Account focus/remount cannot dismiss the active toast.
+  return <ProfileUpdateToastContext.Provider value={{ show }}>{children}<SuccessToastAdapter event={event} onConsume={consume} /></ProfileUpdateToastContext.Provider>;
+}
+
+function useProfileUpdateToast() {
+  const value = useContext(ProfileUpdateToastContext);
+  if (!value) throw new Error("ProfileUpdateToastProvider is required");
+  return value;
+}
+
 function AuthenticatedHome({ navigation }: { navigation: { navigate: (screen: "Account") => void } & { navigate: (screen: "Destination", params: { action: Exclude<HomeAction, "account"> }) => void } }) { const { token } = useAuth(); return <HomeScreen sessionKey={token ?? ""} onNavigate={(action) => action === "account" ? navigation.navigate("Account") : navigation.navigate("Destination", { action })} />; }
 
 function AuthenticatedAccount({ navigation, route }: { navigation: { canGoBack: () => boolean; goBack: () => void; navigate: ((screen: "EditProfile", params: RootStackParamList["EditProfile"]) => void) & ((screen: "Destination", params: { action: "change-password" }) => void); reset: (state: { index: number; routes: { name: "Home" }[] }) => void; setParams: (params: { updateSuccess?: undefined }) => void; addListener: (event: "focus", listener: () => void) => () => void }; route: { params?: RootStackParamList["Account"] } }) {
@@ -33,14 +49,14 @@ function AuthenticatedAccount({ navigation, route }: { navigation: { canGoBack: 
   const refreshKey = useRef(0);
   const [, forceRefresh] = useState(0);
   useEffect(() => navigation.addListener("focus", () => { refreshKey.current += 1; forceRefresh(refreshKey.current); }), [navigation]);
-  const consumeUpdateSuccessToast = useCallback(() => navigation.setParams({ updateSuccess: undefined }), [navigation]);
-  return <AccountScreen authoritativeProfile={route.params?.authoritativeProfile} key={refreshKey.current} sessionKey={token ?? ""} updateSuccess={route.params?.updateSuccess} onUpdateSuccessConsumed={consumeUpdateSuccessToast} onBack={() => navigation.canGoBack() ? navigation.goBack() : navigation.reset({ index: 0, routes: [{ name: "Home" }] })} onChangePassword={() => navigation.navigate("Destination", { action: "change-password" })} onEditProfile={(profile) => navigation.navigate("EditProfile", { profile })} onSignOut={signOut} />;
+  return <AccountScreen authoritativeProfile={route.params?.authoritativeProfile} key={refreshKey.current} sessionKey={token ?? ""} onBack={() => navigation.canGoBack() ? navigation.goBack() : navigation.reset({ index: 0, routes: [{ name: "Home" }] })} onChangePassword={() => navigation.navigate("Destination", { action: "change-password" })} onEditProfile={(profile) => navigation.navigate("EditProfile", { profile })} onSignOut={signOut} />;
 }
 
 function AuthenticatedEditProfile({ navigation, route }: { navigation: { canGoBack: () => boolean; goBack: () => void; navigate: (screen: "Account", params: NonNullable<RootStackParamList["Account"]>) => void; reset: (state: { index: number; routes: { name: "Home" }[] }) => void; addListener: (event: "beforeRemove", listener: (event: { preventDefault: () => void; data: { action: { type: string } } }) => void) => () => void; dispatch: (action: { type: string }) => void }; route: { params: RootStackParamList["EditProfile"] } }) {
   const { token, signOut } = useAuth();
+  const { show } = useProfileUpdateToast();
   const exit = () => navigation.canGoBack() ? navigation.goBack() : navigation.reset({ index: 0, routes: [{ name: "Home" }] });
-  return <EditPersonalInformationScreen navigation={navigation} profile={route.params.profile} sessionKey={token ?? ""} onExit={exit} onSaved={(authoritativeProfile) => navigation.navigate("Account", { authoritativeProfile, updateSuccess: { id: `profile-update-${Date.now()}`, message: "Đã cập nhật thông tin cá nhân." } })} onSessionError={signOut} />;
+  return <EditPersonalInformationScreen navigation={navigation} profile={route.params.profile} sessionKey={token ?? ""} onExit={exit} onSaved={(authoritativeProfile) => { show(); navigation.navigate("Account", { authoritativeProfile }); }} onSessionError={signOut} />;
 }
 
 function DestinationScreen({ navigation, route }: { navigation: { goBack: () => void }; route: { params: RootStackParamList["Destination"] } }) {
@@ -51,7 +67,7 @@ function DestinationScreen({ navigation, route }: { navigation: { goBack: () => 
 export function RootNavigator() {
   const { token, isRestoring } = useAuth();
   if (isRestoring) return <ScreenState kind="loading" />;
-  return <NavigationContainer linking={linking}>{token || isWebReview ? <Stack.Navigator screenOptions={{ headerShown: false }}><Stack.Screen name="Home" component={AuthenticatedHome} /><Stack.Screen name="Account" component={AuthenticatedAccount} /><Stack.Screen name="EditProfile" component={AuthenticatedEditProfile} /><Stack.Screen name="Destination" component={DestinationScreen} /></Stack.Navigator> : <Stack.Navigator screenOptions={{ headerShown: false }}><Stack.Screen name="Auth" component={AuthScreen} /></Stack.Navigator>}</NavigationContainer>;
+  return <ProfileUpdateToastProvider><NavigationContainer linking={linking}>{token || isWebReview ? <Stack.Navigator screenOptions={{ headerShown: false }}><Stack.Screen name="Home" component={AuthenticatedHome} /><Stack.Screen name="Account" component={AuthenticatedAccount} /><Stack.Screen name="EditProfile" component={AuthenticatedEditProfile} /><Stack.Screen name="Destination" component={DestinationScreen} /></Stack.Navigator> : <Stack.Navigator screenOptions={{ headerShown: false }}><Stack.Screen name="Auth" component={AuthScreen} /></Stack.Navigator>}</NavigationContainer></ProfileUpdateToastProvider>;
 }
 
 const styles = StyleSheet.create({

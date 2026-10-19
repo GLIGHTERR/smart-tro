@@ -1,0 +1,39 @@
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+import android_interactions as interaction
+
+
+class NodeSelectionTests(unittest.TestCase):
+    def test_prefers_clickable_accessible_control_to_text(self):
+        xml = '<hierarchy><node text="Name"/><node content-desc="Name" clickable="true" bounds="[10,20][30,40]"/></hierarchy>'
+        self.assertEqual(interaction.center(interaction.select_node(xml, "Name").get("bounds")), (20, 30))
+
+    def test_text_fallback_and_disabled_state(self):
+        node = interaction.select_node('<hierarchy><node text="Disabled" enabled="false"/></hierarchy>', "Disabled")
+        self.assertEqual(node.get("enabled"), "false")
+
+    def test_missing_and_malformed_xml(self):
+        with self.assertRaises(LookupError):
+            interaction.select_node('<hierarchy/>', 'Name')
+        with self.assertRaises(Exception):
+            interaction.select_node('<hierarchy>', 'Name')
+
+    def test_bounds_normal_invalid_and_zero_area(self):
+        self.assertEqual(interaction.center('[0,1][1,2]'), (0, 1))
+        for bounds in (None, '', '[x,0][1,1]', '[0,0][0,1]', '[5,5][4,6]'):
+            with self.subTest(bounds=bounds), self.assertRaises(ValueError):
+                interaction.center(bounds)
+
+    def test_case_records_success_and_exception(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(interaction, 'OUT', Path(directory)), patch.object(interaction, 'RESULTS', []):
+            interaction.run_case('ok', 'expected', lambda: 'actual')
+            interaction.run_case('bad', 'expected', lambda: 1 / 0)
+            self.assertEqual([r['status'] for r in interaction.RESULTS], ['observed', 'failure_or_incomplete'])
+            self.assertIn('division by zero', (Path(directory) / 'results.json').read_text())
+
+
+if __name__ == '__main__':
+    unittest.main()

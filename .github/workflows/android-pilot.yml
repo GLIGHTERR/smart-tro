@@ -1,0 +1,85 @@
+name: Android pilot artifact
+
+on:
+  push:
+    branches: [agent/codex-dev/01a1523d]
+
+permissions:
+  contents: read
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      EXPO_PUBLIC_UI_PILOT: "true"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+      - run: npm ci
+      - run: npx expo prebuild --platform android --no-install
+      - name: Build bundled APK with debug signing
+        working-directory: android
+        run: ./gradlew :app:assembleRelease --no-daemon --stacktrace
+      - name: Record provenance
+        run: |
+          mkdir -p pilot-artifact
+          cp android/app/build/outputs/apk/release/app-release.apk pilot-artifact/smart-tro-pilot.apk
+          git rev-parse HEAD > pilot-artifact/commit.txt
+          sha256sum pilot-artifact/smart-tro-pilot.apk > pilot-artifact/apk-sha256.txt
+          echo "Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" > pilot-artifact/run.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: smart-tro-pilot-apk-${{ github.sha }}
+          path: pilot-artifact/
+          if-no-files-found: error
+          retention-days: 14
+
+  emulator:
+    needs: apk
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: smart-tro-pilot-apk-${{ github.sha }}
+          path: pilot-artifact
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Install, launch and capture Android evidence
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          script: |
+            mkdir -p android-evidence
+            adb shell getprop ro.build.version.sdk > android-evidence/api.txt
+            adb install pilot-artifact/smart-tro-pilot.apk
+            adb logcat -c
+            adb shell monkey -p com.smartplatform.smarttro -c android.intent.category.LAUNCHER 1
+            sleep 25
+            adb shell uiautomator dump /sdcard/window.xml
+            adb pull /sdcard/window.xml android-evidence/window.xml
+            adb shell screencap -p /sdcard/screen.png
+            adb pull /sdcard/screen.png android-evidence/screen.png
+            adb logcat -d -v brief > android-evidence/logcat.txt
+            grep -q 'G1 UI pilot' android-evidence/window.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smart-tro-pilot-android-evidence-${{ github.sha }}
+          path: android-evidence/
+          if-no-files-found: warn
+          retention-days: 14

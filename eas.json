@@ -17,6 +17,12 @@
         "EXPO_PUBLIC_UC03_REVIEW": "true"
       }
     },
+    "pilot": {
+      "extends": "preview",
+      "env": {
+        "EXPO_PUBLIC_UI_PILOT": "true"
+      }
+    },
     "production": {
       "autoIncrement": true,
       "environment": "production",

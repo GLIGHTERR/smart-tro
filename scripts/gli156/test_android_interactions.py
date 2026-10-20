@@ -1,7 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 import android_interactions as interaction
 
@@ -33,6 +33,21 @@ class NodeSelectionTests(unittest.TestCase):
             interaction.run_case('bad', 'expected', lambda: 1 / 0)
             self.assertEqual([r['status'] for r in interaction.RESULTS], ['observed', 'failure_or_incomplete'])
             self.assertIn('division by zero', (Path(directory) / 'results.json').read_text())
+
+    def test_dialog_requires_alice_to_survive_control_and_android_back(self):
+        dumps = [
+            'Page 1',
+            'Page 1 Alice',
+            'Page 1 Alice Pilot dialog',
+            'Page 1 Alice',
+            'Page 1 Alice Pilot dialog',
+            'Page 1 Alice',
+        ]
+        with patch.object(interaction, 'restart'), patch.object(interaction, 'tap') as tap, patch.object(interaction, 'shell') as shell, patch.object(interaction, 'dump', side_effect=dumps):
+            result = interaction.dialog()
+        self.assertIn('retaining Alice', result)
+        shell.assert_has_calls([call('input', 'text', 'Alice'), call('input', 'keyevent', 'KEYCODE_BACK')])
+        self.assertEqual(tap.call_args_list[0].args[1], 'Name')
 
 
 if __name__ == '__main__':

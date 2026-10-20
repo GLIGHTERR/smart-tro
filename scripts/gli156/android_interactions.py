@@ -105,6 +105,10 @@ def validation():
 def dialog():
     restart()
     xml = dump("dialog-01-initial")
+    tap(xml, "Name")
+    shell("input", "text", "Alice")
+    xml = dump("dialog-01-alice")
+    assert "Alice" in xml, "Dialog state fixture was not entered"
     tap(xml, "Open dialog")
     time.sleep(1)
     xml = dump("dialog-02-open")
@@ -112,6 +116,7 @@ def dialog():
     tap(xml, "Close")
     xml = dump("dialog-03-control-close")
     assert "Pilot dialog" not in xml, "Dialog remained after Close"
+    assert "Page 1" in xml and "Alice" in xml, "Close did not retain Page 1 input state"
     tap(xml, "Open dialog")
     time.sleep(1)
     xml = dump("dialog-04-reopened")
@@ -119,7 +124,8 @@ def dialog():
     shell("input", "keyevent", "KEYCODE_BACK")
     xml = dump("dialog-05-back")
     assert "Pilot dialog" not in xml and "Page 1" in xml, "Back did not close dialog to Page 1"
-    return "Dialog opened and closed using Close and Android Back. Focus/semantics in XML; announcement not measured."
+    assert "Alice" in xml, "Back did not retain Page 1 input state"
+    return "Dialog opened and closed using Close and Android Back while retaining Alice. Focus/semantics in XML; announcement not measured."
 
 
 def toast():

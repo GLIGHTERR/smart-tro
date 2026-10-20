@@ -3,6 +3,16 @@ name: Android pilot artifact
 on:
   push:
     branches: [agent/codex-dev/01a1523d]
+  pull_request:
+    branches: [master]
+    paths:
+      - ".github/workflows/android-pilot.yml"
+      - "src/pilot/**"
+      - "src/ui/**"
+      - "index.ts"
+      - "metro.config.js"
+      - "package.json"
+      - "package-lock.json"
 
 permissions:
   contents: read
@@ -15,6 +25,8 @@ jobs:
       EXPO_PUBLIC_UI_PILOT: "true"
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -41,7 +53,7 @@ jobs:
           echo "Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" > pilot-artifact/run.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: smart-tro-pilot-apk-${{ github.sha }}
+          name: smart-tro-pilot-apk-${{ github.event.pull_request.head.sha || github.sha }}
           path: pilot-artifact/
           if-no-files-found: error
           retention-days: 14
@@ -53,9 +65,11 @@ jobs:
     steps:
       # The emulator runner needs the checked-in interaction harness, not just the APK artifact.
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/download-artifact@v4
         with:
-          name: smart-tro-pilot-apk-${{ github.sha }}
+          name: smart-tro-pilot-apk-${{ github.event.pull_request.head.sha || github.sha }}
           path: pilot-artifact
       - name: Verify Android interaction harness
         run: python3 -m unittest discover -s scripts/gli156 -t . -p 'test_*.py' -v
@@ -76,7 +90,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: smart-tro-pilot-android-evidence-${{ github.sha }}
+          name: smart-tro-pilot-android-evidence-${{ github.event.pull_request.head.sha || github.sha }}
           path: android-interactions/
           if-no-files-found: warn
           retention-days: 14

@@ -15,20 +15,26 @@ const previewSha = process.env.EXPO_PUBLIC_BUILD_SHA ?? "not-recorded";
 export function PilotHome({ navigation }: NativeStackScreenProps<Routes, "Home">) {
   const [value, setValue] = useState("");
   const [showError, setShowError] = useState(false);
+  const [showAlert, setShowAlert] = useState(false);
   const [visible, setVisible] = useState(false);
   const close = useCallback(() => setVisible(false), []);
   const showToast = useContext(ToastContext);
   if (!showToast) throw new Error("Pilot toast provider is required");
   return <SafeAreaView style={{ flex: 1 }}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 24, gap: 16 }}>
     <Text accessibilityRole="header">G1 UI pilot</Text><Text>QA preview only - no API or production-data actions</Text><Text accessibilityLabel="Pilot provenance">Base merge: {baseSha}{"\n"}QA enablement revision: {previewSha}{"\n"}EXPO_PUBLIC_UI_PILOT=true</Text><Text>Page 1</Text>
-    <PilotField label="Name" value={value} onChange={setValue} error={showError && !value.trim() ? "Name is required" : undefined} />
-    {showError && !value.trim() ? <PilotAlert message="Name is required" /> : null}
+    <Text>Validate tests field feedback only. A valid value clears the single required-field message.</Text>
+    <PilotField label="Name" value={value} onChange={(nextValue) => { setValue(nextValue); if (nextValue.trim()) setShowError(false); }} error={showError ? "Name is required" : undefined} />
     <PilotButton label="Validate" onPress={() => setShowError(true)} />
+    <Text>Show persistent alert demonstrates a separate business or system message.</Text>
+    {showAlert ? <PilotAlert message="The service is temporarily unavailable. This alert remains until dismissed." /> : null}
+    <PilotButton label="Show persistent alert" onPress={() => setShowAlert(true)} />
+    {showAlert ? <PilotButton label="Dismiss persistent alert" onPress={() => setShowAlert(false)} /> : null}
     <PilotButton label="Disabled" disabled onPress={() => {}} />
     <PilotButton label="Open dialog" onPress={() => setVisible(true)} />
     <PilotButton label="Show toast" onPress={() => showToast("Saved")} />
     <PilotButton label="Show long toast" onPress={() => showToast(longMessage)} />
-    <PilotButton label="Navigate" onPress={() => navigation.navigate("Next")} />
+    <Text>Show toast and navigate verifies that a one-shot success message remains visible on Page 2 and closes after about five seconds.</Text>
+    <PilotButton label="Show toast and navigate" onPress={() => { showToast("Saved while navigating"); navigation.navigate("Next"); }} />
     <PilotDialog visible={visible} title="Pilot dialog" message="Your input remains unchanged." onClose={close} />
   </ScrollView></SafeAreaView>;
 }

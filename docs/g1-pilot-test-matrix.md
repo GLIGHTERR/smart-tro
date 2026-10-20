@@ -7,10 +7,10 @@ The Android runtime and accessibility gate remains separate in GLI-156.
 | --- | --- | --- |
 | Boundary | public API has no vendor types; vendor imports confined to renderer | lint guard, typecheck |
 | Button | enabled, disabled, press | unit and browser |
-| Input | focus, value, validation, keyboard | unit and browser; Android in GLI-156 |
-| Persistent alert | visible until caller clears it; caller input unchanged | unit and browser |
-| Dialog | open, close, Escape/back, focus and restoration | unit and browser; Android in GLI-156 |
-| Toast | default duration, deadline, replacement, duplicate event, unmount/dismiss, navigation | fake-timer unit and browser |
+| Input | focus, value, one visible field-error message, valid clear, keyboard | unit and browser; Android in GLI-156 |
+| Persistent alert | independent system/business message, visible until caller clears it | unit and browser |
+| Dialog | Web masked centered panel; open, close, Escape/back, focus and restoration | unit and browser; Android in GLI-156 |
+| Toast | default duration, deadline, replacement, duplicate event, unmount/dismiss, show-and-navigate lifecycle | fake-timer unit and browser |
 | Accessibility | live region, keyboard dialog/focus, long text | browser; device announcement in GLI-156 |
 | Regression | UC-05 success/failure and navigation | existing tests and Web regression |
 | Build | npm ci, dependency tree, Expo Doctor, lint, typecheck, coverage, production export | commands in handoff |
@@ -19,6 +19,18 @@ The Android runtime and accessibility gate remains separate in GLI-156.
 No permissions, concurrent writes, persistence, or backend operations are added by
 the pilot; event deduplication and timer cancellation cover relevant idempotency
 and race cases. Device behavior is not inferred from mocks.
+
+The validation and persistent-alert demos are deliberately separate: `Validate`
+does not render a NoticeBar, and `Show persistent alert` does not depend on the
+field state. `Show toast and navigate` creates the one-shot success message and
+moves to Page 2 in one action; `Go back` is navigation only, not a vendor demo.
+
+Adapter mapping: Button, InputItem, NoticeBar, Provider and Toast are rendered
+by `@ant-design/react-native` inside `src/ui/pilot/renderer.tsx`. Dialog is an
+adapter fallback: React Native Web renders the masked, centered panel because
+the vendor modal portal did not expose a usable Web dialog tree; Android uses
+React Native `Modal` so Android Back reaches `onRequestClose`. Neither fallback
+is exposed through the public `src/ui` types, and no second UI vendor is used.
 
 The isolated pilot is selected at build time with `EXPO_PUBLIC_UI_PILOT=true`;
 the ordinary product entry and UC-05 are unchanged. `npm run test:web:ui-pilot`

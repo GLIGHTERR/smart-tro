@@ -54,8 +54,25 @@ def dump(name):
     return xml
 
 
+def hierarchy():
+    shell("uiautomator", "dump", "/sdcard/gli156.xml")
+    return adb("exec-out", "cat", "/sdcard/gli156.xml").stdout.decode("utf-8")
+
+
 def tap(xml, label):
-    node = select_node(xml, label)
+    # Input controls may leave the system IME open, and long pilot content can
+    # place later controls below the initial viewport. Scroll deliberately
+    # before reporting that a required accessible control is absent.
+    for attempt in range(4):
+        try:
+            node = select_node(xml, label)
+            break
+        except LookupError:
+            if attempt == 3:
+                raise
+            shell("input", "swipe", "160", "520", "160", "180", "300")
+            time.sleep(0.3)
+            xml = hierarchy()
     x, y = center(node.get("bounds"))
     shell("input", "tap", x, y)
     return node
@@ -65,6 +82,9 @@ def restart():
     shell("am", "force-stop", PACKAGE)
     shell("monkey", "-p", PACKAGE, "-c", "android.intent.category.LAUNCHER", "1")
     time.sleep(5)
+    # Force-stopping the activity does not necessarily dismiss Android's IME.
+    shell("input", "keyevent", "KEYCODE_BACK", check=False)
+    time.sleep(0.3)
 
 
 def run_case(name, expected, action):
@@ -110,6 +130,9 @@ def dialog():
     shell("input", "text", "Alice")
     xml = dump("dialog-01-alice")
     assert "Alice" in xml, "Dialog state fixture was not entered"
+    shell("input", "keyevent", "KEYCODE_BACK", check=False)
+    time.sleep(0.3)
+    xml = hierarchy()
     tap(xml, "Open dialog")
     time.sleep(1)
     xml = dump("dialog-02-open")

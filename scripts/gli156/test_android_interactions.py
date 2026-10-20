@@ -34,6 +34,16 @@ class NodeSelectionTests(unittest.TestCase):
             self.assertEqual([r['status'] for r in interaction.RESULTS], ['observed', 'failure_or_incomplete'])
             self.assertIn('division by zero', (Path(directory) / 'results.json').read_text())
 
+    def test_tap_scrolls_for_a_control_outside_the_initial_viewport(self):
+        control = interaction.ET.fromstring('<node content-desc="Show toast" clickable="true" bounds="[10,20][30,40]"/>')
+        with patch.object(interaction, 'select_node', side_effect=[LookupError('missing'), control]), patch.object(interaction, 'hierarchy', return_value='<hierarchy/>') as hierarchy, patch.object(interaction, 'shell') as shell, patch.object(interaction.time, 'sleep'):
+            interaction.tap('<hierarchy/>', 'Show toast')
+        hierarchy.assert_called_once()
+        shell.assert_has_calls([
+            call('input', 'swipe', '160', '520', '160', '180', '300'),
+            call('input', 'tap', 20, 30),
+        ])
+
     def test_dialog_requires_alice_to_survive_control_and_android_back(self):
         dumps = [
             'Page 1',
@@ -43,10 +53,14 @@ class NodeSelectionTests(unittest.TestCase):
             'Page 1 Alice Pilot dialog',
             'Page 1 Alice',
         ]
-        with patch.object(interaction, 'restart'), patch.object(interaction, 'tap') as tap, patch.object(interaction, 'shell') as shell, patch.object(interaction, 'dump', side_effect=dumps), patch.object(interaction.time, 'sleep') as sleep:
+        with patch.object(interaction, 'restart'), patch.object(interaction, 'tap') as tap, patch.object(interaction, 'shell') as shell, patch.object(interaction, 'hierarchy', return_value='Page 1 Alice'), patch.object(interaction, 'dump', side_effect=dumps), patch.object(interaction.time, 'sleep') as sleep:
             result = interaction.dialog()
         self.assertIn('retaining Alice', result)
-        shell.assert_has_calls([call('input', 'text', 'Alice'), call('input', 'keyevent', 'KEYCODE_BACK')])
+        shell.assert_has_calls([
+            call('input', 'text', 'Alice'),
+            call('input', 'keyevent', 'KEYCODE_BACK', check=False),
+            call('input', 'keyevent', 'KEYCODE_BACK'),
+        ])
         self.assertEqual(tap.call_args_list[0].args[1], 'Name')
         sleep.assert_called_with(1)
 

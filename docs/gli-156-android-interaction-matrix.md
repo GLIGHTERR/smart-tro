@@ -1,7 +1,8 @@
 # GLI-156 technical pilot interaction matrix
 
-This harness is isolated from the pilot PR and uses the existing immutable APK.
-It captures technical observations, not formal QA or TalkBack certification.
+This harness runs against the APK produced from the workflow's triggering
+immutable SHA. It captures technical observations, not formal QA or TalkBack
+certification.
 
 | Scope | Input and expected observation | Evidence |
 | --- | --- | --- |

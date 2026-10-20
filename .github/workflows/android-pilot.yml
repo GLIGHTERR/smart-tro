@@ -54,34 +54,26 @@ jobs:
         with:
           name: smart-tro-pilot-apk-${{ github.sha }}
           path: pilot-artifact
+      - name: Verify Android interaction harness
+        run: python3 -m unittest discover -s scripts/gli156 -p 'test_*.py' -v
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - name: Install, launch and capture Android evidence
+      - name: Reproduce pilot interactions on Android
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
           arch: x86_64
           target: google_apis
           script: |
-            mkdir -p android-evidence
-            adb shell getprop ro.build.version.sdk > android-evidence/api.txt
             adb install pilot-artifact/smart-tro-pilot.apk
-            adb logcat -c
-            adb shell monkey -p com.smartplatform.smarttro -c android.intent.category.LAUNCHER 1
-            sleep 25
-            adb shell uiautomator dump /sdcard/window.xml
-            adb pull /sdcard/window.xml android-evidence/window.xml
-            adb shell screencap -p /sdcard/screen.png
-            adb pull /sdcard/screen.png android-evidence/screen.png
-            adb logcat -d -v brief > android-evidence/logcat.txt
-            grep -q 'G1 UI pilot' android-evidence/window.xml
+            python3 scripts/gli156/android_interactions.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: smart-tro-pilot-android-evidence-${{ github.sha }}
-          path: android-evidence/
+          path: android-interactions/
           if-no-files-found: warn
           retention-days: 14

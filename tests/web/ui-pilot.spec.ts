@@ -7,6 +7,7 @@ test("pilot keyboard, validation, dialog and one-shot status", async ({ page }) 
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "G1 UI pilot" })).toBeVisible();
+  await expect(page.getByLabel("Pilot provenance")).toContainText("EXPO_PUBLIC_UI_PILOT=true");
   await expect(page.getByRole("button", { name: "Disabled" })).toBeDisabled();
   const input = page.getByLabel("Name");
   await input.focus();

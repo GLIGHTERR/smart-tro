@@ -9,6 +9,8 @@ type Routes = { Home: undefined; Next: undefined };
 const Stack = createNativeStackNavigator<Routes>();
 const ToastContext = createContext<((message: string) => void) | undefined>(undefined);
 const longMessage = "The saved changes remain available while you continue navigating. ".repeat(4);
+const baseSha = process.env.EXPO_PUBLIC_PILOT_BASE_SHA ?? "not-recorded";
+const previewSha = process.env.EXPO_PUBLIC_BUILD_SHA ?? "not-recorded";
 
 export function PilotHome({ navigation }: NativeStackScreenProps<Routes, "Home">) {
   const [value, setValue] = useState("");
@@ -18,7 +20,7 @@ export function PilotHome({ navigation }: NativeStackScreenProps<Routes, "Home">
   const showToast = useContext(ToastContext);
   if (!showToast) throw new Error("Pilot toast provider is required");
   return <SafeAreaView style={{ flex: 1 }}><ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 24, gap: 16 }}>
-    <Text accessibilityRole="header">G1 UI pilot</Text><Text>Page 1</Text>
+    <Text accessibilityRole="header">G1 UI pilot</Text><Text>QA preview only - no API or production-data actions</Text><Text accessibilityLabel="Pilot provenance">Base merge: {baseSha}{"\n"}QA enablement revision: {previewSha}{"\n"}EXPO_PUBLIC_UI_PILOT=true</Text><Text>Page 1</Text>
     <PilotField label="Name" value={value} onChange={setValue} error={showError && !value.trim() ? "Name is required" : undefined} />
     {showError && !value.trim() ? <PilotAlert message="Name is required" /> : null}
     <PilotButton label="Validate" onPress={() => setShowError(true)} />

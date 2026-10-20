@@ -30,7 +30,8 @@ jobs:
       - run: npx expo prebuild --platform android --no-install
       - name: Build bundled APK with debug signing
         working-directory: android
-        run: ./gradlew :app:assembleRelease --no-daemon --stacktrace
+        # Limit parallel workers while giving the Android dependency report enough heap on GitHub-hosted runners.
+        run: ./gradlew :app:assembleRelease --no-daemon --stacktrace --max-workers=2 -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g"
       - name: Record provenance
         run: |
           mkdir -p pilot-artifact

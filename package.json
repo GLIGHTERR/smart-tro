@@ -11,7 +11,7 @@
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "test": "node --test scripts/__tests__/review-auth-config.test.mjs && jest --runInBand",
-    "test:coverage": "node --test --experimental-test-coverage scripts/__tests__/review-auth-config.test.mjs && jest --runInBand --coverage",
+    "test:coverage": "node --test --experimental-test-coverage scripts/__tests__/*.test.mjs && jest --runInBand --coverage",
     "verify:review-auth-config": "node scripts/review-auth-config.mjs",
     "export:web": "expo export --platform web --clear && node scripts/write-pages-fallback.mjs",
     "test:web": "npm run export:web && playwright test",

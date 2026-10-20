@@ -1,6 +1,6 @@
-import { Button, InputItem, Modal, NoticeBar, Provider, Toast } from "@ant-design/react-native";
+import { Button, InputItem, Modal as AntModal, NoticeBar, Provider, Toast } from "@ant-design/react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AccessibilityInfo, BackHandler, Platform, Text, useWindowDimensions, View } from "react-native";
+import { AccessibilityInfo, Modal as NativeModal, Platform, Text, useWindowDimensions, View } from "react-native";
 import type { PilotButtonProps, PilotDialogProps, PilotFieldProps, PilotToastEvent } from "./types";
 
 export function PilotProvider({ children }: { children: React.ReactNode }) {
@@ -28,16 +28,6 @@ export function PilotDialog({ visible, title, message, onClose }: PilotDialogPro
     }
   }, [visible]);
   useEffect(() => {
-    if (!visible || Platform.OS === "web") return;
-    // Ant Design's modal does not reliably consume Android Back on this stack.
-    // Consume it here so React Native does not fall through to the activity.
-    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
-      onClose();
-      return true;
-    });
-    return () => subscription.remove();
-  }, [visible, onClose]);
-  useEffect(() => {
     if (!visible || Platform.OS !== "web") return;
     const previous = document.activeElement as HTMLElement | null;
     const handleKey = (event: KeyboardEvent) => {
@@ -48,11 +38,15 @@ export function PilotDialog({ visible, title, message, onClose }: PilotDialogPro
     document.addEventListener("keydown", handleKey);
     return () => { document.removeEventListener("keydown", handleKey); previous?.focus(); };
   }, [visible, onClose]);
-  return <Modal visible={visible} onClose={onClose} onRequestClose={() => { onClose(); return true; }} maskClosable={false}>
-    <View ref={setContent} role="dialog" aria-modal accessibilityViewIsModal accessibilityLabel={title}>
-      <Text>{title}</Text><Text>{message}</Text><PilotButton label="Close" onPress={onClose} />
-    </View>
-  </Modal>;
+  const dialog = <View ref={setContent} role="dialog" aria-modal accessibilityViewIsModal accessibilityLabel={title}>
+    <Text>{title}</Text><Text>{message}</Text><PilotButton label="Close" onPress={onClose} />
+  </View>;
+  if (Platform.OS === "web") {
+    return <AntModal visible={visible} onClose={onClose} onRequestClose={() => { onClose(); return true; }} maskClosable={false}>{dialog}</AntModal>;
+  }
+  // React Native suppresses BackHandler events while a native Modal is open.
+  // onRequestClose is the Android Back callback and avoids Ant's portal handler.
+  return <NativeModal visible={visible} transparent animationType="fade" onRequestClose={onClose}>{dialog}</NativeModal>;
 }
 
 export const PILOT_TOAST_DURATION_MS = 5000;

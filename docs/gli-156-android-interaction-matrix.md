@@ -9,7 +9,7 @@ It captures technical observations, not formal QA or TalkBack certification.
 | Input/validation | Empty `Name`, then `Alice`; required error appears then clears | UI XML and screenshots |
 | Disabled Button | `Disabled` has `enabled=false`; tapping does not navigate | UI XML and screenshots |
 | Persistent Alert | Empty validation shows alert; remains after a delay | UI XML and screenshots |
-| Dialog | Open, close with control, reopen and press Android Back | UI XML and screenshots |
+| Dialog | Enter synthetic `Alice`, open, close with control, reopen and press Android Back; retain Page 1 input after each close | UI XML and screenshots |
 | Toast | `Show toast`, observe immediate and after >5s, then navigate | Screenshots and UI XML |
 | Keyboard/focus | Focus Name, enter `Alice`; record keyboard state and hierarchy | UI XML and input-method dump |
 | Long text/font scale | Long toast with font scale 1.5; record hierarchy and screenshot | Screenshots and UI XML |

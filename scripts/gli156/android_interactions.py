@@ -3,6 +3,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 import time
 import traceback
 import xml.etree.ElementTree as ET
@@ -122,6 +123,8 @@ def dialog():
     xml = dump("dialog-04-reopened")
     assert "Pilot dialog" in xml, "Dialog did not reopen"
     shell("input", "keyevent", "KEYCODE_BACK")
+    # Wait for React Native to commit the dismissal before collecting evidence.
+    time.sleep(1)
     xml = dump("dialog-05-back")
     assert "Pilot dialog" not in xml and "Page 1" in xml, "Back did not close dialog to Page 1"
     assert "Alice" in xml, "Back did not retain Page 1 input state"
@@ -223,7 +226,8 @@ def main():
             run_case(*case)
     finally:
         (OUT / "logcat.txt").write_bytes(adb("logcat", "-d", "-v", "brief", check=False).stdout)
+    return 1 if any(result["status"] == "failure_or_incomplete" for result in RESULTS) else 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

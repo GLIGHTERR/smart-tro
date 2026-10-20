@@ -43,11 +43,21 @@ class NodeSelectionTests(unittest.TestCase):
             'Page 1 Alice Pilot dialog',
             'Page 1 Alice',
         ]
-        with patch.object(interaction, 'restart'), patch.object(interaction, 'tap') as tap, patch.object(interaction, 'shell') as shell, patch.object(interaction, 'dump', side_effect=dumps):
+        with patch.object(interaction, 'restart'), patch.object(interaction, 'tap') as tap, patch.object(interaction, 'shell') as shell, patch.object(interaction, 'dump', side_effect=dumps), patch.object(interaction.time, 'sleep') as sleep:
             result = interaction.dialog()
         self.assertIn('retaining Alice', result)
         shell.assert_has_calls([call('input', 'text', 'Alice'), call('input', 'keyevent', 'KEYCODE_BACK')])
         self.assertEqual(tap.call_args_list[0].args[1], 'Name')
+        sleep.assert_called_with(1)
+
+    def test_main_returns_failure_when_a_case_is_incomplete(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(interaction, 'OUT', Path(directory)), patch.object(interaction, 'RESULTS', []), patch.object(interaction, 'shell', return_value=''), patch.object(interaction, 'adb') as adb, patch.object(interaction, 'run_case') as run_case:
+            adb.return_value.stdout = b''
+            def record_failure(*_):
+                interaction.RESULTS.append({'status': 'failure_or_incomplete'})
+            run_case.side_effect = record_failure
+            self.assertEqual(interaction.main(), 1)
+        adb.assert_called()
 
 
 if __name__ == '__main__':

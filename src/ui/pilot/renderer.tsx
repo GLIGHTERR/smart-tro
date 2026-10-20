@@ -1,6 +1,6 @@
 import { Button, InputItem, Modal, NoticeBar, Provider, Toast } from "@ant-design/react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AccessibilityInfo, Platform, Text, useWindowDimensions, View } from "react-native";
+import { AccessibilityInfo, BackHandler, Platform, Text, useWindowDimensions, View } from "react-native";
 import type { PilotButtonProps, PilotDialogProps, PilotFieldProps, PilotToastEvent } from "./types";
 
 export function PilotProvider({ children }: { children: React.ReactNode }) {
@@ -27,6 +27,16 @@ export function PilotDialog({ visible, title, message, onClose }: PilotDialogPro
       (node as unknown as HTMLElement | null)?.querySelector<HTMLElement>("button")?.focus();
     }
   }, [visible]);
+  useEffect(() => {
+    if (!visible || Platform.OS === "web") return;
+    // Ant Design's modal does not reliably consume Android Back on this stack.
+    // Consume it here so React Native does not fall through to the activity.
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      onClose();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [visible, onClose]);
   useEffect(() => {
     if (!visible || Platform.OS !== "web") return;
     const previous = document.activeElement as HTMLElement | null;

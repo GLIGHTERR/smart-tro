@@ -1,5 +1,5 @@
 import React from "react";
-import { AccessibilityInfo, Platform, Pressable, TextInput } from "react-native";
+import { AccessibilityInfo, BackHandler, Platform, Pressable, TextInput } from "react-native";
 import TestRenderer, { act } from "react-test-renderer";
 import { PilotAlert, PilotButton, PilotDialog, PilotField, PilotProvider, PilotToast, PILOT_TOAST_DURATION_MS } from "../pilot/renderer";
 
@@ -99,14 +99,24 @@ describe("G1 UI pilot adapter", () => {
 
   it("closes dialog on native back and close action", () => {
     const close = jest.fn();
+    const remove = jest.fn();
+    let backHandler!: () => boolean | null | undefined;
+    jest.spyOn(BackHandler, "addEventListener").mockImplementation((_event, handler) => {
+      backHandler = handler;
+      return { remove };
+    });
     let view!: TestRenderer.ReactTestRenderer;
     act(() => { view = TestRenderer.create(<PilotDialog visible title="Dialog" message="Message" onClose={close} />); });
     expect(view.root.findByProps({ role: "dialog" }).props.accessibilityLabel).toBe("Dialog");
+    expect(BackHandler.addEventListener).toHaveBeenCalledWith("hardwareBackPress", expect.any(Function));
+    act(() => expect(backHandler()).toBe(true));
+    expect(close).toHaveBeenCalledTimes(1);
     expect(view.root.findByProps({ maskClosable: false }).props.onRequestClose()).toBe(true);
     act(() => view.root.findByType(Pressable).props.onPress());
-    expect(close).toHaveBeenCalledTimes(2);
+    expect(close).toHaveBeenCalledTimes(3);
     act(() => { view.update(<PilotDialog visible={false} title="Dialog" message="Message" onClose={close} />); });
     expect(view.root.findAllByProps({ role: "dialog" })).toHaveLength(0);
+    expect(remove).toHaveBeenCalledTimes(1);
   });
 
   it("moves web focus into the dialog, traps Tab, closes on Escape and restores focus", () => {

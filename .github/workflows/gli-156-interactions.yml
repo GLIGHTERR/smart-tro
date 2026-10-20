@@ -2,7 +2,7 @@ name: GLI-156 Android interaction evidence
 
 on:
   push:
-    branches: [agent/codex-dev/gli-156-android-interactions]
+    branches: [agent/codex-dev/gli-158-android-retest]
 
 permissions:
   contents: read
@@ -17,13 +17,13 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           github-token: ${{ github.token }}
-          run-id: 39219050148
-          name: smart-tro-pilot-apk-94f1f7c0da44ce50aaa351d967f43ab600763285
+          run-id: 39361465069
+          name: smart-tro-pilot-apk-638b32a3ab07f817cd0c0b520821c016c339d778
           path: pilot-artifact
       - name: Verify pilot provenance
         run: |
-          test "$(cat pilot-artifact/commit.txt)" = 94f1f7c0da44ce50aaa351d967f43ab600763285
-          echo '31a7ece6018cc64cc62901ab67212b00ef3e42161ccf5fdc8cd5d42e67bc0fd0  pilot-artifact/smart-tro-pilot.apk' | sha256sum -c
+          test "$(cat pilot-artifact/commit.txt)" = 638b32a3ab07f817cd0c0b520821c016c339d778
+          echo '15314949ca0b2d2e5e903abcaa22b2f31f82edf4e70011ebacac1f0f546b8793  pilot-artifact/smart-tro-pilot.apk' | sha256sum -c
           python3 -m unittest discover -s scripts/gli156 -p 'test_*.py' -v
       - name: Enable KVM
         run: |

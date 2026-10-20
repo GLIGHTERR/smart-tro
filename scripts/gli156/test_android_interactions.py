@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import call, patch
 
-import android_interactions as interaction
+from scripts.gli156 import android_interactions as interaction
 
 
 class NodeSelectionTests(unittest.TestCase):

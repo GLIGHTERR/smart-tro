@@ -9,6 +9,7 @@ on:
       - ".github/workflows/android-pilot.yml"
       - "src/pilot/**"
       - "src/ui/**"
+      - "scripts/gli156/**"
       - "index.ts"
       - "metro.config.js"
       - "package.json"
@@ -17,8 +18,22 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: android-pilot-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  harness-preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify Android interaction contract and artifact fixtures
+        run: python3 -m unittest discover -s scripts/gli156 -t . -p 'test_*.py' -v
+
   apk:
+    needs: harness-preflight
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
@@ -35,6 +50,7 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
+          cache: gradle
       - uses: android-actions/setup-android@v3
         with:
           packages: platform-tools
@@ -62,6 +78,11 @@ jobs:
     needs: apk
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        attempt: [1, 2]
     steps:
       # The emulator runner needs the checked-in interaction harness, not just the APK artifact.
       - uses: actions/checkout@v4
@@ -71,8 +92,6 @@ jobs:
         with:
           name: smart-tro-pilot-apk-${{ github.event.pull_request.head.sha || github.sha }}
           path: pilot-artifact
-      - name: Verify Android interaction harness
-        run: python3 -m unittest discover -s scripts/gli156 -t . -p 'test_*.py' -v
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -90,7 +109,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: smart-tro-pilot-android-evidence-${{ github.event.pull_request.head.sha || github.sha }}
+          name: smart-tro-pilot-android-evidence-${{ github.event.pull_request.head.sha || github.sha }}-attempt-${{ matrix.attempt }}
           path: android-interactions/
           if-no-files-found: warn
           retention-days: 14

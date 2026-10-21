@@ -1,0 +1,17 @@
+{
+  "provenance": {
+    "imeViewport": "run 39469780837 / head 920c3b0",
+    "launcherForeground": "run 39473690779 / head 80086ff",
+    "staleLabel": "run 39534242208 / head 09a43e5",
+    "offViewport": "run 39536487778 / head 6ccca5b",
+    "fontScale": "run 39538178416 / head 164cffb",
+    "inputConsumedGesture": "run 39538178416 / head 164cffb"
+  },
+  "imeOpen": "mInputShown=true isInputViewShown=true",
+  "imeClosed": "mInputShown=false isInputViewShown=false",
+  "appWindow": "mCurrentFocus=Window{123 u0 com.smartplatform.smarttro/com.smartplatform.smarttro.MainActivity}",
+  "launcherWindow": "mCurrentFocus=Window{456 u0 com.google.android.apps.nexuslauncher/com.google.android.apps.nexuslauncher.NexusLauncherActivity}",
+  "initialHierarchy": "<hierarchy><node class=\"android.widget.ScrollView\" scrollable=\"true\" bounds=\"[0,24][320,616]\"><node resource-id=\"pilot_name_input\" clickable=\"true\" bounds=\"[115,302][281,346]\"/><node resource-id=\"pilot_validate\" clickable=\"true\" bounds=\"[24,387][296,434]\"/></node></hierarchy>",
+  "scrolledHierarchy": "<hierarchy><node class=\"android.widget.ScrollView\" scrollable=\"true\" bounds=\"[0,24][320,616]\"><node resource-id=\"pilot_show_long_toast\" clickable=\"true\" bounds=\"[24,399][296,446]\"/><node resource-id=\"pilot_show_toast_and_navigate\" clickable=\"true\" bounds=\"[24,545][296,592]\"/></node></hierarchy>",
+  "fontScale": "1.5"
+}

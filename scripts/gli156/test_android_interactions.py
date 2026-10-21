@@ -1,3 +1,5 @@
+import json
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -6,82 +8,199 @@ from unittest.mock import call, patch
 from scripts.gli156 import android_interactions as interaction
 
 
-class NodeSelectionTests(unittest.TestCase):
-    def test_prefers_clickable_accessible_control_to_text(self):
-        xml = '<hierarchy><node text="Name"/><node content-desc="Name" clickable="true" bounds="[10,20][30,40]"/></hierarchy>'
-        self.assertEqual(interaction.center(interaction.select_node(xml, "Name").get("bounds")), (20, 30))
+FIXTURES = json.loads((Path(__file__).parent / "fixtures/failure-artifacts.json").read_text())
 
-    def test_text_fallback_and_disabled_state(self):
-        node = interaction.select_node('<hierarchy><node text="Disabled" enabled="false"/></hierarchy>', "Disabled")
-        self.assertEqual(node.get("enabled"), "false")
 
-    def test_missing_and_malformed_xml(self):
+class ContractAndArtifactFixtureTests(unittest.TestCase):
+    def test_contract_is_unique_and_covers_every_harness_control(self):
+        expected = {
+            "page1", "page2", "nameInput", "validate", "disabled", "openDialog",
+            "closeDialog", "showToast", "showLongToast", "showToastAndNavigate", "goBack",
+        }
+        self.assertEqual(set(interaction.CONTRACT), expected)
+        self.assertEqual(len(set(interaction.CONTRACT.values())), len(expected))
+
+    def test_real_failure_fixtures_cover_the_six_known_classes(self):
+        self.assertEqual(set(FIXTURES["provenance"]), {
+            "imeViewport", "launcherForeground", "staleLabel", "offViewport",
+            "fontScale", "inputConsumedGesture",
+        })
+        self.assertTrue(interaction.ime_visible(FIXTURES["imeOpen"]))
+        self.assertFalse(interaction.ime_visible(FIXTURES["imeClosed"]))
+        self.assertEqual(interaction.foreground_state(FIXTURES["appWindow"])["package"], interaction.PACKAGE)
+        self.assertNotEqual(interaction.foreground_state(FIXTURES["launcherWindow"])["package"], interaction.PACKAGE)
         with self.assertRaises(LookupError):
-            interaction.select_node('<hierarchy/>', 'Name')
-        with self.assertRaises(Exception):
-            interaction.select_node('<hierarchy>', 'Name')
+            interaction.select_node(FIXTURES["initialHierarchy"], interaction.CONTRACT["showLongToast"])
+        interaction.select_node(FIXTURES["scrolledHierarchy"], interaction.CONTRACT["showLongToast"])
+        interaction.select_node(FIXTURES["scrolledHierarchy"], interaction.CONTRACT["showToastAndNavigate"])
+        self.assertEqual(FIXTURES["fontScale"], "1.5")
 
-    def test_bounds_normal_invalid_and_zero_area(self):
-        self.assertEqual(interaction.center('[0,1][1,2]'), (0, 1))
-        for bounds in (None, '', '[x,0][1,1]', '[0,0][0,1]', '[5,5][4,6]'):
+
+class ParsingAndStateTests(unittest.TestCase):
+    def test_select_node_accepts_prefixed_resource_id_and_prefers_clickable(self):
+        identifier = interaction.CONTRACT["nameInput"]
+        xml = f'<hierarchy><node resource-id="{identifier}" bounds="[1,1][2,2]"/><node resource-id="pkg:id/{identifier}" clickable="true" bounds="[10,20][30,40]"/></hierarchy>'
+        self.assertEqual(interaction.center(interaction.select_node(xml, identifier).get("bounds")), (20, 30))
+
+    def test_select_node_and_center_reject_invalid_input(self):
+        with self.assertRaises(LookupError):
+            interaction.select_node("<hierarchy/>", "missing")
+        with self.assertRaises(Exception):
+            interaction.select_node("<hierarchy>", "missing")
+        for bounds in (None, "", "[x,0][1,1]", "[0,0][0,1]", "[5,5][4,6]"):
             with self.subTest(bounds=bounds), self.assertRaises(ValueError):
                 interaction.center(bounds)
+        self.assertEqual(interaction.center("[0,1][1,2]"), (0, 1))
 
-    def test_case_records_success_and_exception(self):
-        with tempfile.TemporaryDirectory() as directory, patch.object(interaction, 'OUT', Path(directory)), patch.object(interaction, 'RESULTS', []):
-            interaction.run_case('ok', 'expected', lambda: 'actual')
-            interaction.run_case('bad', 'expected', lambda: 1 / 0)
-            self.assertEqual([r['status'] for r in interaction.RESULTS], ['observed', 'failure_or_incomplete'])
-            self.assertIn('division by zero', (Path(directory) / 'results.json').read_text())
+    def test_foreground_and_ime_parsing_include_unknown_states(self):
+        self.assertEqual(interaction.foreground_state("nothing"), {"package": None, "activity": None})
+        self.assertTrue(interaction.ime_visible("inputShown=true"))
+        self.assertFalse(interaction.ime_visible("inputShown=false"))
 
-    def test_tap_scrolls_for_a_control_outside_the_initial_viewport(self):
-        control = interaction.ET.fromstring('<node content-desc="Show toast" clickable="true" bounds="[10,20][30,40]"/>')
-        with patch.object(interaction, 'select_node', side_effect=[LookupError('missing'), control]), patch.object(interaction, 'hierarchy', return_value='<hierarchy/>') as hierarchy, patch.object(interaction, 'shell') as shell, patch.object(interaction.time, 'sleep'):
-            interaction.tap('<hierarchy/>', 'Show toast')
-        hierarchy.assert_called_once()
+    def test_adb_raises_only_when_requested(self):
+        failed = subprocess.CompletedProcess(["adb"], 1, stdout=b"out", stderr=b"err")
+        with patch.object(interaction.subprocess, "run", return_value=failed):
+            self.assertEqual(interaction.adb("version", check=False).returncode, 1)
+            with self.assertRaises(subprocess.CalledProcessError):
+                interaction.adb("version")
+
+    def test_wait_for_success_and_timeout(self):
+        predicate = unittest.mock.Mock(side_effect=[False, True])
+        with patch.object(interaction.time, "sleep"), patch.object(interaction.time, "monotonic", side_effect=[0, 0, 0.1]):
+            interaction.wait_for(predicate, "condition", timeout=1)
+        with patch.object(interaction.time, "sleep"), patch.object(interaction.time, "monotonic", side_effect=[0, 0, 2]):
+            with self.assertRaises(TimeoutError):
+                interaction.wait_for(lambda: False, "condition", timeout=1)
+
+    def test_assert_foreground_accepts_app_and_rejects_launcher(self):
+        with patch.object(interaction, "foreground_state", return_value={"package": interaction.PACKAGE, "activity": ".MainActivity"}):
+            self.assertEqual(interaction.assert_foreground()["package"], interaction.PACKAGE)
+        with patch.object(interaction, "foreground_state", return_value={"package": "launcher", "activity": ".Home"}):
+            with self.assertRaises(AssertionError):
+                interaction.assert_foreground()
+
+    def test_node_present_handles_found_missing_malformed_and_adb_failure(self):
+        identifier = interaction.CONTRACT["page1"]
+        with patch.object(interaction, "hierarchy", return_value=f'<hierarchy><node resource-id="{identifier}"/></hierarchy>'):
+            self.assertTrue(interaction.node_present(identifier))
+        for failure in ("<hierarchy/>", "<hierarchy>", subprocess.CalledProcessError(1, ["adb"])):
+            with self.subTest(failure=failure), patch.object(interaction, "hierarchy", side_effect=failure if isinstance(failure, Exception) else None, return_value=None if isinstance(failure, Exception) else failure):
+                self.assertFalse(interaction.node_present(identifier))
+
+
+class ResetAndScrollTests(unittest.TestCase):
+    def test_restore_defaults_verifies_all_settings(self):
+        with patch.object(interaction, "shell") as shell, patch.object(interaction, "read_setting", side_effect=lambda _namespace, key: {"font_scale": "1.0", "user_rotation": "0", "accelerometer_rotation": "1"}[key]):
+            interaction.restore_device_defaults()
         shell.assert_has_calls([
-            call('input', 'swipe', '10', '520', '10', '200', '300'),
-            call('input', 'tap', 20, 30),
+            call("settings", "put", "system", "font_scale", "1.0"),
+            call("settings", "put", "system", "user_rotation", "0"),
+            call("settings", "put", "system", "accelerometer_rotation", "1"),
         ])
+    def test_dismiss_ime_never_sends_back_from_launcher_or_when_closed(self):
+        with patch.object(interaction, "foreground_state", return_value={"package": "launcher"}), patch.object(interaction, "ime_visible", return_value=True), patch.object(interaction, "shell") as shell:
+            self.assertFalse(interaction.dismiss_ime_if_visible())
+            shell.assert_not_called()
+        with patch.object(interaction, "foreground_state", return_value={"package": interaction.PACKAGE}), patch.object(interaction, "ime_visible", return_value=False), patch.object(interaction, "shell") as shell:
+            self.assertFalse(interaction.dismiss_ime_if_visible())
+            shell.assert_not_called()
 
-    def test_restart_dismisses_keyboard_before_relaunching_the_activity(self):
-        with patch.object(interaction, 'shell') as shell, patch.object(interaction.time, 'sleep'):
-            interaction.restart()
-        self.assertEqual(shell.call_args_list, [
-            call('input', 'keyevent', 'KEYCODE_BACK', check=False),
-            call('am', 'force-stop', interaction.PACKAGE),
-            call('monkey', '-p', interaction.PACKAGE, '-c', 'android.intent.category.LAUNCHER', '1'),
-        ])
+    def test_dismiss_ime_verifies_postconditions(self):
+        with patch.object(interaction, "foreground_state", return_value={"package": interaction.PACKAGE}), patch.object(interaction, "ime_visible", side_effect=[True, False]), patch.object(interaction, "shell") as shell, patch.object(interaction, "assert_foreground") as foreground:
+            self.assertTrue(interaction.dismiss_ime_if_visible())
+        shell.assert_called_once_with("input", "keyevent", "KEYCODE_BACK")
+        foreground.assert_called_once()
 
-    def test_dialog_requires_alice_to_survive_control_and_android_back(self):
-        dumps = [
-            'Page 1',
-            'Page 1 Alice',
-            'Page 1 Alice Pilot dialog',
-            'Page 1 Alice',
-            'Page 1 Alice Pilot dialog',
-            'Page 1 Alice',
-        ]
-        with patch.object(interaction, 'restart'), patch.object(interaction, 'tap') as tap, patch.object(interaction, 'shell') as shell, patch.object(interaction, 'hierarchy', return_value='Page 1 Alice'), patch.object(interaction, 'dump', side_effect=dumps), patch.object(interaction.time, 'sleep') as sleep:
-            result = interaction.dialog()
-        self.assertIn('retaining Alice', result)
+    def test_teardown_dismisses_resets_stops_and_verifies(self):
+        with patch.object(interaction, "dismiss_ime_if_visible") as dismiss, patch.object(interaction, "restore_device_defaults") as restore, patch.object(interaction, "shell") as shell, patch.object(interaction, "foreground_state", return_value={"package": "launcher"}):
+            interaction.teardown_case()
+        dismiss.assert_called_once()
+        restore.assert_called_once()
+        shell.assert_called_once_with("am", "force-stop", interaction.PACKAGE)
+
+    def test_prepare_case_sets_and_verifies_every_state(self):
+        xml = f'<hierarchy><node resource-id="{interaction.CONTRACT["page1"]}"/><node resource-id="{interaction.CONTRACT["nameInput"]}"/></hierarchy>'
+        with patch.object(interaction, "restore_device_defaults") as restore, patch.object(interaction, "dismiss_ime_if_visible"), patch.object(interaction, "shell") as shell, patch.object(interaction, "foreground_state", return_value={"package": interaction.PACKAGE}), patch.object(interaction, "read_setting", return_value="1.5"), patch.object(interaction, "node_present", return_value=True), patch.object(interaction, "capture", return_value=xml), patch.object(interaction, "assert_foreground") as foreground, patch.object(interaction, "ime_visible", return_value=False):
+            self.assertEqual(interaction.prepare_case("scale", "1.5"), xml)
+        restore.assert_called_once()
         shell.assert_has_calls([
-            call('input', 'text', 'Alice'),
-            call('input', 'keyevent', 'KEYCODE_BACK', check=False),
-            call('input', 'keyevent', 'KEYCODE_BACK'),
+            call("settings", "put", "system", "font_scale", "1.5"),
+            call("am", "force-stop", interaction.PACKAGE),
+            call("am", "start", "-W", "-n", interaction.ACTIVITY),
         ])
-        self.assertEqual(tap.call_args_list[0].args[1], 'Name')
-        sleep.assert_called_with(1)
+        foreground.assert_called_once()
 
-    def test_main_returns_failure_when_a_case_is_incomplete(self):
-        with tempfile.TemporaryDirectory() as directory, patch.object(interaction, 'OUT', Path(directory)), patch.object(interaction, 'RESULTS', []), patch.object(interaction, 'shell', return_value=''), patch.object(interaction, 'adb') as adb, patch.object(interaction, 'run_case') as run_case:
-            adb.return_value.stdout = b''
-            def record_failure(*_):
-                interaction.RESULTS.append({'status': 'failure_or_incomplete'})
-            run_case.side_effect = record_failure
+    def test_prepare_case_rejects_unexpected_ime(self):
+        xml = f'<hierarchy><node resource-id="{interaction.CONTRACT["page1"]}"/><node resource-id="{interaction.CONTRACT["nameInput"]}"/></hierarchy>'
+        with patch.object(interaction, "restore_device_defaults"), patch.object(interaction, "dismiss_ime_if_visible"), patch.object(interaction, "shell"), patch.object(interaction, "foreground_state", return_value={"package": interaction.PACKAGE}), patch.object(interaction, "read_setting", return_value="1.0"), patch.object(interaction, "node_present", return_value=True), patch.object(interaction, "capture", return_value=xml), patch.object(interaction, "assert_foreground"), patch.object(interaction, "ime_visible", return_value=True):
+            with self.assertRaises(AssertionError):
+                interaction.prepare_case("case")
+
+    def test_scroll_gesture_uses_scrollview_edge_outside_input(self):
+        gesture = interaction.scroll_gesture(FIXTURES["initialHierarchy"])
+        self.assertEqual(gesture[0], 308)
+        self.assertEqual(gesture[0], gesture[2])
+        self.assertGreater(gesture[1], gesture[3])
+        with self.assertRaises(LookupError):
+            interaction.scroll_gesture("<hierarchy/>")
+        with self.assertRaises(ValueError):
+            interaction.scroll_gesture('<hierarchy><node scrollable="true" bounds="bad"/></hierarchy>')
+
+    def test_find_control_scrolls_requeries_and_records_evidence(self):
+        identifier = interaction.CONTRACT["showLongToast"]
+        with patch.object(interaction, "capture") as capture, patch.object(interaction, "assert_foreground"), patch.object(interaction, "shell") as shell, patch.object(interaction, "hierarchy", return_value=FIXTURES["scrolledHierarchy"]), patch.object(interaction.time, "sleep"):
+            node = interaction.find_control(identifier, "fixture", FIXTURES["initialHierarchy"])
+        self.assertEqual(node.get("resource-id"), identifier)
+        shell.assert_called_once_with("input", "swipe", 308, 498, 308, 142, "350")
+        self.assertEqual(capture.call_count, 2)
+
+    def test_find_control_stops_after_repeated_no_progress(self):
+        with patch.object(interaction, "capture"), patch.object(interaction, "assert_foreground"), patch.object(interaction, "shell"), patch.object(interaction, "hierarchy", return_value=FIXTURES["initialHierarchy"]), patch.object(interaction.time, "sleep"):
+            with self.assertRaisesRegex(LookupError, "scroll stopped"):
+                interaction.find_control("missing", "fixture", FIXTURES["initialHierarchy"], max_swipes=5)
+
+    def test_find_control_honors_bound_and_tap_verifies_foreground(self):
+        with patch.object(interaction, "capture"), patch.object(interaction, "assert_foreground"), patch.object(interaction, "select_node", side_effect=LookupError("missing")):
+            with self.assertRaises(LookupError):
+                interaction.find_control("missing", "fixture", FIXTURES["initialHierarchy"], max_swipes=0)
+        node = interaction.select_node(FIXTURES["initialHierarchy"], interaction.CONTRACT["validate"])
+        with patch.object(interaction, "find_control", return_value=node), patch.object(interaction, "shell") as shell, patch.object(interaction, "assert_foreground") as foreground:
+            interaction.tap_id(interaction.CONTRACT["validate"], "tap")
+        shell.assert_called_once_with("input", "tap", 160, 410)
+        foreground.assert_called_once()
+
+
+class EvidenceAndRunnerTests(unittest.TestCase):
+    def test_capture_writes_xml_state_and_raw_diagnostics(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(interaction, "OUT", Path(directory)), patch.object(interaction, "adb") as adb, patch.object(interaction, "shell") as shell:
+            adb.return_value.stdout = b"png"
+            shell.side_effect = [FIXTURES["appWindow"], FIXTURES["imeClosed"], "1.0", "1", "0"]
+            interaction.capture("step", FIXTURES["initialHierarchy"])
+            state = json.loads((Path(directory) / "step.state.json").read_text())
+            self.assertEqual(state["foreground"]["package"], interaction.PACKAGE)
+            self.assertFalse(state["imeVisible"])
+            self.assertTrue((Path(directory) / "step.png").exists())
+
+    def test_run_case_records_success_failure_and_restores_state(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(interaction, "OUT", Path(directory)), patch.object(interaction, "RESULTS", []), patch.object(interaction, "prepare_case", return_value="xml"), patch.object(interaction, "teardown_case") as teardown, patch.object(interaction, "capture"):
+            interaction.run_case("ok", "expected", lambda xml: xml)
+            interaction.run_case("bad", "expected", lambda _xml: 1 / 0)
+            self.assertEqual([row["status"] for row in interaction.RESULTS], ["observed", "failure_or_incomplete"])
+            self.assertEqual(teardown.call_count, 2)
+            self.assertIn("division by zero", (Path(directory) / "results.json").read_text())
+
+    def test_run_case_records_teardown_failure_without_losing_case_result(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(interaction, "OUT", Path(directory)), patch.object(interaction, "RESULTS", []), patch.object(interaction, "prepare_case", return_value="xml"), patch.object(interaction, "teardown_case", side_effect=RuntimeError("settings unavailable")), patch.object(interaction, "capture"):
+            interaction.run_case("ok", "expected", lambda xml: xml)
+            self.assertEqual(interaction.RESULTS[0]["status"], "failure_or_incomplete")
+            self.assertIn("Teardown failed", interaction.RESULTS[0]["actual"])
+
+    def test_main_continues_all_cases_and_returns_failure(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(interaction, "OUT", Path(directory)), patch.object(interaction, "RESULTS", [{"status": "failure_or_incomplete"}]), patch.object(interaction, "shell", return_value=""), patch.object(interaction, "adb") as adb, patch.object(interaction, "run_case") as run_case, patch.object(interaction, "teardown_case"):
+            adb.return_value.stdout = b""
             self.assertEqual(interaction.main(), 1)
-        adb.assert_called()
+            self.assertEqual(run_case.call_count, 6)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

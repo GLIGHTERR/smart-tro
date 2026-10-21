@@ -2,6 +2,7 @@ import React from "react";
 import TestRenderer, { act } from "react-test-renderer";
 import { PilotAlert, PilotButton, PilotDialog, PilotField, PilotToast } from "@/ui";
 import PilotApp, { PilotHome } from "../PilotApp";
+import interactionContract from "../interaction-contract.json";
 
 const mockNavigate = jest.fn();
 const mockGoBack = jest.fn();
@@ -34,6 +35,10 @@ it("keeps validation, persistent alerts, dialog and toast-navigation as separate
   let view!: TestRenderer.ReactTestRenderer;
   act(() => { view = TestRenderer.create(<PilotApp />); });
   const button = (label: string) => view.root.findAllByType(PilotButton).find((item) => item.props.label === label)!;
+  expect(view.root.findByType(PilotField).props.testID).toBe(interactionContract.nameInput);
+  expect(button("Validate").props.testID).toBe(interactionContract.validate);
+  expect(button("Show toast and navigate").props.testID).toBe(interactionContract.showToastAndNavigate);
+  expect(view.root.findByType(PilotDialog).props.closeTestID).toBe(interactionContract.closeDialog);
   expect(button("Disabled").props.disabled).toBe(true);
   expect(view.root.findAllByType(PilotAlert)).toHaveLength(0);
   act(() => button("Validate").props.onPress());

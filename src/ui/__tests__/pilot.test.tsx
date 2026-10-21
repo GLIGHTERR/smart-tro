@@ -43,14 +43,16 @@ describe("G1 UI pilot adapter", () => {
     const press = jest.fn();
     const change = jest.fn();
     let view!: TestRenderer.ReactTestRenderer;
-    act(() => { view = TestRenderer.create(<PilotProvider><PilotButton label="Save" onPress={press} /><PilotButton label="Busy" disabled onPress={press} /><PilotField label="Name" value="An" onChange={change} keyboardType="email-address" error="Invalid" /><PilotAlert message="Failed" /></PilotProvider>); });
+    act(() => { view = TestRenderer.create(<PilotProvider><PilotButton testID="save_action" label="Save" onPress={press} /><PilotButton label="Busy" disabled onPress={press} /><PilotField testID="name_input" label="Name" value="An" onChange={change} keyboardType="email-address" error="Invalid" /><PilotAlert message="Failed" /></PilotProvider>); });
     const buttons = view.root.findAllByType(Pressable);
     expect(buttons[1]!.props.disabled).toBe(true);
+    expect(buttons[0]!.props.testID).toBe("save_action");
     act(() => buttons[0]!.props.onPress());
     expect(press).toHaveBeenCalledTimes(1);
     const input = view.root.findByType(TextInput);
     expect(input.props.value).toBe("An");
     expect(input.props.accessibilityLabel).toBe("Name");
+    expect(input.props.testID).toBe("name_input");
     expect(input.props.keyboardType).toBe("email-address");
     act(() => input.props.onChangeText("Anh"));
     expect(change).toHaveBeenCalledWith("Anh");
@@ -102,9 +104,10 @@ describe("G1 UI pilot adapter", () => {
   it("uses the native Android Back callback and close action", () => {
     const close = jest.fn();
     let view!: TestRenderer.ReactTestRenderer;
-    act(() => { view = TestRenderer.create(<PilotDialog visible title="Dialog" message="Message" onClose={close} />); });
+    act(() => { view = TestRenderer.create(<PilotDialog visible title="Dialog" message="Message" closeTestID="close_dialog" onClose={close} />); });
     expect(view.root.findByProps({ role: "dialog" }).props.accessibilityLabel).toBe("Dialog");
     expect(view.root.findByProps({ animationType: "fade" }).props.transparent).toBe(true);
+    expect(view.root.findByType(Pressable).props.testID).toBe("close_dialog");
     act(() => view.root.findByProps({ animationType: "fade" }).props.onRequestClose());
     expect(close).toHaveBeenCalledTimes(1);
     act(() => view.root.findByType(Pressable).props.onPress());

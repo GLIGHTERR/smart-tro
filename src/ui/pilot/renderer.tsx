@@ -7,19 +7,19 @@ export function PilotProvider({ children }: { children: React.ReactNode }) {
   return <Provider>{children}</Provider>;
 }
 
-export function PilotButton({ label, onPress, disabled }: PilotButtonProps) {
-  return <Button disabled={disabled} onPress={onPress}>{label}</Button>;
+export function PilotButton({ label, onPress, disabled, testID }: PilotButtonProps) {
+  return <Button testID={testID} disabled={disabled} onPress={onPress}>{label}</Button>;
 }
 
-export function PilotField({ label, value, onChange, error, keyboardType }: PilotFieldProps) {
-  return <View><InputItem accessibilityLabel={label} value={value} onChange={onChange} type={keyboardType} error={Boolean(error)}>{label}</InputItem>{error ? <Text accessibilityLiveRegion="polite" style={styles.fieldError}>{error}</Text> : null}</View>;
+export function PilotField({ label, value, onChange, error, keyboardType, testID }: PilotFieldProps) {
+  return <View><InputItem testID={testID} accessibilityLabel={label} value={value} onChange={onChange} type={keyboardType} error={Boolean(error)}>{label}</InputItem>{error ? <Text accessibilityLiveRegion="polite" style={styles.fieldError}>{error}</Text> : null}</View>;
 }
 
 export function PilotAlert({ message }: { message: string }) {
   return <View accessibilityRole="alert"><NoticeBar marqueeProps={{ play: false }}>Error</NoticeBar><Text>{message}</Text></View>;
 }
 
-export function PilotDialog({ visible, title, message, onClose }: PilotDialogProps) {
+export function PilotDialog({ visible, title, message, onClose, closeTestID }: PilotDialogProps) {
   const content = useRef<View>(null);
   const previousFocus = useRef<HTMLElement | null>(null);
   const setContent = useCallback((node: View | null) => {
@@ -41,7 +41,7 @@ export function PilotDialog({ visible, title, message, onClose }: PilotDialogPro
     return () => { document.removeEventListener("keydown", handleKey); previous?.focus(); previousFocus.current = null; };
   }, [visible, onClose]);
   const dialog = <View ref={setContent} role="dialog" aria-modal accessibilityViewIsModal accessibilityLabel={title} style={styles.dialogContent}>
-    <Text style={styles.dialogTitle}>{title}</Text><Text style={styles.dialogMessage}>{message}</Text><PilotButton label="Close" onPress={onClose} />
+    <Text style={styles.dialogTitle}>{title}</Text><Text style={styles.dialogMessage}>{message}</Text><PilotButton testID={closeTestID} label="Close" onPress={onClose} />
   </View>;
   if (Platform.OS === "web") {
     if (!visible) return null;

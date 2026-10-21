@@ -44,6 +44,15 @@ class NodeSelectionTests(unittest.TestCase):
             call('input', 'tap', 20, 30),
         ])
 
+    def test_restart_dismisses_keyboard_before_relaunching_the_activity(self):
+        with patch.object(interaction, 'shell') as shell, patch.object(interaction.time, 'sleep'):
+            interaction.restart()
+        self.assertEqual(shell.call_args_list, [
+            call('input', 'keyevent', 'KEYCODE_BACK', check=False),
+            call('am', 'force-stop', interaction.PACKAGE),
+            call('monkey', '-p', interaction.PACKAGE, '-c', 'android.intent.category.LAUNCHER', '1'),
+        ])
+
     def test_dialog_requires_alice_to_survive_control_and_android_back(self):
         dumps = [
             'Page 1',

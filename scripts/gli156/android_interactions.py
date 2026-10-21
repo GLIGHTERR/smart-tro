@@ -79,12 +79,14 @@ def tap(xml, label):
 
 
 def restart():
+    # Dismiss a prior case's keyboard while its activity is still foregrounded.
+    # Sending Back after monkey launches a fresh no-keyboard activity returns
+    # Android to the launcher instead of hiding an IME.
+    shell("input", "keyevent", "KEYCODE_BACK", check=False)
+    time.sleep(0.3)
     shell("am", "force-stop", PACKAGE)
     shell("monkey", "-p", PACKAGE, "-c", "android.intent.category.LAUNCHER", "1")
     time.sleep(5)
-    # Force-stopping the activity does not necessarily dismiss Android's IME.
-    shell("input", "keyevent", "KEYCODE_BACK", check=False)
-    time.sleep(0.3)
 
 
 def run_case(name, expected, action):

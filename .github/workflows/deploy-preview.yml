@@ -1,18 +1,31 @@
-name: Deploy preview
+name: Deploy immutable Pages UAT preview
 
 on:
-  push:
-    branches: [master]
   workflow_dispatch:
+    inputs:
+      deployment_mode:
+        description: "preview publishes root plus immutable QA pilot; rollback publishes root only"
+        required: true
+        type: choice
+        options: [preview, rollback]
+      root_sha:
+        description: "Exact current master commit to build as the Pages root"
+        required: true
+        type: string
+      pilot_sha:
+        description: "Exact PR #56 head, required for preview"
+        required: false
+        type: string
 
 permissions:
   contents: read
   pages: write
   id-token: write
 
+# Pages has one target. Serializing runs prevents a partial publish from winning.
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -22,32 +35,88 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm run verify:review-auth-config
-      - run: npm run export:web
+      - name: Validate immutable deployment inputs
+        env:
+          DEPLOYMENT_MODE: ${{ inputs.deployment_mode }}
+          ROOT_SHA: ${{ inputs.root_sha }}
+          PILOT_SHA: ${{ inputs.pilot_sha }}
+        run: |
+          set -euo pipefail
+          sha_pattern='^[0-9a-f]{40}$'
+          [[ "$ROOT_SHA" =~ $sha_pattern ]]
+          git fetch --no-tags origin master
+          test "$(git rev-parse origin/master)" = "$ROOT_SHA"
+          git fetch --no-tags origin "$ROOT_SHA"
+          git cat-file -e "$ROOT_SHA^{commit}"
+          if [ "$DEPLOYMENT_MODE" = preview ]; then
+            [[ "$PILOT_SHA" =~ $sha_pattern ]]
+            git fetch --no-tags origin "pull/56/head:refs/remotes/origin/pr-56"
+            test "$(git rev-parse origin/pr-56)" = "$PILOT_SHA"
+            git cat-file -e "$PILOT_SHA^{commit}"
+          else
+            test "$DEPLOYMENT_MODE" = rollback
+            test -z "$PILOT_SHA"
+          fi
+      - name: Check out pinned root and pilot sources
+        env:
+          DEPLOYMENT_MODE: ${{ inputs.deployment_mode }}
+          ROOT_SHA: ${{ inputs.root_sha }}
+          PILOT_SHA: ${{ inputs.pilot_sha }}
+        run: |
+          set -euo pipefail
+          git worktree add --detach root-source "$ROOT_SHA"
+          if [ "$DEPLOYMENT_MODE" = preview ]; then
+            git worktree add --detach pilot-source "$PILOT_SHA"
+          fi
+      - name: Build root from pinned master
+        working-directory: root-source
         env:
           EXPO_PUBLIC_API_BASE_URL: "https://smart-platform-renter-api.onrender.com"
           EXPO_PUBLIC_AUTH_USE_MOCK: "false"
-          EXPO_PUBLIC_BUILD_SHA: ${{ github.sha }}
+          EXPO_PUBLIC_BUILD_SHA: ${{ inputs.root_sha }}
           EXPO_PUBLIC_DEBUG_REVISION: "true"
           EXPO_PUBLIC_REVIEW_SOCIALS: "true"
           EXPO_PUBLIC_UC03_REVIEW: "true"
           EXPO_PUBLIC_HOME_REVIEW: "false"
-      - name: Export isolated QA pilot
-        run: npx expo export --platform web --clear --output-dir pilot-dist && node scripts/write-pages-fallback.mjs pilot-dist
+          EXPO_PUBLIC_WEB_BASE_URL: /smart-tro
+        run: |
+          npm ci
+          npm run verify:review-auth-config
+          npm run export:web
+      - name: Build pilot from pinned PR #56
+        if: inputs.deployment_mode == 'preview'
+        working-directory: pilot-source
         env:
-          EXPO_PUBLIC_BUILD_SHA: ${{ github.sha }}
-          EXPO_PUBLIC_PILOT_BASE_SHA: "2348825546603866fd766a7b1af0ee60aa484f7f"
+          EXPO_PUBLIC_BUILD_SHA: ${{ inputs.pilot_sha }}
+          EXPO_PUBLIC_PILOT_BASE_SHA: ${{ inputs.root_sha }}
           EXPO_PUBLIC_UI_PILOT: "true"
-          EXPO_PUBLIC_WEB_BASE_URL: /smart-tro/qa-pilot/${{ github.sha }}
-      - name: Add pilot under its immutable revision path
-        run: mkdir -p dist/qa-pilot/${{ github.sha }} && cp -R pilot-dist/. dist/qa-pilot/${{ github.sha }}/
+          EXPO_PUBLIC_WEB_BASE_URL: /smart-tro/qa-pilot/${{ inputs.pilot_sha }}
+        run: |
+          npm ci
+          npx expo export --platform web --clear --output-dir pilot-dist
+          node scripts/write-pages-fallback.mjs pilot-dist
+      - name: Assemble and guard Pages artifact provenance
+        env:
+          DEPLOYMENT_MODE: ${{ inputs.deployment_mode }}
+          ROOT_SHA: ${{ inputs.root_sha }}
+          PILOT_SHA: ${{ inputs.pilot_sha }}
+        run: |
+          set -euo pipefail
+          args=(--mode "$DEPLOYMENT_MODE" --root-dir root-source/dist --root-sha "$ROOT_SHA" --out-dir pages-dist)
+          if [ "$DEPLOYMENT_MODE" = preview ]; then
+            args+=(--pilot-dir pilot-source/pilot-dist --pilot-sha "$PILOT_SHA")
+          fi
+          node scripts/assemble-pages-preview.mjs "${args[@]}" | tee provenance.txt
+          grep -F "root_sha=$ROOT_SHA" provenance.txt
+          grep -F "mode=$DEPLOYMENT_MODE" provenance.txt
+          if [ "$DEPLOYMENT_MODE" = preview ]; then grep -F "pilot_sha=$PILOT_SHA" provenance.txt; fi
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: pages-dist
       - id: deployment
         uses: actions/deploy-pages@v4

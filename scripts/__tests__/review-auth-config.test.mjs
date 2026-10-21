@@ -32,7 +32,10 @@ test("accepts the Pages deployment workflow", () => {
   const workflow = readFileSync(new URL("../../.github/workflows/deploy-preview.yml", import.meta.url), "utf8");
   assert.doesNotThrow(() => assertReviewAuthConfig(workflow));
   assert.match(workflow, /EXPO_PUBLIC_UI_PILOT: "true"/);
-  assert.match(workflow, /EXPO_PUBLIC_PILOT_BASE_SHA: "2348825546603866fd766a7b1af0ee60aa484f7f"/);
-  assert.match(workflow, /dist\/qa-pilot\/\$\{\{ github\.sha \}\}/);
+  assert.match(workflow, /EXPO_PUBLIC_PILOT_BASE_SHA: \$\{\{ inputs\.root_sha \}\}/);
+  assert.match(workflow, /EXPO_PUBLIC_WEB_BASE_URL: \/smart-tro\/qa-pilot\/\$\{\{ inputs\.pilot_sha \}\}/);
+  assert.match(workflow, /test "\$\(git rev-parse origin\/master\)" = "\$ROOT_SHA"/);
+  assert.match(workflow, /test "\$\(git rev-parse origin\/pr-56\)" = "\$PILOT_SHA"/);
+  assert.doesNotMatch(workflow, /\n  push:/);
   assert.doesNotThrow(() => verifyReviewAuthConfig());
 });

@@ -63,14 +63,15 @@ def tap(xml, label):
     # Input controls may leave the system IME open, and long pilot content can
     # place later controls below the initial viewport. Scroll deliberately
     # before reporting that a required accessible control is absent.
-    for attempt in range(4):
+    swipes = (("520", "360"), ("520", "360"), ("220", "420"), ("220", "420"))
+    for attempt, (start_y, end_y) in enumerate(swipes):
         try:
             node = select_node(xml, label)
             break
         except LookupError:
-            if attempt == 3:
+            if attempt == len(swipes) - 1:
                 raise
-            shell("input", "swipe", "160", "520", "160", "180", "300")
+            shell("input", "swipe", "160", start_y, "160", end_y, "300")
             time.sleep(0.3)
             xml = hierarchy()
     x, y = center(node.get("bounds"))
@@ -169,7 +170,7 @@ def toast():
     time.sleep(0.5)
     # A screenshot precedes the UI dump so the five-second toast can be reviewed.
     xml = dump("toast-04-before-navigation")
-    tap(xml, "Navigate")
+    tap(xml, "Show toast and navigate")
     xml = dump("toast-05-navigation")
     assert "Page 2" in xml, "Navigation did not reach Page 2"
     time.sleep(6)

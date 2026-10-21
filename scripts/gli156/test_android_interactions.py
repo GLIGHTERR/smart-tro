@@ -23,7 +23,7 @@ class ContractAndArtifactFixtureTests(unittest.TestCase):
     def test_real_failure_fixtures_cover_all_known_classes(self):
         self.assertEqual(set(FIXTURES["provenance"]), {
             "imeViewport", "launcherForeground", "staleLabel", "offViewport",
-            "fontScale", "inputConsumedGesture", "edgeClippedControl",
+            "fontScale", "inputConsumedGesture", "edgeClippedControl", "nonScrollableModal",
         })
         self.assertTrue(interaction.ime_visible(FIXTURES["imeOpen"]))
         self.assertFalse(interaction.ime_visible(FIXTURES["imeClosed"]))
@@ -58,6 +58,21 @@ class ParsingAndStateTests(unittest.TestCase):
         revealed = interaction.select_node(FIXTURES["revealedControlHierarchy"], interaction.CONTRACT["openDialog"])
         self.assertFalse(interaction.actionable_in_viewport(clipped, FIXTURES["clippedControlHierarchy"]))
         self.assertTrue(interaction.actionable_in_viewport(revealed, FIXTURES["revealedControlHierarchy"]))
+
+    def test_modal_control_uses_fixed_content_viewport(self):
+        node = interaction.select_node(FIXTURES["modalHierarchy"], interaction.CONTRACT["closeDialog"])
+        viewport, kind = interaction.interaction_viewport(FIXTURES["modalHierarchy"])
+        self.assertEqual(kind, "fixed")
+        self.assertEqual(viewport.get("resource-id"), "android:id/content")
+        self.assertTrue(interaction.actionable_in_viewport(node, FIXTURES["modalHierarchy"]))
+
+    def test_dialog_lifecycle_distinguishes_open_closed_and_inconsistent(self):
+        self.assertEqual(interaction.dialog_state(FIXTURES["modalHierarchy"]), "open")
+        self.assertEqual(interaction.dialog_state(FIXTURES["closedDialogHierarchy"]), "closed")
+        self.assertEqual(interaction.dialog_state(FIXTURES["modalMissingCloseHierarchy"]), "inconsistent")
+        interaction.assert_dialog_state(FIXTURES["modalHierarchy"], "open")
+        with self.assertRaisesRegex(AssertionError, "got inconsistent"):
+            interaction.assert_dialog_state(FIXTURES["modalMissingCloseHierarchy"], "open")
 
     def test_foreground_and_ime_parsing_include_unknown_states(self):
         self.assertEqual(interaction.foreground_state("nothing"), {"package": None, "activity": None})
@@ -175,11 +190,11 @@ class ResetAndScrollTests(unittest.TestCase):
 
     def test_find_control_scrolls_requeries_and_records_evidence(self):
         identifier = interaction.CONTRACT["showLongToast"]
-        with patch.object(interaction, "capture") as capture, patch.object(interaction, "assert_foreground"), patch.object(interaction, "shell") as shell, patch.object(interaction, "hierarchy", return_value=FIXTURES["scrolledHierarchy"]), patch.object(interaction.time, "sleep"):
+        with patch.object(interaction, "capture") as capture, patch.object(interaction, "assert_foreground"), patch.object(interaction, "shell") as shell, patch.object(interaction, "hierarchy", side_effect=[FIXTURES["initialHierarchy"], FIXTURES["scrolledHierarchy"]]), patch.object(interaction.time, "sleep"):
             node = interaction.find_control(identifier, "fixture", FIXTURES["initialHierarchy"])
         self.assertEqual(node.get("resource-id"), identifier)
         shell.assert_called_once_with("input", "swipe", 308, 498, 308, 142, "350")
-        self.assertEqual(capture.call_count, 2)
+        self.assertEqual(capture.call_count, 3)
 
     def test_find_control_scrolls_until_edge_clipped_node_is_safe(self):
         identifier = interaction.CONTRACT["openDialog"]
@@ -188,13 +203,40 @@ class ResetAndScrollTests(unittest.TestCase):
         self.assertEqual(node.get("bounds"), "[24,510][296,557]")
         shell.assert_called_once_with("input", "swipe", 308, 498, 308, 142, "350")
 
+    def test_find_control_accepts_modal_control_without_scroll_fallback(self):
+        with patch.object(interaction, "capture"), patch.object(interaction, "assert_foreground"), patch.object(interaction, "shell") as shell:
+            node = interaction.find_control(
+                interaction.CONTRACT["closeDialog"], "dialog-close",
+                FIXTURES["modalHierarchy"], allow_scroll=False,
+            )
+        self.assertEqual(node.get("resource-id"), interaction.CONTRACT["closeDialog"])
+        shell.assert_not_called()
+
+    def test_find_control_refreshes_stale_xml_before_recovery(self):
+        with patch.object(interaction, "capture"), patch.object(interaction, "assert_foreground"), patch.object(interaction, "hierarchy", return_value=FIXTURES["modalHierarchy"]), patch.object(interaction, "shell") as shell:
+            node = interaction.find_control(
+                interaction.CONTRACT["closeDialog"], "dialog-close",
+                FIXTURES["closedDialogHierarchy"], allow_scroll=False,
+            )
+        self.assertEqual(node.get("resource-id"), interaction.CONTRACT["closeDialog"])
+        shell.assert_not_called()
+
+    def test_find_control_rejects_absent_modal_control_without_scrolling(self):
+        with patch.object(interaction, "capture"), patch.object(interaction, "assert_foreground"), patch.object(interaction, "hierarchy", return_value=FIXTURES["modalMissingCloseHierarchy"]), patch.object(interaction, "shell") as shell:
+            with self.assertRaisesRegex(LookupError, "dialog_state=inconsistent"):
+                interaction.find_control(
+                    interaction.CONTRACT["closeDialog"], "dialog-close",
+                    FIXTURES["modalMissingCloseHierarchy"], allow_scroll=False,
+                )
+        shell.assert_not_called()
+
     def test_find_control_stops_after_repeated_no_progress(self):
         with patch.object(interaction, "capture"), patch.object(interaction, "assert_foreground"), patch.object(interaction, "shell"), patch.object(interaction, "hierarchy", return_value=FIXTURES["initialHierarchy"]), patch.object(interaction.time, "sleep"):
             with self.assertRaisesRegex(LookupError, "scroll stopped"):
                 interaction.find_control("missing", "fixture", FIXTURES["initialHierarchy"], max_swipes=5)
 
     def test_find_control_honors_bound_and_tap_verifies_foreground(self):
-        with patch.object(interaction, "capture"), patch.object(interaction, "assert_foreground"), patch.object(interaction, "select_node", side_effect=LookupError("missing")):
+        with patch.object(interaction, "capture"), patch.object(interaction, "assert_foreground"), patch.object(interaction, "select_node", side_effect=LookupError("missing")), patch.object(interaction, "hierarchy", return_value=FIXTURES["initialHierarchy"]):
             with self.assertRaises(LookupError):
                 interaction.find_control("missing", "fixture", FIXTURES["initialHierarchy"], max_swipes=0)
         node = interaction.select_node(FIXTURES["initialHierarchy"], interaction.CONTRACT["validate"])

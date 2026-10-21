@@ -49,13 +49,22 @@ def parse_bounds(bounds):
     return x1, y1, x2, y2
 
 
-def actionable_in_viewport(node, xml):
+def interaction_viewport(xml):
     root = ET.fromstring(xml)
     scrollable = next((item for item in root.iter("node") if item.get("scrollable") == "true"), None)
-    if scrollable is None:
-        raise LookupError("No scrollable container in hierarchy")
+    if scrollable is not None:
+        return scrollable, "scrollable"
+    content = next((item for item in root.iter("node")
+                    if (item.get("resource-id") or "").endswith("android:id/content")), None)
+    if content is not None:
+        return content, "fixed"
+    raise LookupError("No interaction viewport in hierarchy")
+
+
+def actionable_in_viewport(node, xml):
+    viewport, _kind = interaction_viewport(xml)
     x1, y1, x2, y2 = parse_bounds(node.get("bounds"))
-    vx1, vy1, vx2, vy2 = parse_bounds(scrollable.get("bounds"))
+    vx1, vy1, vx2, vy2 = parse_bounds(viewport.get("bounds"))
     tap_x, tap_y = center(node.get("bounds"))
     return (
         x2 - x1 >= MIN_TAP_SIZE
@@ -63,6 +72,27 @@ def actionable_in_viewport(node, xml):
         and vx1 + VIEWPORT_EDGE_INSET <= tap_x <= vx2 - VIEWPORT_EDGE_INSET
         and vy1 + VIEWPORT_EDGE_INSET <= tap_y <= vy2 - VIEWPORT_EDGE_INSET
     )
+
+
+def dialog_state(xml):
+    root = ET.fromstring(xml)
+    title_present = any(node.get("text") == "Pilot dialog" for node in root.iter("node"))
+    try:
+        select_node(xml, CONTRACT["closeDialog"])
+        close_present = True
+    except LookupError:
+        close_present = False
+    if title_present and close_present:
+        return "open"
+    if not title_present and not close_present:
+        return "closed"
+    return "inconsistent"
+
+
+def assert_dialog_state(xml, expected):
+    actual = dialog_state(xml)
+    if actual != expected:
+        raise AssertionError(f"Expected dialog state {expected}, got {actual}")
 
 
 def adb(*args, check=True, retries=0):
@@ -219,7 +249,7 @@ def scroll_gesture(xml):
     return x, y2 - max(72, (y2 - y1) // 5), x, y1 + max(72, (y2 - y1) // 5)
 
 
-def find_control(identifier, evidence_name, xml=None, max_swipes=8):
+def find_control(identifier, evidence_name, xml=None, max_swipes=8, allow_scroll=True):
     xml = xml if xml is not None else hierarchy()
     unchanged = 0
     for attempt in range(max_swipes + 1):
@@ -231,10 +261,22 @@ def find_control(identifier, evidence_name, xml=None, max_swipes=8):
                 return node
         except LookupError:
             node = None
+        if attempt == 0 and node is None:
+            refreshed = hierarchy()
+            capture(f"{evidence_name}-refresh", refreshed)
+            if refreshed != xml:
+                xml = refreshed
+                continue
         if attempt == max_swipes:
             if node is not None:
                 raise LookupError(f"UI node remains outside safe tap viewport: {identifier}")
             raise LookupError(f"UI node not found: {identifier}")
+        _viewport, viewport_kind = interaction_viewport(xml)
+        if not allow_scroll or viewport_kind != "scrollable":
+            state = dialog_state(xml)
+            raise LookupError(
+                f"UI node unavailable without scroll recovery: {identifier}; dialog_state={state}"
+            )
         previous = scroll_signature(xml)
         shell("input", "swipe", *scroll_gesture(xml), "350")
         time.sleep(0.5)
@@ -247,8 +289,8 @@ def find_control(identifier, evidence_name, xml=None, max_swipes=8):
     raise AssertionError("unreachable")
 
 
-def tap_id(identifier, evidence_name, xml=None):
-    node = find_control(identifier, evidence_name, xml)
+def tap_id(identifier, evidence_name, xml=None, allow_scroll=True):
+    node = find_control(identifier, evidence_name, xml, allow_scroll=allow_scroll)
     shell("input", "tap", *center(node.get("bounds")))
     wait_for_foreground()
     return node
@@ -310,19 +352,21 @@ def dialog(xml):
     assert dismiss_ime_if_visible(), "Dialog fixture did not open the IME"
     xml = capture("dialog-02-ime-dismissed")
     tap_id(CONTRACT["openDialog"], "dialog-open", xml)
-    wait_for(lambda: "Pilot dialog" in hierarchy(), "dialog open")
+    wait_for(lambda: dialog_state(hierarchy()) == "open", "dialog open state")
     xml = capture("dialog-03-open")
-    assert "Pilot dialog" in xml, "Dialog title missing"
-    tap_id(CONTRACT["closeDialog"], "dialog-close", xml)
-    wait_for(lambda: "Pilot dialog" not in hierarchy(), "dialog control close")
+    assert_dialog_state(xml, "open")
+    tap_id(CONTRACT["closeDialog"], "dialog-close", xml, allow_scroll=False)
+    wait_for(lambda: dialog_state(hierarchy()) == "closed", "dialog control close state")
     xml = capture("dialog-04-control-close")
-    assert "Pilot dialog" not in xml and "Alice" in xml, "Close did not retain Page 1 input"
+    assert_dialog_state(xml, "closed")
+    assert "Alice" in xml, "Close did not retain Page 1 input"
     tap_id(CONTRACT["openDialog"], "dialog-reopen", xml)
-    wait_for(lambda: "Pilot dialog" in hierarchy(), "dialog reopen")
+    wait_for(lambda: dialog_state(hierarchy()) == "open", "dialog reopen state")
     shell("input", "keyevent", "KEYCODE_BACK")
-    wait_for(lambda: "Pilot dialog" not in hierarchy(), "dialog Back close")
+    wait_for(lambda: dialog_state(hierarchy()) == "closed", "dialog Back close state")
     xml = capture("dialog-05-back")
-    assert "Pilot dialog" not in xml and "Alice" in xml, "Back did not close dialog and retain input"
+    assert_dialog_state(xml, "closed")
+    assert "Alice" in xml, "Back did not close dialog and retain input"
     assert_foreground()
     return "Dialog closed by control and Android Back while app remained foreground and retained Alice."
 

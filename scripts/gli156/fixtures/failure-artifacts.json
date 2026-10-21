@@ -7,7 +7,8 @@
     "fontScale": "run 39538178416 / head 164cffb",
     "inputConsumedGesture": "run 39538178416 / head 164cffb",
     "edgeClippedControl": "run 39544116878 / head 0b86a29 (attempts 1 and 2)",
-    "nonScrollableModal": "run 39564949284 / head 21e0827 (attempts 1 and 2)"
+    "nonScrollableModal": "run 39564949284 / head 21e0827 (attempts 1 and 2)",
+    "offViewportStateAssertion": "run 39568830878 / head 80504cb (attempts 1 and 2)"
   },
   "imeOpen": "mInputShown=true isInputViewShown=true",
   "imeClosed": "mInputShown=false isInputViewShown=false",
@@ -21,5 +22,7 @@
   "modalHierarchy": "<hierarchy><node bounds=\"[0,0][320,640]\"><node resource-id=\"android:id/content\" bounds=\"[0,24][320,616]\"><node text=\"Pilot dialog\" bounds=\"[48,256][272,284]\"/><node resource-id=\"pilot_close_dialog\" clickable=\"true\" bounds=\"[48,338][272,385]\"/></node></node></hierarchy>",
   "modalMissingCloseHierarchy": "<hierarchy><node bounds=\"[0,0][320,640]\"><node resource-id=\"android:id/content\" bounds=\"[0,24][320,616]\"><node text=\"Pilot dialog\" bounds=\"[48,256][272,284]\"/></node></node></hierarchy>",
   "closedDialogHierarchy": "<hierarchy><node bounds=\"[0,0][320,640]\"><node resource-id=\"android:id/content\" bounds=\"[0,24][320,616]\"><node resource-id=\"pilot_page_1\" bounds=\"[24,198][296,223]\"/></node></node></hierarchy>",
+  "scrolledPastInputHierarchy": "<hierarchy><node class=\"android.widget.ScrollView\" scrollable=\"true\" bounds=\"[0,24][320,616]\"><node resource-id=\"pilot_open_dialog\" clickable=\"true\" bounds=\"[24,273][296,320]\"/><node resource-id=\"pilot_show_toast\" clickable=\"true\" bounds=\"[24,336][296,383]\"/></node></hierarchy>",
+  "retainedInputHierarchy": "<hierarchy><node class=\"android.widget.ScrollView\" scrollable=\"true\" bounds=\"[0,24][320,616]\"><node resource-id=\"pilot_name_input\" clickable=\"true\" text=\"Alice\" bounds=\"[115,302][281,346]\"/><node resource-id=\"pilot_validate\" clickable=\"true\" bounds=\"[24,387][296,434]\"/></node></hierarchy>",
   "fontScale": "1.5"
 }

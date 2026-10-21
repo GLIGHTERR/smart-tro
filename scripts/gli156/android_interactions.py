@@ -239,60 +239,85 @@ def scroll_signature(xml):
                  if node.get("resource-id"))
 
 
-def scroll_gesture(xml):
+def scroll_gesture(xml, direction="forward"):
     root = ET.fromstring(xml)
     scrollable = next((node for node in root.iter("node") if node.get("scrollable") == "true"), None)
     if scrollable is None:
         raise LookupError("No scrollable container in hierarchy")
     x1, y1, x2, y2 = parse_bounds(scrollable.get("bounds"))
     x = x2 - 12
-    return x, y2 - max(72, (y2 - y1) // 5), x, y1 + max(72, (y2 - y1) // 5)
+    bottom = y2 - max(72, (y2 - y1) // 5)
+    top = y1 + max(72, (y2 - y1) // 5)
+    if direction == "forward":
+        return x, bottom, x, top
+    if direction == "backward":
+        return x, top, x, bottom
+    raise ValueError(f"Unknown scroll direction: {direction}")
 
 
 def find_control(identifier, evidence_name, xml=None, max_swipes=8, allow_scroll=True):
     xml = xml if xml is not None else hierarchy()
-    unchanged = 0
-    for attempt in range(max_swipes + 1):
-        capture(f"{evidence_name}-search-{attempt:02d}", xml)
-        assert_foreground()
-        try:
-            node = select_node(xml, identifier)
-            if actionable_in_viewport(node, xml):
-                return node
-        except LookupError:
-            node = None
-        if attempt == 0 and node is None:
-            refreshed = hierarchy()
-            capture(f"{evidence_name}-refresh", refreshed)
-            if refreshed != xml:
-                xml = refreshed
-                continue
-        if attempt == max_swipes:
-            if node is not None:
-                raise LookupError(f"UI node remains outside safe tap viewport: {identifier}")
-            raise LookupError(f"UI node not found: {identifier}")
-        _viewport, viewport_kind = interaction_viewport(xml)
-        if not allow_scroll or viewport_kind != "scrollable":
-            state = dialog_state(xml)
-            raise LookupError(
-                f"UI node unavailable without scroll recovery: {identifier}; dialog_state={state}"
-            )
-        previous = scroll_signature(xml)
-        shell("input", "swipe", *scroll_gesture(xml), "350")
-        time.sleep(0.5)
-        next_xml = hierarchy()
-        unchanged = unchanged + 1 if scroll_signature(next_xml) == previous else 0
-        if unchanged >= 2:
-            capture(f"{evidence_name}-no-progress", next_xml)
-            raise LookupError(f"UI node not found after scroll stopped: {identifier}")
-        xml = next_xml
-    raise AssertionError("unreachable")
+    capture(f"{evidence_name}-search-00", xml)
+    assert_foreground()
+    try:
+        node = select_node(xml, identifier)
+        if actionable_in_viewport(node, xml):
+            return node
+    except LookupError:
+        node = None
+    if node is None:
+        refreshed = hierarchy()
+        capture(f"{evidence_name}-refresh", refreshed)
+        if refreshed != xml:
+            xml = refreshed
+            try:
+                node = select_node(xml, identifier)
+                if actionable_in_viewport(node, xml):
+                    return node
+            except LookupError:
+                node = None
+    _viewport, viewport_kind = interaction_viewport(xml)
+    if not allow_scroll or viewport_kind != "scrollable":
+        state = dialog_state(xml)
+        raise LookupError(
+            f"UI node unavailable without scroll recovery: {identifier}; dialog_state={state}"
+        )
+    for direction in ("forward", "backward"):
+        unchanged = 0
+        for attempt in range(1, max_swipes + 1):
+            previous = scroll_signature(xml)
+            shell("input", "swipe", *scroll_gesture(xml, direction), "350")
+            time.sleep(0.5)
+            xml = hierarchy()
+            capture(f"{evidence_name}-{direction}-{attempt:02d}", xml)
+            assert_foreground()
+            unchanged = unchanged + 1 if scroll_signature(xml) == previous else 0
+            try:
+                node = select_node(xml, identifier)
+                if actionable_in_viewport(node, xml):
+                    return node
+            except LookupError:
+                node = None
+            if unchanged >= 2:
+                capture(f"{evidence_name}-{direction}-no-progress", xml)
+                break
+    if node is not None:
+        raise LookupError(f"UI node remains outside safe tap viewport: {identifier}")
+    raise LookupError(f"UI node not found after bidirectional scroll stopped: {identifier}")
 
 
 def tap_id(identifier, evidence_name, xml=None, allow_scroll=True):
     node = find_control(identifier, evidence_name, xml, allow_scroll=allow_scroll)
     shell("input", "tap", *center(node.get("bounds")))
     wait_for_foreground()
+    return node
+
+
+def assert_input_value(expected, evidence_name, xml=None):
+    node = find_control(CONTRACT["nameInput"], evidence_name, xml)
+    actual = node.get("text") or ""
+    if actual != expected:
+        raise AssertionError(f"Expected retained input {expected!r}, got {actual!r}")
     return node
 
 
@@ -359,14 +384,15 @@ def dialog(xml):
     wait_for(lambda: dialog_state(hierarchy()) == "closed", "dialog control close state")
     xml = capture("dialog-04-control-close")
     assert_dialog_state(xml, "closed")
-    assert "Alice" in xml, "Close did not retain Page 1 input"
+    assert_input_value("Alice", "dialog-control-retained", xml)
+    xml = hierarchy()
     tap_id(CONTRACT["openDialog"], "dialog-reopen", xml)
     wait_for(lambda: dialog_state(hierarchy()) == "open", "dialog reopen state")
     shell("input", "keyevent", "KEYCODE_BACK")
     wait_for(lambda: dialog_state(hierarchy()) == "closed", "dialog Back close state")
     xml = capture("dialog-05-back")
     assert_dialog_state(xml, "closed")
-    assert "Alice" in xml, "Back did not close dialog and retain input"
+    assert_input_value("Alice", "dialog-back-retained", xml)
     assert_foreground()
     return "Dialog closed by control and Android Back while app remained foreground and retained Alice."
 

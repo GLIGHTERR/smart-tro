@@ -24,6 +24,7 @@ class ContractAndArtifactFixtureTests(unittest.TestCase):
         self.assertEqual(set(FIXTURES["provenance"]), {
             "imeViewport", "launcherForeground", "staleLabel", "offViewport",
             "fontScale", "inputConsumedGesture", "edgeClippedControl", "nonScrollableModal",
+            "offViewportStateAssertion",
         })
         self.assertTrue(interaction.ime_visible(FIXTURES["imeOpen"]))
         self.assertFalse(interaction.ime_visible(FIXTURES["imeClosed"]))
@@ -183,6 +184,10 @@ class ResetAndScrollTests(unittest.TestCase):
         self.assertEqual(gesture[0], 308)
         self.assertEqual(gesture[0], gesture[2])
         self.assertGreater(gesture[1], gesture[3])
+        backward = interaction.scroll_gesture(FIXTURES["initialHierarchy"], "backward")
+        self.assertEqual(backward, (gesture[2], gesture[3], gesture[0], gesture[1]))
+        with self.assertRaises(ValueError):
+            interaction.scroll_gesture(FIXTURES["initialHierarchy"], "sideways")
         with self.assertRaises(LookupError):
             interaction.scroll_gesture("<hierarchy/>")
         with self.assertRaises(ValueError):
@@ -202,6 +207,25 @@ class ResetAndScrollTests(unittest.TestCase):
             node = interaction.find_control(identifier, "fixture", FIXTURES["clippedControlHierarchy"])
         self.assertEqual(node.get("bounds"), "[24,510][296,557]")
         shell.assert_called_once_with("input", "swipe", 308, 498, 308, 142, "350")
+
+    def test_find_control_reverses_direction_for_state_above_viewport(self):
+        identifier = interaction.CONTRACT["nameInput"]
+        unchanged = FIXTURES["scrolledPastInputHierarchy"]
+        with patch.object(interaction, "capture"), patch.object(interaction, "assert_foreground"), patch.object(interaction, "shell") as shell, patch.object(interaction, "hierarchy", side_effect=[unchanged, unchanged, unchanged, FIXTURES["retainedInputHierarchy"]]), patch.object(interaction.time, "sleep"):
+            node = interaction.find_control(identifier, "retained", unchanged)
+        self.assertEqual(node.get("text"), "Alice")
+        self.assertEqual(shell.call_args_list, [
+            call("input", "swipe", 308, 498, 308, 142, "350"),
+            call("input", "swipe", 308, 498, 308, 142, "350"),
+            call("input", "swipe", 308, 142, 308, 498, "350"),
+        ])
+
+    def test_assert_input_value_checks_recovered_node_state(self):
+        node = interaction.select_node(FIXTURES["retainedInputHierarchy"], interaction.CONTRACT["nameInput"])
+        with patch.object(interaction, "find_control", return_value=node):
+            interaction.assert_input_value("Alice", "retained")
+            with self.assertRaisesRegex(AssertionError, "Expected retained input"):
+                interaction.assert_input_value("Bob", "retained")
 
     def test_find_control_accepts_modal_control_without_scroll_fallback(self):
         with patch.object(interaction, "capture"), patch.object(interaction, "assert_foreground"), patch.object(interaction, "shell") as shell:
@@ -232,8 +256,8 @@ class ResetAndScrollTests(unittest.TestCase):
 
     def test_find_control_stops_after_repeated_no_progress(self):
         with patch.object(interaction, "capture"), patch.object(interaction, "assert_foreground"), patch.object(interaction, "shell"), patch.object(interaction, "hierarchy", return_value=FIXTURES["initialHierarchy"]), patch.object(interaction.time, "sleep"):
-            with self.assertRaisesRegex(LookupError, "scroll stopped"):
-                interaction.find_control("missing", "fixture", FIXTURES["initialHierarchy"], max_swipes=5)
+            with self.assertRaisesRegex(LookupError, "bidirectional scroll stopped"):
+                interaction.find_control("missing", "fixture", FIXTURES["initialHierarchy"], max_swipes=2)
 
     def test_find_control_honors_bound_and_tap_verifies_foreground(self):
         with patch.object(interaction, "capture"), patch.object(interaction, "assert_foreground"), patch.object(interaction, "select_node", side_effect=LookupError("missing")), patch.object(interaction, "hierarchy", return_value=FIXTURES["initialHierarchy"]):

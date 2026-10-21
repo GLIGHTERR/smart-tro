@@ -37,34 +37,42 @@ def center(bounds):
     return (x1 + x2) // 2, (y1 + y2) // 2
 
 
-def adb(*args, check=True):
-    result = subprocess.run(["adb", *map(str, args)], capture_output=True,
-                            check=False, timeout=90)
-    if check and result.returncode:
-        raise subprocess.CalledProcessError(
-            result.returncode, result.args, output=result.stdout, stderr=result.stderr)
-    return result
+def adb(*args, check=True, retries=0):
+    for attempt in range(retries + 1):
+        result = subprocess.run(["adb", *map(str, args)], capture_output=True,
+                                check=False, timeout=90)
+        if not check or result.returncode == 0:
+            return result
+        if attempt < retries:
+            time.sleep(0.5)
+    raise subprocess.CalledProcessError(
+        result.returncode, result.args, output=result.stdout, stderr=result.stderr)
 
 
-def shell(*args, check=True):
-    return adb("shell", *args, check=check).stdout.decode("utf-8", "replace")
+def shell(*args, check=True, retries=0):
+    return adb("shell", *args, check=check, retries=retries).stdout.decode("utf-8", "replace")
 
 
 def hierarchy():
-    shell("uiautomator", "dump", "/sdcard/gli156.xml")
-    xml = adb("exec-out", "cat", "/sdcard/gli156.xml").stdout.decode("utf-8")
+    shell("uiautomator", "dump", "/sdcard/gli156.xml", retries=2)
+    xml = adb("exec-out", "cat", "/sdcard/gli156.xml", retries=2).stdout.decode("utf-8")
     ET.fromstring(xml)
     return xml
 
 
-def foreground_state(window_dump=None):
-    window_dump = window_dump if window_dump is not None else shell("dumpsys", "window", "windows", check=False)
-    match = re.search(r"(?:mCurrentFocus|mFocusedApp).*?\s([\w.]+)/(\.?[\w.$]+)", window_dump)
+def foreground_state(system_dump=None):
+    if system_dump is None:
+        system_dump = (shell("dumpsys", "activity", "activities", retries=2) + "\n" +
+                       shell("dumpsys", "window", "windows", retries=2))
+    match = re.search(
+        r"(?:mResumedActivity|topResumedActivity|mCurrentFocus|mFocusedApp).*?\s(?:u\d+\s+)?([\w.]+)/(\.?[\w.$]+)",
+        system_dump,
+    )
     return {"package": match.group(1), "activity": match.group(2)} if match else {"package": None, "activity": None}
 
 
 def ime_visible(input_method_dump=None):
-    input_method_dump = input_method_dump if input_method_dump is not None else shell("dumpsys", "input_method", check=False)
+    input_method_dump = input_method_dump if input_method_dump is not None else shell("dumpsys", "input_method", retries=2)
     return bool(re.search(r"(?:mInputShown|isInputViewShown|inputShown)=true", input_method_dump))
 
 
@@ -93,7 +101,7 @@ def node_present(identifier):
 
 
 def read_setting(namespace, key):
-    return shell("settings", "get", namespace, key, check=False).strip()
+    return shell("settings", "get", namespace, key, retries=2).strip()
 
 
 def capture(name, xml=None):
@@ -102,9 +110,10 @@ def capture(name, xml=None):
     xml = xml if xml is not None else hierarchy()
     (OUT / f"{name}.xml").write_text(xml, encoding="utf-8")
     window = shell("dumpsys", "window", "windows", check=False)
+    activity = shell("dumpsys", "activity", "activities", check=False)
     input_method = shell("dumpsys", "input_method", check=False)
     state = {
-        "foreground": foreground_state(window),
+        "foreground": foreground_state(activity + "\n" + window),
         "imeVisible": ime_visible(input_method),
         "fontScale": read_setting("system", "font_scale"),
         "accelerometerRotation": read_setting("system", "accelerometer_rotation"),
@@ -112,14 +121,15 @@ def capture(name, xml=None):
     }
     (OUT / f"{name}.state.json").write_text(json.dumps(state, indent=2), encoding="utf-8")
     (OUT / f"{name}.window.txt").write_text(window, encoding="utf-8")
+    (OUT / f"{name}.activity.txt").write_text(activity, encoding="utf-8")
     (OUT / f"{name}.ime.txt").write_text(input_method, encoding="utf-8")
     return xml
 
 
 def restore_device_defaults():
-    shell("settings", "put", "system", "font_scale", "1.0")
-    shell("settings", "put", "system", "user_rotation", "0")
-    shell("settings", "put", "system", "accelerometer_rotation", "1")
+    shell("settings", "put", "system", "font_scale", "1.0", retries=2)
+    shell("settings", "put", "system", "user_rotation", "0", retries=2)
+    shell("settings", "put", "system", "accelerometer_rotation", "1", retries=2)
     wait_for(lambda: read_setting("system", "font_scale") == "1.0", "font scale reset")
     wait_for(lambda: read_setting("system", "user_rotation") == "0", "rotation reset")
     wait_for(lambda: read_setting("system", "accelerometer_rotation") == "1", "auto rotation reset")
@@ -138,16 +148,16 @@ def dismiss_ime_if_visible():
 def teardown_case():
     dismiss_ime_if_visible()
     restore_device_defaults()
-    shell("am", "force-stop", PACKAGE)
+    shell("am", "force-stop", PACKAGE, retries=2)
     wait_for(lambda: foreground_state()["package"] != PACKAGE, "pilot activity stop")
 
 
 def prepare_case(name, font_scale="1.0"):
     restore_device_defaults()
-    shell("settings", "put", "system", "font_scale", font_scale)
+    shell("settings", "put", "system", "font_scale", font_scale, retries=2)
     dismiss_ime_if_visible()
-    shell("am", "force-stop", PACKAGE)
-    shell("am", "start", "-W", "-n", ACTIVITY)
+    shell("am", "force-stop", PACKAGE, retries=2)
+    shell("am", "start", "-W", "-n", ACTIVITY, retries=2)
     wait_for(lambda: foreground_state()["package"] == PACKAGE, "pilot activity foreground")
     wait_for(lambda: read_setting("system", "font_scale") == font_scale, f"font scale {font_scale}")
     wait_for(lambda: node_present(CONTRACT["page1"]), "Page 1 route")
@@ -311,8 +321,8 @@ def scale_long(xml):
 
 
 def orientation(xml):
-    shell("settings", "put", "system", "accelerometer_rotation", "0")
-    shell("settings", "put", "system", "user_rotation", "1")
+    shell("settings", "put", "system", "accelerometer_rotation", "0", retries=2)
+    shell("settings", "put", "system", "user_rotation", "1", retries=2)
     time.sleep(2)
     xml = capture("orientation-01-request-landscape")
     assert_foreground()

@@ -28,6 +28,7 @@ class ContractAndArtifactFixtureTests(unittest.TestCase):
         self.assertTrue(interaction.ime_visible(FIXTURES["imeOpen"]))
         self.assertFalse(interaction.ime_visible(FIXTURES["imeClosed"]))
         self.assertEqual(interaction.foreground_state(FIXTURES["appWindow"])["package"], interaction.PACKAGE)
+        self.assertEqual(interaction.foreground_state(FIXTURES["appActivity"])["package"], interaction.PACKAGE)
         self.assertNotEqual(interaction.foreground_state(FIXTURES["launcherWindow"])["package"], interaction.PACKAGE)
         with self.assertRaises(LookupError):
             interaction.select_node(FIXTURES["initialHierarchy"], interaction.CONTRACT["showLongToast"])
@@ -64,6 +65,17 @@ class ParsingAndStateTests(unittest.TestCase):
             with self.assertRaises(subprocess.CalledProcessError):
                 interaction.adb("version")
 
+    def test_adb_retries_only_when_the_caller_marks_an_operation_idempotent(self):
+        failed = subprocess.CompletedProcess(["adb"], 1, stdout=b"", stderr=b"offline")
+        passed = subprocess.CompletedProcess(["adb"], 0, stdout=b"ok", stderr=b"")
+        with patch.object(interaction.subprocess, "run", side_effect=[failed, passed]) as run, patch.object(interaction.time, "sleep"):
+            self.assertEqual(interaction.adb("shell", "settings", retries=1).stdout, b"ok")
+            self.assertEqual(run.call_count, 2)
+        with patch.object(interaction.subprocess, "run", return_value=failed) as run, patch.object(interaction.time, "sleep"):
+            with self.assertRaises(subprocess.CalledProcessError):
+                interaction.adb("shell", "settings")
+            run.assert_called_once()
+
     def test_wait_for_success_and_timeout(self):
         predicate = unittest.mock.Mock(side_effect=[False, True])
         with patch.object(interaction.time, "sleep"), patch.object(interaction.time, "monotonic", side_effect=[0, 0, 0.1]):
@@ -93,9 +105,9 @@ class ResetAndScrollTests(unittest.TestCase):
         with patch.object(interaction, "shell") as shell, patch.object(interaction, "read_setting", side_effect=lambda _namespace, key: {"font_scale": "1.0", "user_rotation": "0", "accelerometer_rotation": "1"}[key]):
             interaction.restore_device_defaults()
         shell.assert_has_calls([
-            call("settings", "put", "system", "font_scale", "1.0"),
-            call("settings", "put", "system", "user_rotation", "0"),
-            call("settings", "put", "system", "accelerometer_rotation", "1"),
+            call("settings", "put", "system", "font_scale", "1.0", retries=2),
+            call("settings", "put", "system", "user_rotation", "0", retries=2),
+            call("settings", "put", "system", "accelerometer_rotation", "1", retries=2),
         ])
     def test_dismiss_ime_never_sends_back_from_launcher_or_when_closed(self):
         with patch.object(interaction, "foreground_state", return_value={"package": "launcher"}), patch.object(interaction, "ime_visible", return_value=True), patch.object(interaction, "shell") as shell:
@@ -116,7 +128,7 @@ class ResetAndScrollTests(unittest.TestCase):
             interaction.teardown_case()
         dismiss.assert_called_once()
         restore.assert_called_once()
-        shell.assert_called_once_with("am", "force-stop", interaction.PACKAGE)
+        shell.assert_called_once_with("am", "force-stop", interaction.PACKAGE, retries=2)
 
     def test_prepare_case_sets_and_verifies_every_state(self):
         xml = f'<hierarchy><node resource-id="{interaction.CONTRACT["page1"]}"/><node resource-id="{interaction.CONTRACT["nameInput"]}"/></hierarchy>'
@@ -124,9 +136,9 @@ class ResetAndScrollTests(unittest.TestCase):
             self.assertEqual(interaction.prepare_case("scale", "1.5"), xml)
         restore.assert_called_once()
         shell.assert_has_calls([
-            call("settings", "put", "system", "font_scale", "1.5"),
-            call("am", "force-stop", interaction.PACKAGE),
-            call("am", "start", "-W", "-n", interaction.ACTIVITY),
+            call("settings", "put", "system", "font_scale", "1.5", retries=2),
+            call("am", "force-stop", interaction.PACKAGE, retries=2),
+            call("am", "start", "-W", "-n", interaction.ACTIVITY, retries=2),
         ])
         foreground.assert_called_once()
 
@@ -174,7 +186,7 @@ class EvidenceAndRunnerTests(unittest.TestCase):
     def test_capture_writes_xml_state_and_raw_diagnostics(self):
         with tempfile.TemporaryDirectory() as directory, patch.object(interaction, "OUT", Path(directory)), patch.object(interaction, "adb") as adb, patch.object(interaction, "shell") as shell:
             adb.return_value.stdout = b"png"
-            shell.side_effect = [FIXTURES["appWindow"], FIXTURES["imeClosed"], "1.0", "1", "0"]
+            shell.side_effect = [FIXTURES["appWindow"], FIXTURES["appActivity"], FIXTURES["imeClosed"], "1.0", "1", "0"]
             interaction.capture("step", FIXTURES["initialHierarchy"])
             state = json.loads((Path(directory) / "step.state.json").read_text())
             self.assertEqual(state["foreground"]["package"], interaction.PACKAGE)

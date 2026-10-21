@@ -10,6 +10,7 @@
 | `39536487778` / `6ccca5b` | long-toast control remained below 1.5x viewport | incomplete one-direction scroll model | search is bounded, settled, re-queried and progress-aware |
 | `39538178416` / `164cffb` | swipe began inside native input and did not move the parent | gesture consumed by child control | gesture coordinates come from the ScrollView edge, outside editable content |
 | `39538178416` / `164cffb` | diagnostic `dumpsys`/reset commands failed and contaminated later cases | diagnostics and cases coupled | diagnostic capture is non-authoritative; every case performs its own verified reset and records its own failure evidence |
+| `39542230458` / `2d55f1d` | Android 35 app window existed but foreground parser returned unknown | platform state-source compatibility | foreground uses resumed-activity state with window fallback; only idempotent reads/resets retry transient ADB failures |
 
 The failures are harness defects. The artifacts do not show a product control disappearing or an APK/provisioning failure. Required APK and Web checks passed on the failed heads.
 

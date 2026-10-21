@@ -16,6 +16,8 @@ OUT = Path(os.environ.get("GLI156_EVIDENCE_DIR", "android-interactions"))
 CONTRACT_PATH = Path(__file__).resolve().parents[2] / "src/pilot/interaction-contract.json"
 CONTRACT = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
 RESULTS = []
+MIN_TAP_SIZE = 24
+VIEWPORT_EDGE_INSET = 24
 
 
 def select_node(xml, identifier):
@@ -35,6 +37,32 @@ def center(bounds):
     if x2 <= x1 or y2 <= y1:
         raise ValueError(f"Empty bounds: {bounds!r}")
     return (x1 + x2) // 2, (y1 + y2) // 2
+
+
+def parse_bounds(bounds):
+    match = re.fullmatch(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", bounds or "")
+    if not match:
+        raise ValueError(f"Invalid bounds: {bounds!r}")
+    x1, y1, x2, y2 = map(int, match.groups())
+    if x2 <= x1 or y2 <= y1:
+        raise ValueError(f"Empty bounds: {bounds!r}")
+    return x1, y1, x2, y2
+
+
+def actionable_in_viewport(node, xml):
+    root = ET.fromstring(xml)
+    scrollable = next((item for item in root.iter("node") if item.get("scrollable") == "true"), None)
+    if scrollable is None:
+        raise LookupError("No scrollable container in hierarchy")
+    x1, y1, x2, y2 = parse_bounds(node.get("bounds"))
+    vx1, vy1, vx2, vy2 = parse_bounds(scrollable.get("bounds"))
+    tap_x, tap_y = center(node.get("bounds"))
+    return (
+        x2 - x1 >= MIN_TAP_SIZE
+        and y2 - y1 >= MIN_TAP_SIZE
+        and vx1 + VIEWPORT_EDGE_INSET <= tap_x <= vx2 - VIEWPORT_EDGE_INSET
+        and vy1 + VIEWPORT_EDGE_INSET <= tap_y <= vy2 - VIEWPORT_EDGE_INSET
+    )
 
 
 def adb(*args, check=True, retries=0):
@@ -90,6 +118,11 @@ def assert_foreground():
     if state["package"] != PACKAGE:
         raise AssertionError(f"Expected {PACKAGE} foreground, got {state}")
     return state
+
+
+def wait_for_foreground():
+    wait_for(lambda: foreground_state()["package"] == PACKAGE, "pilot activity foreground")
+    return assert_foreground()
 
 
 def node_present(identifier):
@@ -181,11 +214,7 @@ def scroll_gesture(xml):
     scrollable = next((node for node in root.iter("node") if node.get("scrollable") == "true"), None)
     if scrollable is None:
         raise LookupError("No scrollable container in hierarchy")
-    bounds = scrollable.get("bounds")
-    match = re.fullmatch(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", bounds or "")
-    if not match:
-        raise ValueError(f"Invalid scroll bounds: {bounds!r}")
-    x1, y1, x2, y2 = map(int, match.groups())
+    x1, y1, x2, y2 = parse_bounds(scrollable.get("bounds"))
     x = x2 - 12
     return x, y2 - max(72, (y2 - y1) // 5), x, y1 + max(72, (y2 - y1) // 5)
 
@@ -197,10 +226,15 @@ def find_control(identifier, evidence_name, xml=None, max_swipes=8):
         capture(f"{evidence_name}-search-{attempt:02d}", xml)
         assert_foreground()
         try:
-            return select_node(xml, identifier)
+            node = select_node(xml, identifier)
+            if actionable_in_viewport(node, xml):
+                return node
         except LookupError:
-            if attempt == max_swipes:
-                raise
+            node = None
+        if attempt == max_swipes:
+            if node is not None:
+                raise LookupError(f"UI node remains outside safe tap viewport: {identifier}")
+            raise LookupError(f"UI node not found: {identifier}")
         previous = scroll_signature(xml)
         shell("input", "swipe", *scroll_gesture(xml), "350")
         time.sleep(0.5)
@@ -216,7 +250,7 @@ def find_control(identifier, evidence_name, xml=None, max_swipes=8):
 def tap_id(identifier, evidence_name, xml=None):
     node = find_control(identifier, evidence_name, xml)
     shell("input", "tap", *center(node.get("bounds")))
-    assert_foreground()
+    wait_for_foreground()
     return node
 
 

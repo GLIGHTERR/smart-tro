@@ -20,10 +20,10 @@ class ContractAndArtifactFixtureTests(unittest.TestCase):
         self.assertEqual(set(interaction.CONTRACT), expected)
         self.assertEqual(len(set(interaction.CONTRACT.values())), len(expected))
 
-    def test_real_failure_fixtures_cover_the_six_known_classes(self):
+    def test_real_failure_fixtures_cover_all_known_classes(self):
         self.assertEqual(set(FIXTURES["provenance"]), {
             "imeViewport", "launcherForeground", "staleLabel", "offViewport",
-            "fontScale", "inputConsumedGesture",
+            "fontScale", "inputConsumedGesture", "edgeClippedControl",
         })
         self.assertTrue(interaction.ime_visible(FIXTURES["imeOpen"]))
         self.assertFalse(interaction.ime_visible(FIXTURES["imeClosed"]))
@@ -52,6 +52,12 @@ class ParsingAndStateTests(unittest.TestCase):
             with self.subTest(bounds=bounds), self.assertRaises(ValueError):
                 interaction.center(bounds)
         self.assertEqual(interaction.center("[0,1][1,2]"), (0, 1))
+
+    def test_actionable_control_rejects_edge_clipped_artifact_node(self):
+        clipped = interaction.select_node(FIXTURES["clippedControlHierarchy"], interaction.CONTRACT["openDialog"])
+        revealed = interaction.select_node(FIXTURES["revealedControlHierarchy"], interaction.CONTRACT["openDialog"])
+        self.assertFalse(interaction.actionable_in_viewport(clipped, FIXTURES["clippedControlHierarchy"]))
+        self.assertTrue(interaction.actionable_in_viewport(revealed, FIXTURES["revealedControlHierarchy"]))
 
     def test_foreground_and_ime_parsing_include_unknown_states(self):
         self.assertEqual(interaction.foreground_state("nothing"), {"package": None, "activity": None})
@@ -90,6 +96,15 @@ class ParsingAndStateTests(unittest.TestCase):
         with patch.object(interaction, "foreground_state", return_value={"package": "launcher", "activity": ".Home"}):
             with self.assertRaises(AssertionError):
                 interaction.assert_foreground()
+
+    def test_wait_for_foreground_allows_transient_launcher_then_requires_app(self):
+        states = [
+            {"package": "com.google.android.apps.nexuslauncher", "activity": ".NexusLauncherActivity"},
+            {"package": interaction.PACKAGE, "activity": ".MainActivity"},
+            {"package": interaction.PACKAGE, "activity": ".MainActivity"},
+        ]
+        with patch.object(interaction, "foreground_state", side_effect=states), patch.object(interaction.time, "sleep"):
+            self.assertEqual(interaction.wait_for_foreground()["package"], interaction.PACKAGE)
 
     def test_node_present_handles_found_missing_malformed_and_adb_failure(self):
         identifier = interaction.CONTRACT["page1"]
@@ -166,6 +181,13 @@ class ResetAndScrollTests(unittest.TestCase):
         shell.assert_called_once_with("input", "swipe", 308, 498, 308, 142, "350")
         self.assertEqual(capture.call_count, 2)
 
+    def test_find_control_scrolls_until_edge_clipped_node_is_safe(self):
+        identifier = interaction.CONTRACT["openDialog"]
+        with patch.object(interaction, "capture"), patch.object(interaction, "assert_foreground"), patch.object(interaction, "shell") as shell, patch.object(interaction, "hierarchy", return_value=FIXTURES["revealedControlHierarchy"]), patch.object(interaction.time, "sleep"):
+            node = interaction.find_control(identifier, "fixture", FIXTURES["clippedControlHierarchy"])
+        self.assertEqual(node.get("bounds"), "[24,510][296,557]")
+        shell.assert_called_once_with("input", "swipe", 308, 498, 308, 142, "350")
+
     def test_find_control_stops_after_repeated_no_progress(self):
         with patch.object(interaction, "capture"), patch.object(interaction, "assert_foreground"), patch.object(interaction, "shell"), patch.object(interaction, "hierarchy", return_value=FIXTURES["initialHierarchy"]), patch.object(interaction.time, "sleep"):
             with self.assertRaisesRegex(LookupError, "scroll stopped"):
@@ -176,7 +198,7 @@ class ResetAndScrollTests(unittest.TestCase):
             with self.assertRaises(LookupError):
                 interaction.find_control("missing", "fixture", FIXTURES["initialHierarchy"], max_swipes=0)
         node = interaction.select_node(FIXTURES["initialHierarchy"], interaction.CONTRACT["validate"])
-        with patch.object(interaction, "find_control", return_value=node), patch.object(interaction, "shell") as shell, patch.object(interaction, "assert_foreground") as foreground:
+        with patch.object(interaction, "find_control", return_value=node), patch.object(interaction, "shell") as shell, patch.object(interaction, "wait_for_foreground") as foreground:
             interaction.tap_id(interaction.CONTRACT["validate"], "tap")
         shell.assert_called_once_with("input", "tap", 160, 410)
         foreground.assert_called_once()

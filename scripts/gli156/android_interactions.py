@@ -74,7 +74,9 @@ def tap(xml, label):
         except LookupError:
             if attempt == len(swipes) - 1:
                 raise
-            shell("input", "swipe", "160", start_y, "160", end_y, "300")
+            # Avoid the focused native text input at the center of this form;
+            # the ScrollView receives gestures from its unoccupied edge.
+            shell("input", "swipe", "10", start_y, "10", end_y, "300")
             time.sleep(0.3)
             xml = hierarchy()
     x, y = center(node.get("bounds"))
@@ -123,7 +125,7 @@ def validation():
     tap(xml, "Name")
     shell("input", "text", "Alice")
     xml = dump("validation-05-alice")
-    (OUT / "keyboard-input-method.txt").write_text(shell("dumpsys", "input_method"), encoding="utf-8")
+    (OUT / "keyboard-input-method.txt").write_text(shell("dumpsys", "input_method", check=False), encoding="utf-8")
     assert "Alice" in xml, "Entered value absent from hierarchy"
     assert "Name is required" not in xml, "Validation error remains after valid input"
     return "Disabled stayed on Page 1; required text persisted then cleared after Alice. See XML/screenshots and keyboard dump."

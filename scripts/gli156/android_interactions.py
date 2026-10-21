@@ -63,7 +63,10 @@ def tap(xml, label):
     # Input controls may leave the system IME open, and long pilot content can
     # place later controls below the initial viewport. Scroll deliberately
     # before reporting that a required accessible control is absent.
-    swipes = (("520", "360"), ("520", "360"), ("220", "420"), ("220", "420"))
+    # Each case starts from the top of the form. At 1.5x font scale the
+    # long-toast control is several viewports below, so use settled downward
+    # scans rather than a stale immediate dump or a direction-reversing loop.
+    swipes = (("520", "200"),) * 6
     for attempt, (start_y, end_y) in enumerate(swipes):
         try:
             node = select_node(xml, label)
@@ -184,9 +187,6 @@ def scale_long():
     try:
         restart()
         xml = dump("scale-01-initial")
-        if "Show long toast" not in xml:
-            shell("input", "swipe", "160", "520", "160", "200", "500")
-            xml = dump("scale-01-scrolled")
         tap(xml, "Show long toast")
         time.sleep(0.5)
         dump("scale-02-long-toast")

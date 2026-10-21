@@ -40,7 +40,7 @@ class NodeSelectionTests(unittest.TestCase):
             interaction.tap('<hierarchy/>', 'Show toast')
         hierarchy.assert_called_once()
         shell.assert_has_calls([
-            call('input', 'swipe', '160', '520', '160', '360', '300'),
+            call('input', 'swipe', '160', '520', '160', '200', '300'),
             call('input', 'tap', 20, 30),
         ])
 

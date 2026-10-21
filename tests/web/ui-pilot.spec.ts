@@ -13,14 +13,23 @@ test("pilot keyboard, validation, dialog and one-shot status", async ({ page }) 
   await input.focus();
   await expect(input).toBeFocused();
   await page.getByRole("button", { name: "Validate" }).click();
-  await expect(page.getByRole("alert")).toContainText("Name is required");
+  await expect(page.getByText("Name is required")).toHaveCount(1);
+  await expect(page.getByRole("alert")).toHaveCount(0);
   await input.fill("Anh");
+  await expect(page.getByText("Name is required")).toHaveCount(0);
+  await page.getByRole("button", { name: "Show persistent alert" }).click();
+  await expect(page.getByRole("alert")).toContainText("service is temporarily unavailable");
+  await page.getByRole("button", { name: "Dismiss persistent alert" }).click();
   await expect(page.getByRole("alert")).toHaveCount(0);
 
   const opener = page.getByRole("button", { name: "Open dialog" });
   await opener.click();
   const dialog = page.getByRole("dialog", { name: "Pilot dialog" });
   await expect(dialog).toBeVisible();
+  const dialogBounds = await dialog.boundingBox();
+  expect(dialogBounds).not.toBeNull();
+  expect(dialogBounds!.x).toBeGreaterThan(0);
+  expect(dialogBounds!.width).toBeLessThan(375);
   const close = dialog.getByRole("button", { name: "Close" });
   await expect(close).toBeFocused();
   await page.keyboard.press("Tab");
@@ -30,12 +39,11 @@ test("pilot keyboard, validation, dialog and one-shot status", async ({ page }) 
   await expect(opener).toBeFocused();
   await expect(input).toHaveValue("Anh");
 
-  await page.getByRole("button", { name: "Show toast" }).click();
+  await page.getByRole("button", { name: "Show toast and navigate" }).click();
   const status = page.getByRole("status");
-  await expect(status).toContainText("Saved");
+  await expect(status).toContainText("Saved while navigating");
   await expect(status).toHaveAttribute("aria-live", "polite");
-  await page.getByRole("button", { name: "Navigate" }).click();
-  await expect(page.getByText("Page 2")).toBeVisible();
+  await expect(page.getByText("Page 2", { exact: true })).toBeVisible();
   await expect(status).toBeVisible();
   await page.getByRole("button", { name: "Go back" }).click();
   await expect(input).toHaveValue("Anh");

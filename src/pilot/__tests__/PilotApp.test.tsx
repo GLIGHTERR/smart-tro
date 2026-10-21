@@ -2,6 +2,7 @@ import React from "react";
 import TestRenderer, { act } from "react-test-renderer";
 import { PilotAlert, PilotButton, PilotDialog, PilotField, PilotToast } from "@/ui";
 import PilotApp, { PilotHome } from "../PilotApp";
+import interactionContract from "../interaction-contract.json";
 
 const mockNavigate = jest.fn();
 const mockGoBack = jest.fn();
@@ -30,17 +31,26 @@ jest.mock("@/ui", () => {
   };
 });
 
-it("keeps form state through validation, dialog, navigation and one-shot toast consumption", () => {
+it("keeps validation, persistent alerts, dialog and toast-navigation as separate contracts", () => {
   let view!: TestRenderer.ReactTestRenderer;
   act(() => { view = TestRenderer.create(<PilotApp />); });
   const button = (label: string) => view.root.findAllByType(PilotButton).find((item) => item.props.label === label)!;
+  expect(view.root.findByType(PilotField).props.testID).toBe(interactionContract.nameInput);
+  expect(button("Validate").props.testID).toBe(interactionContract.validate);
+  expect(button("Show toast and navigate").props.testID).toBe(interactionContract.showToastAndNavigate);
+  expect(view.root.findByType(PilotDialog).props.closeTestID).toBe(interactionContract.closeDialog);
   expect(button("Disabled").props.disabled).toBe(true);
   expect(view.root.findAllByType(PilotAlert)).toHaveLength(0);
   act(() => button("Validate").props.onPress());
-  expect(view.root.findByType(PilotAlert).props.message).toBe("Name is required");
+  expect(view.root.findByType(PilotField).props.error).toBe("Name is required");
+  expect(view.root.findAllByType(PilotAlert)).toHaveLength(0);
   act(() => view.root.findByType(PilotField).props.onChange("  "));
   expect(view.root.findByType(PilotField).props.error).toBe("Name is required");
   act(() => view.root.findByType(PilotField).props.onChange("Anh"));
+  expect(view.root.findByType(PilotField).props.error).toBeUndefined();
+  act(() => button("Show persistent alert").props.onPress());
+  expect(view.root.findByType(PilotAlert).props.message).toContain("service is temporarily unavailable");
+  act(() => button("Dismiss persistent alert").props.onPress());
   expect(view.root.findAllByType(PilotAlert)).toHaveLength(0);
   act(() => button("Open dialog").props.onPress());
   expect(view.root.findByType(PilotDialog).props.visible).toBe(true);
@@ -48,8 +58,9 @@ it("keeps form state through validation, dialog, navigation and one-shot toast c
   expect(view.root.findByType(PilotDialog).props.visible).toBe(false);
   act(() => button("Show toast").props.onPress());
   expect(view.root.findByType(PilotToast).props.event.message).toBe("Saved");
-  act(() => button("Navigate").props.onPress());
+  act(() => button("Show toast and navigate").props.onPress());
   expect(mockNavigate).toHaveBeenCalledWith("Next");
+  expect(view.root.findByType(PilotToast).props.event.message).toBe("Saved while navigating");
   expect(view.root.findByType(PilotField).props.value).toBe("Anh");
   act(() => button("Go back").props.onPress());
   expect(mockGoBack).toHaveBeenCalledTimes(1);

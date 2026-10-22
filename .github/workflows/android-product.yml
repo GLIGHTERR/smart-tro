@@ -1,0 +1,126 @@
+name: Android product artifact
+
+on:
+  pull_request:
+    branches: [master]
+    paths:
+      - ".github/workflows/android-product.yml"
+      - "scripts/gli178/**"
+      - "src/**"
+      - "index.ts"
+      - "metro.config.js"
+      - "app.json"
+      - "package.json"
+      - "package-lock.json"
+  push:
+    branches: [master]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Exact commit SHA to build
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-product-${{ github.event.pull_request.number || inputs.ref || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      # This is the normal product entry; the fixture only supplies offline QA data.
+      EXPO_PUBLIC_UI_PILOT: "false"
+      EXPO_PUBLIC_HOME_REVIEW: "true"
+      EXPO_PUBLIC_HOME_REVIEW_SCENARIO: "single"
+      EXPO_PUBLIC_ACCOUNT_REVIEW: "true"
+      EXPO_PUBLIC_ACCOUNT_REVIEW_SCENARIO: "one"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || inputs.ref || github.sha }}
+      - name: Verify exact checked-out SHA and product flag
+        run: |
+          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || inputs.ref || github.sha }}"
+          test "$EXPO_PUBLIC_UI_PILOT" = "false"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: npm ci
+      - run: npx expo prebuild --platform android --no-install
+      - name: Build bundled product APK with debug signing
+        working-directory: android
+        run: ./gradlew :app:assembleRelease --no-daemon --stacktrace --max-workers=2 -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g"
+      - name: Record immutable provenance
+        run: |
+          mkdir -p product-artifact
+          cp android/app/build/outputs/apk/release/app-release.apk product-artifact/smart-tro-product.apk
+          apk_sha="$(sha256sum product-artifact/smart-tro-product.apk | awk '{print $1}')"
+          commit_sha="$(git rev-parse HEAD)"
+          cat > product-artifact/provenance.json <<EOF
+          {"commit":"$commit_sha","apkSha256":"$apk_sha","workflowRun":"${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}","uiPilot":false,"buildCommand":"./gradlew :app:assembleRelease --no-daemon --stacktrace --max-workers=2 -Dorg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g"}
+          EOF
+      - uses: actions/upload-artifact@v4
+        with:
+          name: smart-tro-product-apk-${{ github.event.pull_request.head.sha || inputs.ref || github.sha }}
+          path: product-artifact/
+          if-no-files-found: error
+          retention-days: 14
+
+  emulator:
+    needs: apk
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        attempt: [1, 2]
+    env:
+      EXPO_PUBLIC_UI_PILOT: "false"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || inputs.ref || github.sha }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: smart-tro-product-apk-${{ github.event.pull_request.head.sha || inputs.ref || github.sha }}
+          path: product-artifact
+      - name: Verify product provenance before install
+        run: |
+          test "$EXPO_PUBLIC_UI_PILOT" = "false"
+          test "$(git rev-parse HEAD)" = "$(python3 -c 'import json; print(json.load(open("product-artifact/provenance.json"))["commit"])')"
+          sha256sum --check <(python3 -c 'import json; print(json.load(open("product-artifact/provenance.json"))["apkSha256"] + "  product-artifact/smart-tro-product.apk")')
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Smoke normal product entry on Android
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          script: |
+            adb install product-artifact/smart-tro-product.apk
+            python3 scripts/gli178/product_smoke.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smart-tro-product-android-evidence-${{ github.event.pull_request.head.sha || inputs.ref || github.sha }}-attempt-${{ matrix.attempt }}
+          path: android-product-smoke/
+          if-no-files-found: warn
+          retention-days: 14

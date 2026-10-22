@@ -61,19 +61,12 @@ npx eas-cli build --platform android --profile preview
 
 Install the resulting APK on a review device and validate sign-in, app restart/session restoration, refresh-token rotation, `/auth/me`, and logout/revocation. The GitHub Pages review remains intentionally memory-only and is not evidence for persistent mobile session behavior.
 
-## G1 UI pilot Pages preview
+## G1 UI pilot isolation
 
-Each successful `Deploy preview` run publishes the normal product entry at the
-Pages root and a separate, non-mutating pilot at
-`/smart-tro/qa-pilot/<QA-enablement-SHA>/`. The pilot page visibly records its
-base merge SHA, its QA-enablement revision, and
-`EXPO_PUBLIC_UI_PILOT=true`; it does not call the API or use a real account.
-
-The page is immutable for the deployed Pages artifact. To remove it, revert the
-QA-enablement revision and let `Deploy preview` replace the artifact; the normal
-Pages root remains the default entry throughout. A later Pages deployment also
-replaces the prior artifact, so retain the workflow URL and revision pair as the
-durable provenance record.
+Pages publishes only the normal product entry. The G1 pilot can be exported for
+local or CI review with `EXPO_PUBLIC_UI_PILOT=true`, but it is never copied to
+the public Pages artifact. Normal exports run a bundle-isolation guard that
+rejects pilot copy and `@ant-design/react-native` payload markers.
 
 ## Auth integration test matrix
 

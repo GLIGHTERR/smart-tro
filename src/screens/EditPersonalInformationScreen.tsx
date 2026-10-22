@@ -97,7 +97,7 @@ export function EditPersonalInformationScreen({ profile = fixture, onExit, onSes
       </ScrollView>
       <View style={styles.actions}><Button accessibilityLabel="Hủy chỉnh sửa" disabled={saving} label="Hủy" onPress={requestExit} tone="secondary" /><Button accessibilityLabel="Lưu" disabled={!canSave} label="Lưu" loading={saving} onPress={save} /></View>
     </KeyboardAvoidingView>
-    <Dialog visible={dialog} title="Hủy thay đổi?" message="Các thay đổi chưa lưu sẽ bị mất. Bạn có chắc muốn rời khỏi màn hình này?" onDismiss={stay}><Button label="Tiếp tục chỉnh sửa" onPress={stay} tone="secondary" /><Button label="Bỏ thay đổi" onPress={discard} tone="danger" /></Dialog>
+    {dialog ? <Dialog visible title="Hủy thay đổi?" message="Các thay đổi chưa lưu sẽ bị mất. Bạn có chắc muốn rời khỏi màn hình này?" onDismiss={stay}><Button label="Tiếp tục chỉnh sửa" onPress={stay} tone="secondary" /><Button label="Bỏ thay đổi" onPress={discard} tone="danger" /></Dialog> : null}
   </SafeAreaView>;
 }
 

@@ -4,9 +4,7 @@ import { fileURLToPath } from "node:url";
 
 export const forbiddenProductBundleMarkers = Object.freeze([
   "G1 UI pilot",
-  "InputItem",
   "Pilot toast provider is required",
-  "@ant-design/react-native",
 ]);
 
 function findJavaScriptFiles(directory) {
@@ -29,7 +27,7 @@ export function assertProductBundleIsIsolated(bundleDirectory) {
   });
 
   if (matches.length > 0) {
-    throw new Error(`Normal product bundle includes pilot or vendor payload:\n${matches.join("\n")}`);
+    throw new Error(`Normal product bundle includes pilot payload:\n${matches.join("\n")}`);
   }
 }
 

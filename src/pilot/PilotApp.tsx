@@ -3,7 +3,8 @@ import { createNativeStackNavigator, type NativeStackScreenProps } from "@react-
 import { createContext, useCallback, useContext, useRef, useState } from "react";
 import { ScrollView, Text } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
-import { PilotAlert, PilotButton, PilotDialog, PilotField, PilotProvider, PilotToast, type PilotToastEvent } from "@/ui";
+import { PilotAlert, PilotButton, PilotDialog, PilotField, PilotProvider, PilotToast } from "@/ui/pilot/renderer";
+import type { PilotToastEvent } from "@/ui/pilot/types";
 import interactionContract from "./interaction-contract.json";
 
 type Routes = { Home: undefined; Next: undefined };

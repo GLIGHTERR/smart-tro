@@ -5,14 +5,13 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAuth } from "@/auth/AuthProvider";
-import { ScreenState } from "@/ui/components";
+import { ScreenState, Toast, type ToastEvent } from "@/ui";
 import { AuthScreen } from "@/screens/AuthScreen";
 import { HomeScreen } from "@/screens/HomeScreen";
 import { AccountScreen } from "@/screens/AccountScreen";
 import { EditPersonalInformationScreen } from "@/screens/EditPersonalInformationScreen";
 import type { EditableProfile } from "@/screens/editPersonalInformationModel";
 import type { ProfileUpdatePayload } from "@/profile/gateway";
-import { SuccessToastAdapter, type SuccessToastEvent } from "@/ui/SuccessToastAdapter";
 import { homeDestinations, type HomeAction } from "@/screens/homeModel";
 
 type RootStackParamList = { Auth: undefined; Home: undefined; Account: { authoritativeProfile?: ProfileUpdatePayload["profile"] } | undefined; EditProfile: { profile: EditableProfile }; Destination: { action: Exclude<HomeAction, "account"> | "change-password" } };
@@ -29,11 +28,11 @@ const linking = {
 };
 
 function ProfileUpdateToastProvider({ children }: { children: ReactNode }) {
-  const [event, setEvent] = useState<SuccessToastEvent>();
+  const [event, setEvent] = useState<ToastEvent>();
   const show = useCallback(() => setEvent({ id: `profile-update-${Date.now()}`, message: "Đã cập nhật thông tin cá nhân." }), []);
   const consume = useCallback((eventId: string) => setEvent((current) => current?.id === eventId ? undefined : current), []);
   // Keep this mounted above the stack so an Account focus/remount cannot dismiss the active toast.
-  return <ProfileUpdateToastContext.Provider value={{ show }}>{children}<SuccessToastAdapter event={event} onConsume={consume} /></ProfileUpdateToastContext.Provider>;
+  return <ProfileUpdateToastContext.Provider value={{ show }}>{children}<Toast event={event} onConsume={consume} /></ProfileUpdateToastContext.Provider>;
 }
 
 function useProfileUpdateToast() {

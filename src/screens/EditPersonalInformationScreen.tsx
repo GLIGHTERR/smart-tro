@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, BackHandler, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { BackHandler, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { colors, radius } from "@/theme/tokens";
+import { Button, Dialog, Field } from "@/ui";
 import { createConfiguredProfileGateway, ProfileGatewayError, type ProfileGateway, type ProfileUpdatePayload } from "@/profile/gateway";
 import { maskEmail } from "./accountModel";
 import { canonicalPhoneFromDomestic, domesticPhoneFromCanonical, isDirty, type EditableProfile, validateEditableProfile } from "./editPersonalInformationModel";
@@ -89,21 +90,15 @@ export function EditPersonalInformationScreen({ profile = fixture, onExit, onSes
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.header}><Text accessibilityRole="header" style={styles.title}>Cập nhật thông tin cá nhân</Text></View>
         <Text style={styles.intro}>Kiểm tra và cập nhật thông tin liên hệ của bạn.</Text>
-        <Field label="Họ và tên" value={name} onChangeText={setName} error={validation.nameError} required disabled={saving} />
-        <Field label="Số điện thoại" value={phone} onChangeText={setPhone} error={validation.phoneError} keyboardType="phone-pad" hint="Không bắt buộc. Ví dụ: 0901234567" disabled={saving} />
+        <Field label="Họ và tên" value={name} onChangeText={setName} error={validation.nameError} required autoCapitalize="words" maxLength={240} disabled={saving} />
+        <Field label="Số điện thoại" value={phone} onChangeText={setPhone} error={validation.phoneError} keyboardType="phone-pad" hint="Không bắt buộc. Ví dụ: 0901234567" maxLength={10} disabled={saving} />
         <View style={styles.field}><Text style={styles.label}>Email</Text><Text accessibilityLabel="Email chỉ đọc" style={styles.readonly}>{maskEmail(profile.email)}</Text><Text style={styles.hint}>Email không thể chỉnh sửa.</Text></View>
         {notice?.kind === "error" ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={[styles.notice, styles.errorNotice]}>{notice.message}</Text> : null}
       </ScrollView>
-      <View style={styles.actions}><Pressable accessibilityRole="button" accessibilityLabel="Hủy chỉnh sửa" disabled={saving} onPress={requestExit} style={({ pressed }) => [styles.secondary, (pressed || saving) && styles.pressed]}><Text style={styles.secondaryText}>Hủy</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel="Lưu" accessibilityState={{ disabled: !canSave }} disabled={!canSave} onPress={save} style={({ pressed }) => [styles.primary, (!canSave || pressed) && styles.pressed]}>{saving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryText}>Lưu</Text>}</Pressable></View>
+      <View style={styles.actions}><Button accessibilityLabel="Hủy chỉnh sửa" disabled={saving} label="Hủy" onPress={requestExit} tone="secondary" /><Button accessibilityLabel="Lưu" disabled={!canSave} label="Lưu" loading={saving} onPress={save} /></View>
     </KeyboardAvoidingView>
-    <Modal visible={dialog} transparent animationType="fade" onRequestClose={() => setDialog(false)}>
-      <View accessibilityViewIsModal style={styles.backdrop}><View accessibilityRole="alert" style={styles.dialog}><Text accessibilityRole="header" style={styles.dialogTitle}>Hủy thay đổi?</Text><Text style={styles.dialogCopy}>Các thay đổi chưa lưu sẽ bị mất. Bạn có chắc muốn rời khỏi màn hình này?</Text><View style={styles.dialogActions}><Pressable ref={stayRef} accessibilityRole="button" onPress={stay} style={styles.stay}><Text style={styles.stayText}>Tiếp tục chỉnh sửa</Text></Pressable><Pressable accessibilityRole="button" onPress={discard} style={styles.discard}><Text style={styles.discardText}>Bỏ thay đổi</Text></Pressable></View></View></View>
-    </Modal>
+    <Dialog visible={dialog} title="Hủy thay đổi?" message="Các thay đổi chưa lưu sẽ bị mất. Bạn có chắc muốn rời khỏi màn hình này?" onDismiss={stay}><Button label="Tiếp tục chỉnh sửa" onPress={stay} tone="secondary" /><Button label="Bỏ thay đổi" onPress={discard} tone="danger" /></Dialog>
   </SafeAreaView>;
-}
-
-function Field({ label, value, onChangeText, error, required, hint, keyboardType = "default", disabled = false }: { label: string; value: string; onChangeText: (value: string) => void; error?: string; required?: boolean; hint?: string; keyboardType?: "default" | "phone-pad"; disabled?: boolean }) {
-  return <View style={styles.field}><Text style={styles.label}>{label}{required ? " *" : ""}</Text><TextInput accessibilityLabel={label} accessibilityHint={hint} autoCapitalize="words" editable={!disabled} keyboardType={keyboardType} maxLength={required ? 240 : 10} onChangeText={onChangeText} style={[styles.input, error && styles.inputError]} value={value} />{hint ? <Text style={styles.hint}>{hint}</Text> : null}{error ? <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text> : null}</View>;
 }
 
 const styles = StyleSheet.create({

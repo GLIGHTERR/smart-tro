@@ -53,5 +53,6 @@ test("accepts the Pages deployment workflow", () => {
   const workflow = readFileSync(new URL("../../.github/workflows/deploy-preview.yml", import.meta.url), "utf8");
   assert.doesNotThrow(() => assertReviewAuthConfig(workflow));
   assert.doesNotThrow(() => assertNoPublicPilotPreview(workflow));
+  assert.match(workflow, /EXPO_PUBLIC_HOME_REVIEW: "false"/);
   assert.doesNotThrow(() => verifyReviewAuthConfig());
 });

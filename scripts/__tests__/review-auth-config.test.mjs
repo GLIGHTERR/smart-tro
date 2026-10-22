@@ -2,7 +2,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-import { assertReviewAuthConfig, verifyReviewAuthConfig } from "../review-auth-config.mjs";
+import {
+  assertNoPublicPilotPreview,
+  assertReviewAuthConfig,
+  verifyReviewAuthConfig,
+} from "../review-auth-config.mjs";
 
 const configuredReviewWorkflow = `
 env:
@@ -28,11 +32,26 @@ test("rejects a review workflow without a configured HTTPS API URL", () => {
   );
 });
 
+test("accepts a Pages workflow with no public pilot artifact", () => {
+  assert.doesNotThrow(() => assertNoPublicPilotPreview(configuredReviewWorkflow));
+});
+
+test("rejects publishing a pilot build flag or artifact path", () => {
+  for (const publicPilotReference of [
+    'EXPO_PUBLIC_UI_PILOT: "true"',
+    "dist/qa-pilot/${{ github.sha }}",
+    "pilot-dist",
+  ]) {
+    assert.throws(
+      () => assertNoPublicPilotPreview(`${configuredReviewWorkflow}\n${publicPilotReference}`),
+      /must not publish a public pilot preview/
+    );
+  }
+});
+
 test("accepts the Pages deployment workflow", () => {
   const workflow = readFileSync(new URL("../../.github/workflows/deploy-preview.yml", import.meta.url), "utf8");
   assert.doesNotThrow(() => assertReviewAuthConfig(workflow));
-  assert.match(workflow, /EXPO_PUBLIC_UI_PILOT: "true"/);
-  assert.match(workflow, /EXPO_PUBLIC_PILOT_BASE_SHA: "2348825546603866fd766a7b1af0ee60aa484f7f"/);
-  assert.match(workflow, /dist\/qa-pilot\/\$\{\{ github\.sha \}\}/);
+  assert.doesNotThrow(() => assertNoPublicPilotPreview(workflow));
   assert.doesNotThrow(() => verifyReviewAuthConfig());
 });

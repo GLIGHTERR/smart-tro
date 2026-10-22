@@ -37,6 +37,7 @@ jobs:
           EXPO_PUBLIC_REVIEW_SOCIALS: "true"
           EXPO_PUBLIC_UC03_REVIEW: "true"
           EXPO_PUBLIC_HOME_REVIEW: "false"
+      - run: npm run verify:product-bundle
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

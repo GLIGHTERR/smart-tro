@@ -60,6 +60,9 @@
     "testMatch": [
       "**/__tests__/**/*.test.ts?(x)"
     ],
+    "moduleNameMapper": {
+      "^@ant-design/react-native$": "<rootDir>/test/mocks/ant-design-react-native.tsx"
+    },
     "collectCoverageFrom": [
       "src/auth/gateway.ts",
       "src/auth/restoreSession.ts",
@@ -71,6 +74,8 @@
       "src/screens/editPersonalInformationModel.ts",
       "src/screens/homeModel.ts",
       "src/startup/fontState.ts",
+      "src/ui/contracts.tsx",
+      "src/ui/SuccessToastAdapter.tsx",
       "src/ui/pilot/renderer.tsx",
       "src/pilot/PilotApp.tsx"
     ],
@@ -142,6 +147,18 @@
         "statements": 100
       },
       "./src/startup/fontState.ts": {
+        "branches": 100,
+        "functions": 100,
+        "lines": 100,
+        "statements": 100
+      },
+      "./src/ui/contracts.tsx": {
+        "branches": 100,
+        "functions": 100,
+        "lines": 100,
+        "statements": 100
+      },
+      "./src/ui/SuccessToastAdapter.tsx": {
         "branches": 100,
         "functions": 100,
         "lines": 100,

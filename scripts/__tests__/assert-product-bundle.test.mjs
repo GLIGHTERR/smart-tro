@@ -18,16 +18,16 @@ async function withBundleDirectory(callback) {
   }
 }
 
-test("accepts a normal bundle with no pilot or vendor payload", async () => {
+test("accepts a normal bundle with the production vendor payload", async () => {
   await withBundleDirectory((directory) => {
     mkdirSync(join(directory, "_expo", "static"), { recursive: true });
-    writeFileSync(join(directory, "_expo", "static", "app.js"), "console.log('product');");
+    writeFileSync(join(directory, "_expo", "static", "app.js"), "console.log('@ant-design/react-native');");
 
     assert.doesNotThrow(() => assertProductBundleIsIsolated(directory));
   });
 });
 
-test("rejects every pilot and vendor marker in normal JavaScript bundles", async () => {
+test("rejects every pilot marker in normal JavaScript bundles", async () => {
   for (const marker of forbiddenProductBundleMarkers) {
     await withBundleDirectory((directory) => {
       writeFileSync(join(directory, "app.js"), `const marker = ${JSON.stringify(marker)};`);

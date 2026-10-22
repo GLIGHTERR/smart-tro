@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Toast as AntToast } from "@ant-design/react-native";
 import { StyleSheet, Text, View } from "react-native";
 
 export const SUCCESS_TOAST_DURATION_MS = 5000;
@@ -25,12 +26,12 @@ export function Toast({ event, onConsume }: ToastProps) {
 
   useEffect(() => {
     if (!activeEvent) return;
+    const key = AntToast.show({ content: <View accessibilityLiveRegion="polite" role="status" pointerEvents="none" style={styles.toast}><Text style={styles.text}>{activeEvent.message}</Text></View>, duration: 0, mask: false, position: "bottom" });
     const timeout = setTimeout(() => setActiveEvent(null), SUCCESS_TOAST_DURATION_MS);
-    return () => clearTimeout(timeout);
+    return () => { clearTimeout(timeout); AntToast.remove(key); };
   }, [activeEvent]);
 
-  if (!activeEvent) return null;
-  return <View accessibilityLiveRegion="polite" role="status" pointerEvents="none" style={styles.toast}><Text style={styles.text}>{activeEvent.message}</Text></View>;
+  return null;
 }
 
 export const SuccessToastAdapter = Toast;

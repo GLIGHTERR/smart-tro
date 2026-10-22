@@ -1,6 +1,6 @@
 import React from "react";
 import TestRenderer, { act } from "react-test-renderer";
-import { PilotAlert, PilotButton, PilotDialog, PilotField, PilotToast } from "@/ui";
+import { PilotAlert, PilotButton, PilotDialog, PilotField, PilotToast } from "@/ui/pilot/renderer";
 import PilotApp, { PilotHome } from "../PilotApp";
 import interactionContract from "../interaction-contract.json";
 
@@ -18,7 +18,7 @@ jest.mock("react-native-safe-area-context", () => {
   const { View } = jest.requireActual<typeof import("react-native")>("react-native");
   return { SafeAreaProvider: ({ children }: any) => <View>{children}</View>, SafeAreaView: ({ children }: any) => <View>{children}</View> };
 });
-jest.mock("@/ui", () => {
+jest.mock("@/ui/pilot/renderer", () => {
   const React = jest.requireActual<typeof import("react")>("react");
   const { Text, View } = jest.requireActual<typeof import("react-native")>("react-native");
   return {

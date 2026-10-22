@@ -24,11 +24,20 @@ def shell(*args):
     return adb("shell", *args).stdout.decode("utf-8", "replace")
 
 
-def hierarchy():
-    shell("uiautomator", "dump", "/sdcard/gli178.xml")
-    xml = adb("exec-out", "cat", "/sdcard/gli178.xml").stdout.decode("utf-8")
-    ET.fromstring(xml)
-    return xml
+def hierarchy(retries=2):
+    """Read a complete UI dump; the emulator briefly exposes an empty file on launch."""
+    last_error = None
+    for attempt in range(retries + 1):
+        try:
+            shell("uiautomator", "dump", "/sdcard/gli178.xml")
+            xml = adb("exec-out", "cat", "/sdcard/gli178.xml").stdout.decode("utf-8")
+            ET.fromstring(xml)
+            return xml
+        except (ET.ParseError, subprocess.CalledProcessError) as error:
+            last_error = error
+            if attempt < retries:
+                time.sleep(0.4)
+    raise last_error
 
 
 def foreground():

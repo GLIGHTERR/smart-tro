@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const workflow = readFileSync(new URL("../../.github/workflows/android-product.yml", import.meta.url), "utf8");
+const testWorkflow = readFileSync(new URL("../../.github/workflows/test.yml", import.meta.url), "utf8");
 const smoke = readFileSync(new URL("../gli178/product_smoke.py", import.meta.url), "utf8");
 
 test("product fallback is isolated, exact-SHA pinned, and explicitly non-pilot", () => {
@@ -22,4 +23,7 @@ test("two product emulator attempts retain evidence and reject pilot UI", () => 
   assert.match(smoke, /PILOT_MARKERS/);
   assert.match(smoke, /Home", "Account", "Edit Profile/);
   assert.match(smoke, /Chỉnh sửa thông tin cá nhân/);
+  assert.match(smoke, /def hierarchy\(retries=2\)/);
+  assert.match(smoke, /except \(ET\.ParseError, subprocess\.CalledProcessError\)/);
+  assert.match(testWorkflow, /python3 -m unittest scripts\.gli178\.test_product_smoke/);
 });

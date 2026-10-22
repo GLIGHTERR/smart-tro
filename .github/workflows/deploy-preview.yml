@@ -37,15 +37,6 @@ jobs:
           EXPO_PUBLIC_REVIEW_SOCIALS: "true"
           EXPO_PUBLIC_UC03_REVIEW: "true"
           EXPO_PUBLIC_HOME_REVIEW: "false"
-      - name: Export isolated QA pilot
-        run: npx expo export --platform web --clear --output-dir pilot-dist && node scripts/write-pages-fallback.mjs pilot-dist
-        env:
-          EXPO_PUBLIC_BUILD_SHA: ${{ github.sha }}
-          EXPO_PUBLIC_PILOT_BASE_SHA: "2348825546603866fd766a7b1af0ee60aa484f7f"
-          EXPO_PUBLIC_UI_PILOT: "true"
-          EXPO_PUBLIC_WEB_BASE_URL: /smart-tro/qa-pilot/${{ github.sha }}
-      - name: Add pilot under its immutable revision path
-        run: mkdir -p dist/qa-pilot/${{ github.sha }} && cp -R pilot-dist/. dist/qa-pilot/${{ github.sha }}/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

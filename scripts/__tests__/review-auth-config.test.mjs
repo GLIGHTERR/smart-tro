@@ -31,8 +31,7 @@ test("rejects a review workflow without a configured HTTPS API URL", () => {
 test("accepts the Pages deployment workflow", () => {
   const workflow = readFileSync(new URL("../../.github/workflows/deploy-preview.yml", import.meta.url), "utf8");
   assert.doesNotThrow(() => assertReviewAuthConfig(workflow));
-  assert.match(workflow, /EXPO_PUBLIC_UI_PILOT: "true"/);
-  assert.match(workflow, /EXPO_PUBLIC_PILOT_BASE_SHA: "2348825546603866fd766a7b1af0ee60aa484f7f"/);
-  assert.match(workflow, /dist\/qa-pilot\/\$\{\{ github\.sha \}\}/);
+  assert.doesNotMatch(workflow, /EXPO_PUBLIC_UI_PILOT/);
+  assert.doesNotMatch(workflow, /qa-pilot/);
   assert.doesNotThrow(() => verifyReviewAuthConfig());
 });

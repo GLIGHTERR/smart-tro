@@ -34,9 +34,11 @@ is exposed through the public `src/ui` types, and no second UI vendor is used.
 
 The isolated pilot is selected at build time with `EXPO_PUBLIC_UI_PILOT=true`;
 the ordinary product entry and UC-05 are unchanged. `npm run test:web:ui-pilot`
-exports and exercises that entry in Chromium. The existing Web suite uses the
-normal entry. Neither suite proves mobile accessibility, font autolinking,
-keyboard/safe-area behavior, or iOS support.
+exports and exercises that entry in Chromium, but Pages never publishes it.
+Normal `npm run export:web` runs a deterministic bundle-content guard that
+rejects pilot copy and `@ant-design/react-native` markers. Neither suite proves
+mobile accessibility, font autolinking, keyboard/safe-area behavior, or iOS
+support.
 
 Rollback: do not merge the pilot PR, or revert its single commit if it has been
 integrated later. The existing internal primitives and product entry remain in

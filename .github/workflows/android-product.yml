@@ -100,9 +100,11 @@ jobs:
           path: product-artifact
       - name: Verify product provenance before install
         run: |
+          mkdir -p android-product-smoke
           test "$EXPO_PUBLIC_UI_PILOT" = "false"
           test "$(git rev-parse HEAD)" = "$(python3 -c 'import json; print(json.load(open("product-artifact/provenance.json"))["commit"])')"
           sha256sum --check <(python3 -c 'import json; print(json.load(open("product-artifact/provenance.json"))["apkSha256"] + "  product-artifact/smart-tro-product.apk")')
+          cp product-artifact/provenance.json android-product-smoke/provenance.json
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -116,7 +118,7 @@ jobs:
           target: google_apis
           script: |
             adb install product-artifact/smart-tro-product.apk
-            python3 scripts/gli178/product_smoke.py
+            GLI178_EXPECTED_COMMIT="$(git rev-parse HEAD)" python3 scripts/gli178/product_smoke.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:

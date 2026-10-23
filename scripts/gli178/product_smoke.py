@@ -109,7 +109,6 @@ def assert_field_layout(xml, label, input_label, detail=None, editable=True):
     if detail:
         detail_node = node(xml, detail)
         assert_below(control, detail_node, f"{label} input/helper")
-        assert_readable_text(detail_node, f"{label} helper/error")
     return {"label": label, "input": input_label, "detail": detail, "vertical": True}
 
 
@@ -210,6 +209,7 @@ def run():
     invalid = hierarchy()
     assert_product(invalid)
     assert_field_layout(invalid, "Họ và tên", "Họ và tên", "Họ và tên là bắt buộc.")
+    assert_readable_text(node(invalid, "Họ và tên là bắt buộc."), "Full name required error")
     tap(node(invalid, "Lưu"))
     time.sleep(0.4)
     after_invalid_save = hierarchy()

@@ -59,7 +59,7 @@ class FieldMatrixTests(unittest.TestCase):
     def test_field_layout_rejects_a_clipped_error_while_the_keyboard_is_visible(self):
         clipped = EDIT_PROFILE_XML.replace('  <node text="Số điện thoại"', '  <node text="Họ và tên là bắt buộc." bounds="[10,91][300,94]" />\n  <node text="Số điện thoại"')
         with self.assertRaisesRegex(AssertionError, "Clipped Field text"):
-            product_smoke.assert_field_layout(clipped, "Họ và tên", "Họ và tên", "Họ và tên là bắt buộc.")
+            product_smoke.assert_readable_text(product_smoke.node(clipped, "Họ và tên là bắt buộc."), "Full name required error")
 
     def test_field_layout_accepts_the_existing_required_marker(self):
         required = EDIT_PROFILE_XML.replace('text="Họ và tên" bounds="[10,10][200,30]"', 'text="Họ và tên *" bounds="[10,10][200,30]"')

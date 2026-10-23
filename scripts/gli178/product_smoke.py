@@ -69,6 +69,14 @@ def nodes(xml, value):
     return [item for item in root.iter("node") if value in (item.get("text"), item.get("content-desc"))]
 
 
+def test_hook(xml, value):
+    root = ET.fromstring(xml)
+    matches = [item for item in root.iter("node") if (item.get("resource-id") or "").endswith(f"/{value}") or item.get("content-desc") == value]
+    if not matches:
+        raise LookupError(f"Product test hook not found: {value}")
+    return matches[0]
+
+
 def input_node(xml, label, editable=True):
     """Find a Field control by its accessibility label, optionally requiring editable input."""
     matches = nodes(xml, label)
@@ -144,16 +152,14 @@ def assert_product(xml):
         raise AssertionError(f"Expected {PACKAGE} foreground, got {foreground()}")
 
 
-def disabled(xml, label):
-    candidates = nodes(xml, label)
-    if not candidates:
-        raise LookupError(f"Product UI control not found: {label}")
-    if not any(item.get("enabled") == "false" for item in candidates):
-        raise AssertionError(f"Expected disabled control: {label}")
+def assert_save_disabled(xml):
+    # Ant's visible Text child does not expose its parent's disabled state in Android XML.
+    # This test-only hook reflects the same `canSave` state passed to the native control.
+    test_hook(xml, "profile-save-disabled")
 
 
 def edit_profile_matrix(xml):
-    disabled(xml, "Lưu")
+    assert_save_disabled(xml)
     return {
         "fullName": assert_field_layout(xml, "Họ và tên", "Họ và tên"),
         "phone": assert_field_layout(xml, "Số điện thoại", "Số điện thoại", "Không bắt buộc. Ví dụ: 0901234567"),
@@ -197,7 +203,7 @@ def run():
     invalid = hierarchy()
     assert_product(invalid)
     assert_field_layout(invalid, "Họ và tên", "Họ và tên", "Họ và tên là bắt buộc.")
-    disabled(invalid, "Lưu")
+    assert_save_disabled(invalid)
     matrix["fullName"]["invalidError"] = "Họ và tên là bắt buộc."
     matrix["saveDisabledAfterInvalidValue"] = True
     capture("05-edit-profile-full-name-error", invalid)

@@ -41,6 +41,18 @@ describe("EditPersonalInformationScreen", () => {
     expect(button(renderer.root, "Lưu").props.accessibilityState).toEqual({ disabled: true });
   });
 
+  it("keeps the domestic Account handoff clean and prevents a no-op save", async () => {
+    const update = jest.fn();
+    const profile = { displayName: "Nguyễn Văn A", phone: "0901234567", email: "nguyen.van.a.renter@example.com" };
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<EditPersonalInformationScreen gateway={gateway(update)} profile={profile} onExit={jest.fn()} onSaved={jest.fn()} onSessionError={jest.fn()} sessionKey="review-fixture" />); });
+    expect(renderer.root.findAllByType(TextInput)[1]!.props.value).toBe("0901234567");
+    expect(button(renderer.root, "Lưu").props.accessibilityState).toEqual({ disabled: true });
+    await act(async () => { await button(renderer.root, "Lưu").props.onPress(); });
+    expect(update).not.toHaveBeenCalled();
+    expect(copy(renderer.root)).not.toContain("Chưa thể lưu thay đổi. Vui lòng thử lại.");
+  });
+
   it("normalizes valid dirty data, PATCHes the strict allowlist once, and hands off success immediately without an inline notice", async () => {
     const onSaved = jest.fn(); let complete!: (value: { profile: { displayName: string; email: string; phone: string | null; avatar: null } }) => void;
     const update = jest.fn().mockImplementation(() => new Promise((resolve) => { complete = resolve; })); let renderer!: TestRenderer.ReactTestRenderer;

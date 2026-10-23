@@ -10,10 +10,11 @@ describe("edit personal information model", () => {
     expect(validateEditableProfile("a".repeat(161), "").nameError).toBe("Họ và tên tối đa 160 ký tự.");
   });
 
-  it("round trips optional Vietnamese domestic phones at the mock boundary", () => {
+  it("accepts canonical and domestic Vietnamese phones at the Account-to-Edit Profile boundary", () => {
     expect(domesticPhoneFromCanonical("+84901234567")).toBe("0901234567");
     expect(domesticPhoneFromCanonical(null)).toBe("");
-    expect(domesticPhoneFromCanonical("0901234567")).toBe("");
+    expect(domesticPhoneFromCanonical("0901234567")).toBe("0901234567");
+    expect(domesticPhoneFromCanonical("not-a-phone")).toBe("");
     expect(canonicalPhoneFromDomestic("0901234567")).toBe("+84901234567");
     expect(canonicalPhoneFromDomestic("")).toBeNull();
     expect(validateEditableProfile("Mai", "0912345678").phoneError).toBeUndefined();
@@ -22,6 +23,7 @@ describe("edit personal information model", () => {
 
   it("returns clean after a full revert, including whitespace-only name changes", () => {
     expect(isDirty(profile, " Nguyễn Văn A ", "0901234567")).toBe(false);
+    expect(isDirty({ ...profile, phone: "0901234567" }, "Nguyễn Văn A", "0901234567")).toBe(false);
     expect(isDirty(profile, "Mai An", "0901234567")).toBe(true);
     expect(isDirty(profile, "Nguyễn Văn A", "")).toBe(true);
   });

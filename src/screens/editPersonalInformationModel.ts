@@ -7,7 +7,8 @@ export function normalizeName(value: string) { return value.trim().replace(/\s+/
 export function domesticPhoneFromCanonical(phone: string | null) {
   if (!phone) return "";
   const match = /^\+84(\d{9})$/.exec(phone);
-  return match ? `0${match[1]}` : "";
+  if (match) return `0${match[1]}`;
+  return domesticPhonePattern.test(phone) ? phone : "";
 }
 
 export function canonicalPhoneFromDomestic(phone: string) { return phone ? `+84${phone.slice(1)}` : null; }
@@ -22,5 +23,5 @@ export function validateEditableProfile(displayName: string, phone: string) {
 }
 
 export function isDirty(original: EditableProfile, displayName: string, phone: string) {
-  return normalizeName(displayName) !== normalizeName(original.displayName) || canonicalPhoneFromDomestic(phone) !== original.phone;
+  return normalizeName(displayName) !== normalizeName(original.displayName) || phone !== domesticPhoneFromCanonical(original.phone);
 }

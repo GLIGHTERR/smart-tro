@@ -21,7 +21,6 @@ describe("EditPersonalInformationScreen", () => {
     expect(copy(renderer.root)).toContain("Cập nhật thông tin cá nhân");
     expect(copy(renderer.root)).toContain("n***r@example.com");
     expect(renderer.root.findByProps({ accessibilityLabel: "Email chỉ đọc" })).toBeTruthy();
-    expect(renderer.root.findByProps({ accessibilityLabel: "Trạng thái Lưu: bị vô hiệu" })).toBeTruthy();
     expect(button(renderer.root, "Lưu").props.accessibilityState).toEqual({ disabled: true });
     const fields = renderer.root.findAllByType(TextInput);
     act(() => fields[0]!.props.onChangeText("   "));

@@ -11,7 +11,7 @@ PACKAGE = "com.smartplatform.smarttro"
 ACTIVITY = f"{PACKAGE}/.MainActivity"
 OUT = Path(os.environ.get("GLI178_EVIDENCE_DIR", "android-product-smoke"))
 PILOT_MARKERS = ("G1 UI pilot", "pilot_", "QA preview only", "EXPO_PUBLIC_UI_PILOT=true")
-FIXTURE = "authorized offline review fixture; Save is never activated"
+FIXTURE = "authorized offline review fixture; Save is tapped only while disabled"
 
 
 def adb(*args, check=True):
@@ -144,19 +144,18 @@ def assert_product(xml):
         raise AssertionError(f"Expected {PACKAGE} foreground, got {foreground()}")
 
 
-def assert_save_disabled(xml):
-    # Ant's visible Text child does not expose its parent's disabled state in Android XML.
-    # The control's state-accurate accessibility label remains visible to native automation.
-    node(xml, "Trạng thái Lưu: bị vô hiệu")
+def assert_disabled_save_attempt(before, after):
+    """Prove the visible Save control cannot leave or mutate the clean/invalid fixture."""
+    node(after, "Cập nhật thông tin cá nhân")
+    if input_node(before, "Họ và tên").get("text") != input_node(after, "Họ và tên").get("text"):
+        raise AssertionError("Disabled Save changed the Full name fixture")
 
 
 def edit_profile_matrix(xml):
-    assert_save_disabled(xml)
     return {
         "fullName": assert_field_layout(xml, "Họ và tên", "Họ và tên"),
         "phone": assert_field_layout(xml, "Số điện thoại", "Số điện thoại", "Không bắt buộc. Ví dụ: 0901234567"),
         "email": assert_field_layout(xml, "Email", "Email chỉ đọc", "Email không thể chỉnh sửa.", editable=False),
-        "saveDisabledBeforeMutation": True,
     }
 
 
@@ -182,7 +181,15 @@ def run():
     capture("03-edit-profile-normal-disabled", edit)
     matrix = edit_profile_matrix(edit)
 
-    name_input = input_node(edit, "Họ và tên")
+    tap(node(edit, "Lưu"))
+    time.sleep(0.4)
+    after_disabled_save = hierarchy()
+    assert_product(after_disabled_save)
+    assert_disabled_save_attempt(edit, after_disabled_save)
+    matrix["saveDisabledBeforeMutation"] = True
+    capture("03a-edit-profile-save-disabled", after_disabled_save)
+
+    name_input = input_node(after_disabled_save, "Họ và tên")
     tap(name_input)
     wait_for(lambda: input_node(hierarchy(), "Họ và tên").get("focused") == "true", "Full name focus state")
     focused = hierarchy()
@@ -195,7 +202,11 @@ def run():
     invalid = hierarchy()
     assert_product(invalid)
     assert_field_layout(invalid, "Họ và tên", "Họ và tên", "Họ và tên là bắt buộc.")
-    assert_save_disabled(invalid)
+    tap(node(invalid, "Lưu"))
+    time.sleep(0.4)
+    after_invalid_save = hierarchy()
+    assert_product(after_invalid_save)
+    assert_disabled_save_attempt(invalid, after_invalid_save)
     matrix["fullName"]["invalidError"] = "Họ và tên là bắt buộc."
     matrix["saveDisabledAfterInvalidValue"] = True
     capture("05-edit-profile-full-name-error", invalid)
@@ -203,7 +214,7 @@ def run():
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "result.json").write_text(json.dumps({
         "status": "PASS", "entry": "src/App", "flow": ["Home", "Account", "Edit Profile"],
-        "provenance": provenance, "fixture": FIXTURE, "mutation": {"saveActivated": False, "backendChanged": False},
+        "provenance": provenance, "fixture": FIXTURE, "mutation": {"saveControlTappedWhileDisabled": True, "validSaveActivated": False, "backendChanged": False},
         "fieldStateMatrix": matrix,
     }, indent=2), encoding="utf-8")
 

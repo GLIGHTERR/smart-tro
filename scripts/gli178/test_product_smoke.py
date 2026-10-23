@@ -19,7 +19,7 @@ EDIT_PROFILE_XML = """<hierarchy>
   <node text="Email" bounds="[10,220][200,240]" />
   <node content-desc="Email chỉ đọc" class="android.widget.TextView" bounds="[10,250][300,300]" />
   <node text="Email không thể chỉnh sửa." bounds="[10,310][300,330]" />
-  <node content-desc="Trạng thái Lưu: bị vô hiệu" text="Lưu" enabled="true" bounds="[10,340][300,390]" />
+  <node text="Lưu" enabled="true" bounds="[10,340][300,390]" />
 </hierarchy>"""
 
 HOME_XML = """<hierarchy><node text="Xin chào" bounds="[0,0][1,1]" /><node text="Tài khoản: UC-04 — Tài khoản/Cá nhân" bounds="[0,2][1,3]" /></hierarchy>"""
@@ -49,7 +49,7 @@ class FieldMatrixTests(unittest.TestCase):
         self.assertEqual(matrix["fullName"]["input"], "Họ và tên")
         self.assertEqual(matrix["phone"]["detail"], "Không bắt buộc. Ví dụ: 0901234567")
         self.assertTrue(matrix["email"]["vertical"])
-        self.assertTrue(matrix["saveDisabledBeforeMutation"])
+        self.assertNotIn("saveDisabledBeforeMutation", matrix)
 
     def test_field_layout_rejects_overlapping_label_and_input(self):
         overlapping = EDIT_PROFILE_XML.replace('[10,40][300,90]', '[10,25][300,90]')
@@ -69,14 +69,15 @@ class FieldMatrixTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Invalid UI bounds"):
             product_smoke.bounds(ET.fromstring('<node bounds="bad" />'))
 
-    def test_product_and_disabled_guards_reject_pilot_wrong_foreground_and_missing_save_accessibility_state(self):
+    def test_product_and_disabled_guards_reject_pilot_wrong_foreground_and_mutating_disabled_save(self):
         with self.assertRaisesRegex(AssertionError, "Pilot identifier"):
             product_smoke.assert_product("G1 UI pilot")
         with patch.object(product_smoke, "foreground", return_value={"package": "wrong", "activity": None}):
             with self.assertRaisesRegex(AssertionError, "Expected com.smartplatform.smarttro foreground"):
                 product_smoke.assert_product(EDIT_PROFILE_XML)
-        with self.assertRaisesRegex(LookupError, "Product UI node not found"):
-            product_smoke.assert_save_disabled(EDIT_PROFILE_XML.replace("Trạng thái Lưu: bị vô hiệu", "Trạng thái Lưu: có thể lưu"))
+        changed = EDIT_PROFILE_XML.replace('content-desc="Họ và tên" class="android.widget.EditText" focused="false"', 'content-desc="Họ và tên" class="android.widget.EditText" text="Mai An" focused="false"')
+        with self.assertRaisesRegex(AssertionError, "Disabled Save changed"):
+            product_smoke.assert_disabled_save_attempt(EDIT_PROFILE_XML, changed)
 
     def test_clear_input_uses_delete_keys_without_saving(self):
         item = product_smoke.input_node(EDIT_PROFILE_XML, "Họ và tên")
@@ -108,7 +109,7 @@ class ProvenanceTests(unittest.TestCase):
     def test_run_captures_normal_focus_and_error_evidence_without_activating_save(self):
         focused = EDIT_PROFILE_XML.replace('focused="false"', 'focused="true"')
         invalid = EDIT_PROFILE_XML.replace('  <node text="Số điện thoại"', '  <node text="Họ và tên là bắt buộc." bounds="[10,91][300,99]" />\n  <node text="Số điện thoại"')
-        dumps = [HOME_XML, HOME_XML, ACCOUNT_XML, ACCOUNT_XML, EDIT_PROFILE_XML, EDIT_PROFILE_XML, focused, focused, invalid, invalid]
+        dumps = [HOME_XML, HOME_XML, ACCOUNT_XML, ACCOUNT_XML, EDIT_PROFILE_XML, EDIT_PROFILE_XML, EDIT_PROFILE_XML, focused, focused, invalid, invalid, invalid]
         png = subprocess.CompletedProcess(["adb"], 0, stdout=b"png", stderr=b"")
         with tempfile.TemporaryDirectory() as directory, patch.object(product_smoke, "OUT", product_smoke.Path(directory)), patch.object(product_smoke, "assert_product_provenance", return_value={"commit": "a" * 40, "package": product_smoke.PACKAGE, "pilot": False}), patch.object(product_smoke, "foreground", return_value={"package": product_smoke.PACKAGE, "activity": ".MainActivity"}), patch.object(product_smoke, "hierarchy", side_effect=dumps), patch.object(product_smoke, "adb", return_value=png), patch.object(product_smoke, "shell") as shell:
             product_smoke.run()
@@ -116,7 +117,7 @@ class ProvenanceTests(unittest.TestCase):
         self.assertEqual(result["status"], "PASS")
         self.assertTrue(result["fieldStateMatrix"]["fullName"]["focused"])
         self.assertEqual(result["fieldStateMatrix"]["fullName"]["invalidError"], "Họ và tên là bắt buộc.")
-        self.assertEqual(result["mutation"], {"saveActivated": False, "backendChanged": False})
+        self.assertEqual(result["mutation"], {"saveControlTappedWhileDisabled": True, "validSaveActivated": False, "backendChanged": False})
         self.assertNotIn("Lưu", [arg for call in shell.call_args_list for arg in call.args])
 
     def test_retries_adb_failure_and_preserves_the_last_failure(self):

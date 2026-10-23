@@ -29,7 +29,7 @@ test("two product emulator attempts retain a complete immutable Field-state matr
   assert.match(smoke, /edit_profile_matrix/);
   assert.match(smoke, /Full name focus state/);
   assert.match(smoke, /Họ và tên là bắt buộc\./);
-  assert.match(smoke, /saveActivated": False/);
+  assert.match(smoke, /validSaveActivated": False/);
   assert.match(workflow, /GLI178_EXPECTED_COMMIT="\$\(git rev-parse HEAD\)" python3 scripts\/gli178\/product_smoke\.py/);
   assert.match(workflow, /android-product-smoke\/provenance\.json/);
   assert.match(testWorkflow, /python3 -m unittest scripts\.gli178\.test_product_smoke/);

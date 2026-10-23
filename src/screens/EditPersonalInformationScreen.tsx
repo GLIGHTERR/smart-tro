@@ -86,7 +86,7 @@ export function EditPersonalInformationScreen({ profile = fixture, onExit, onSes
     } finally { saveInFlight.current = false; setSaving(false); }
   };
   return <SafeAreaView edges={["top", "left", "right", "bottom"]} style={styles.safe}>
-    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={styles.flex}>
+    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : Platform.OS === "android" ? "height" : undefined} style={styles.flex}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <View style={styles.header}><Text accessibilityRole="header" style={styles.title}>Cập nhật thông tin cá nhân</Text></View>
         <Text style={styles.intro}>Kiểm tra và cập nhật thông tin liên hệ của bạn.</Text>

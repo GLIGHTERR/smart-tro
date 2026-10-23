@@ -1,5 +1,5 @@
 import React from "react";
-import { Pressable, Text, TextInput } from "react-native";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput } from "react-native";
 import TestRenderer, { act, type ReactTestInstance } from "react-test-renderer";
 
 import { EditPersonalInformationScreen } from "../EditPersonalInformationScreen";
@@ -14,6 +14,19 @@ const gateway = (update = jest.fn().mockResolvedValue({ profile: { displayName: 
 describe("EditPersonalInformationScreen", () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(() => jest.useRealTimers());
+
+  it("resizes and scrolls the Android edit form above the visible keyboard when the required error appears", () => {
+    const platform = jest.replaceProperty(Platform, "OS", "android");
+    const scrollTo = jest.spyOn(ScrollView.prototype, "scrollTo");
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<EditPersonalInformationScreen onExit={jest.fn()} onSaved={jest.fn()} onSessionError={jest.fn()} />); });
+    expect(renderer.root.findByType(KeyboardAvoidingView).props.behavior).toBe("height");
+    expect(renderer.root.findByType(KeyboardAvoidingView).findByProps({ keyboardShouldPersistTaps: "handled" })).toBeTruthy();
+    act(() => renderer.root.findAllByType(TextInput)[0]!.props.onChangeText(" "));
+    expect(scrollTo).toHaveBeenCalledWith({ animated: false, y: 48 });
+    scrollTo.mockRestore();
+    platform.restore();
+  });
 
   it("renders the approved fields and keeps save disabled while clean or invalid", () => {
     let renderer!: TestRenderer.ReactTestRenderer;

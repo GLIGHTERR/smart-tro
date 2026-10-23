@@ -12,6 +12,7 @@ ACTIVITY = f"{PACKAGE}/.MainActivity"
 OUT = Path(os.environ.get("GLI178_EVIDENCE_DIR", "android-product-smoke"))
 PILOT_MARKERS = ("G1 UI pilot", "pilot_", "QA preview only", "EXPO_PUBLIC_UI_PILOT=true")
 FIXTURE = "authorized offline review fixture; Save is tapped only while disabled"
+MIN_READABLE_TEXT_HEIGHT = 16
 
 
 def adb(*args, check=True):
@@ -91,6 +92,12 @@ def assert_below(upper, lower, description):
     _, lower_top, _, _ = bounds(lower)
     if upper_bottom > lower_top:
         raise AssertionError(f"Overlapping or reversed Field layout for {description}: {upper.get('bounds')} then {lower.get('bounds')}")
+
+
+def assert_readable_text(item, description):
+    _, top, _, bottom = bounds(item)
+    if bottom - top < MIN_READABLE_TEXT_HEIGHT:
+        raise AssertionError(f"Clipped Field text for {description}: {item.get('bounds')} is below {MIN_READABLE_TEXT_HEIGHT}px")
 
 
 def assert_field_layout(xml, label, input_label, detail=None, editable=True):
@@ -202,6 +209,7 @@ def run():
     invalid = hierarchy()
     assert_product(invalid)
     assert_field_layout(invalid, "Họ và tên", "Họ và tên", "Họ và tên là bắt buộc.")
+    assert_readable_text(node(invalid, "Họ và tên là bắt buộc."), "Full name required error")
     tap(node(invalid, "Lưu"))
     time.sleep(0.4)
     after_invalid_save = hierarchy()

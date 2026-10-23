@@ -58,6 +58,31 @@ test("direct cancel discard leaves dirty UC-05 for Account without a profile PAT
   await expect(page.getByRole("heading", { name: "Tài khoản" })).toBeVisible();
 });
 
+test("UC-05 keeps profile labels, controls, and helper text vertically separated", async ({ page }) => {
+  await openAccount(page, "one", { width: 375, height: 812 });
+  await page.getByRole("button", { name: "Chỉnh sửa thông tin cá nhân" }).click();
+  const name = page.getByRole("textbox", { name: "Họ và tên" });
+  const phone = page.getByRole("textbox", { name: "Số điện thoại" });
+  const email = page.getByLabel("Email chỉ đọc");
+  const nameLabel = page.getByText("Họ và tên *", { exact: true });
+  const phoneLabel = page.getByText("Số điện thoại", { exact: true });
+  const helper = page.getByText("Không bắt buộc. Ví dụ: 0901234567", { exact: true });
+  await expect(name).toBeVisible();
+  await expect(phone).toBeVisible();
+  await expect(email).toBeVisible();
+  await name.focus();
+  await expect(name).toBeFocused();
+  await name.fill("");
+  await expect(page.getByText("Họ và tên là bắt buộc.")).toBeVisible();
+
+  const [nameLabelBox, nameBox, phoneLabelBox, phoneBox, helperBox, emailBox] = await Promise.all([nameLabel.boundingBox(), name.boundingBox(), phoneLabel.boundingBox(), phone.boundingBox(), helper.boundingBox(), email.boundingBox()]);
+  for (const box of [nameLabelBox, nameBox, phoneLabelBox, phoneBox, helperBox, emailBox]) expect(box).not.toBeNull();
+  expect(nameLabelBox!.y + nameLabelBox!.height).toBeLessThanOrEqual(nameBox!.y);
+  expect(phoneLabelBox!.y + phoneLabelBox!.height).toBeLessThanOrEqual(phoneBox!.y);
+  expect(phoneBox!.y + phoneBox!.height).toBeLessThanOrEqual(helperBox!.y);
+  expect(helperBox!.y + helperBox!.height).toBeLessThanOrEqual(emailBox!.y);
+});
+
 test("Personal and Signature tabs switch without a Home action", async ({ page }) => {
   await openAccount(page, "one", { width: 375, height: 812 });
   await page.getByRole("tab", { name: "Chữ ký" }).click();

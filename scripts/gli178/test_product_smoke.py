@@ -19,7 +19,7 @@ EDIT_PROFILE_XML = """<hierarchy>
   <node text="Email" bounds="[10,220][200,240]" />
   <node content-desc="Email chỉ đọc" class="android.widget.TextView" bounds="[10,250][300,300]" />
   <node text="Email không thể chỉnh sửa." bounds="[10,310][300,330]" />
-  <node content-desc="Lưu — bị vô hiệu" text="Lưu" enabled="true" bounds="[10,340][300,390]" />
+  <node content-desc="Trạng thái Lưu: bị vô hiệu" text="Lưu" enabled="true" bounds="[10,340][300,390]" />
 </hierarchy>"""
 
 HOME_XML = """<hierarchy><node text="Xin chào" bounds="[0,0][1,1]" /><node text="Tài khoản: UC-04 — Tài khoản/Cá nhân" bounds="[0,2][1,3]" /></hierarchy>"""
@@ -76,7 +76,7 @@ class FieldMatrixTests(unittest.TestCase):
             with self.assertRaisesRegex(AssertionError, "Expected com.smartplatform.smarttro foreground"):
                 product_smoke.assert_product(EDIT_PROFILE_XML)
         with self.assertRaisesRegex(LookupError, "Product UI node not found"):
-            product_smoke.assert_save_disabled(EDIT_PROFILE_XML.replace("Lưu — bị vô hiệu", "Lưu — có thể lưu"))
+            product_smoke.assert_save_disabled(EDIT_PROFILE_XML.replace("Trạng thái Lưu: bị vô hiệu", "Trạng thái Lưu: có thể lưu"))
 
     def test_clear_input_uses_delete_keys_without_saving(self):
         item = product_smoke.input_node(EDIT_PROFILE_XML, "Họ và tên")

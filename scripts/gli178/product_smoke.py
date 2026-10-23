@@ -147,7 +147,7 @@ def assert_product(xml):
 def assert_save_disabled(xml):
     # Ant's visible Text child does not expose its parent's disabled state in Android XML.
     # The control's state-accurate accessibility label remains visible to native automation.
-    node(xml, "Lưu — bị vô hiệu")
+    node(xml, "Trạng thái Lưu: bị vô hiệu")
 
 
 def edit_profile_matrix(xml):
@@ -179,8 +179,8 @@ def run():
     wait_for(lambda: "Cập nhật thông tin cá nhân" in hierarchy(), "Edit Profile entry")
     edit = hierarchy()
     assert_product(edit)
-    matrix = edit_profile_matrix(edit)
     capture("03-edit-profile-normal-disabled", edit)
+    matrix = edit_profile_matrix(edit)
 
     name_input = input_node(edit, "Họ và tên")
     tap(name_input)

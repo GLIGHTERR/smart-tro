@@ -36,7 +36,7 @@ describe("production UI contracts", () => {
     expect(input.props).toMatchObject({ accessibilityHint: "Help", accessibilityLabel: "Phone", disabled: true, error: true, keyboardType: "phone-pad", maxLength: 10, value: "0901" });
     act(() => input.props.onChangeText("0902"));
     expect(onChangeText).toHaveBeenCalledWith("0902");
-    expect(renderer.root.findByProps({ accessibilityLiveRegion: "polite" }).props.children).toBe("Invalid");
+    expect(renderer.root.findByProps({ accessibilityLiveRegion: "polite" }).props).toMatchObject({ accessibilityRole: "alert", children: "Invalid", style: expect.objectContaining({ includeFontPadding: true, lineHeight: 19, minHeight: 19 }) });
     act(() => { renderer.update(<Field label="Name" onChangeText={onChangeText} value="Mai" />); });
     expect(renderer.root.findByType(TextInput).props.disabled).toBe(false);
     expect(renderer.root.findAllByType(Text).map((node) => node.props.children)).toEqual([["Name", ""]]);

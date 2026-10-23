@@ -56,6 +56,11 @@ class FieldMatrixTests(unittest.TestCase):
         with self.assertRaisesRegex(AssertionError, "Overlapping or reversed"):
             product_smoke.assert_field_layout(overlapping, "Họ và tên", "Họ và tên")
 
+    def test_field_layout_rejects_a_clipped_error_while_the_keyboard_is_visible(self):
+        clipped = EDIT_PROFILE_XML.replace('  <node text="Số điện thoại"', '  <node text="Họ và tên là bắt buộc." bounds="[10,91][300,94]" />\n  <node text="Số điện thoại"')
+        with self.assertRaisesRegex(AssertionError, "Clipped Field text"):
+            product_smoke.assert_field_layout(clipped, "Họ và tên", "Họ và tên", "Họ và tên là bắt buộc.")
+
     def test_field_layout_accepts_the_existing_required_marker(self):
         required = EDIT_PROFILE_XML.replace('text="Họ và tên" bounds="[10,10][200,30]"', 'text="Họ và tên *" bounds="[10,10][200,30]"')
         self.assertTrue(product_smoke.assert_field_layout(required, "Họ và tên", "Họ và tên")["vertical"])
@@ -112,7 +117,7 @@ class ProvenanceTests(unittest.TestCase):
 
     def test_run_captures_normal_focus_and_error_evidence_without_activating_save(self):
         focused = EDIT_PROFILE_XML.replace('focused="false"', 'focused="true"')
-        invalid = EDIT_PROFILE_XML.replace('  <node text="Số điện thoại"', '  <node text="Họ và tên là bắt buộc." bounds="[10,91][300,99]" />\n  <node text="Số điện thoại"')
+        invalid = EDIT_PROFILE_XML.replace('  <node text="Số điện thoại"', '  <node text="Họ và tên là bắt buộc." bounds="[10,91][300,110]" />\n  <node text="Số điện thoại"')
         dumps = [HOME_XML, HOME_XML, ACCOUNT_XML, ACCOUNT_XML, EDIT_PROFILE_XML, EDIT_PROFILE_XML, EDIT_PROFILE_XML, focused, focused, invalid, invalid, invalid]
         png = subprocess.CompletedProcess(["adb"], 0, stdout=b"png", stderr=b"")
         with tempfile.TemporaryDirectory() as directory, patch.object(product_smoke, "OUT", product_smoke.Path(directory)), patch.object(product_smoke, "assert_product_provenance", return_value={"commit": "a" * 40, "package": product_smoke.PACKAGE, "pilot": False}), patch.object(product_smoke, "foreground", return_value={"package": product_smoke.PACKAGE, "activity": ".MainActivity"}), patch.object(product_smoke, "hierarchy", side_effect=dumps), patch.object(product_smoke, "adb", return_value=png), patch.object(product_smoke, "shell") as shell:

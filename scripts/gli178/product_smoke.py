@@ -12,6 +12,7 @@ ACTIVITY = f"{PACKAGE}/.MainActivity"
 OUT = Path(os.environ.get("GLI178_EVIDENCE_DIR", "android-product-smoke"))
 PILOT_MARKERS = ("G1 UI pilot", "pilot_", "QA preview only", "EXPO_PUBLIC_UI_PILOT=true")
 FIXTURE = "authorized offline review fixture; Save is tapped only while disabled"
+MIN_READABLE_TEXT_HEIGHT = 16
 
 
 def adb(*args, check=True):
@@ -93,6 +94,12 @@ def assert_below(upper, lower, description):
         raise AssertionError(f"Overlapping or reversed Field layout for {description}: {upper.get('bounds')} then {lower.get('bounds')}")
 
 
+def assert_readable_text(item, description):
+    _, top, _, bottom = bounds(item)
+    if bottom - top < MIN_READABLE_TEXT_HEIGHT:
+        raise AssertionError(f"Clipped Field text for {description}: {item.get('bounds')} is below {MIN_READABLE_TEXT_HEIGHT}px")
+
+
 def assert_field_layout(xml, label, input_label, detail=None, editable=True):
     label_node = next((item for item in ET.fromstring(xml).iter("node") if (item.get("text") or "") in (label, f"{label} *")), None)
     if label_node is None:
@@ -102,6 +109,7 @@ def assert_field_layout(xml, label, input_label, detail=None, editable=True):
     if detail:
         detail_node = node(xml, detail)
         assert_below(control, detail_node, f"{label} input/helper")
+        assert_readable_text(detail_node, f"{label} helper/error")
     return {"label": label, "input": input_label, "detail": detail, "vertical": True}
 
 

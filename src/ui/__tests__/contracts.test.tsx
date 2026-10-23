@@ -1,5 +1,5 @@
 import React from "react";
-import { Platform, Pressable, TextInput, View } from "react-native";
+import { Platform, Pressable, Text, TextInput, View } from "react-native";
 import TestRenderer, { act } from "react-test-renderer";
 
 import { Button, Dialog, Field, ScreenState, UiProvider, smartTroAntTheme } from "../contracts";
@@ -27,16 +27,19 @@ describe("production UI contracts", () => {
     for (const control of renderer.root.findAllByType(Pressable)) expect(control.props.accessibilityState).toEqual({ disabled: true });
   });
 
-  it("maps controlled fields, validation, optional copy, and disabled state through InputItem", () => {
+  it("renders every Field as a vertical label, input, helper/error contract", () => {
     const onChangeText = jest.fn(); let renderer!: TestRenderer.ReactTestRenderer;
     act(() => { renderer = TestRenderer.create(<Field disabled error="Invalid" hint="Help" label="Phone" maxLength={10} onChangeText={onChangeText} required value="0901" keyboardType="phone-pad" />); });
     const input = renderer.root.findByType(TextInput);
-    expect(input.props).toMatchObject({ accessibilityLabel: "Phone", disabled: true, error: true, keyboardType: "phone-pad", maxLength: 10, value: "0901" });
+    expect(input.parent?.parent?.parent?.props.children).toBeUndefined();
+    expect(renderer.root.findAllByType(Text).map((node) => node.props.children)).toEqual([["Phone", " *"], "Help", "Invalid"]);
+    expect(input.props).toMatchObject({ accessibilityHint: "Help", accessibilityLabel: "Phone", disabled: true, error: true, keyboardType: "phone-pad", maxLength: 10, value: "0901" });
     act(() => input.props.onChangeText("0902"));
     expect(onChangeText).toHaveBeenCalledWith("0902");
     expect(renderer.root.findByProps({ accessibilityLiveRegion: "polite" }).props.children).toBe("Invalid");
     act(() => { renderer.update(<Field label="Name" onChangeText={onChangeText} value="Mai" />); });
     expect(renderer.root.findByType(TextInput).props.disabled).toBe(false);
+    expect(renderer.root.findAllByType(Text).map((node) => node.props.children)).toEqual([["Name", ""]]);
   });
 
   it("maps dialogs and all screen states through public contracts", () => {

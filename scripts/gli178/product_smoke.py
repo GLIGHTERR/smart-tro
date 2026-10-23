@@ -94,7 +94,7 @@ def assert_below(upper, lower, description):
 
 
 def assert_field_layout(xml, label, input_label, detail=None, editable=True):
-    label_node = next((item for item in nodes(xml, label) if item.get("text") == label), None)
+    label_node = next((item for item in ET.fromstring(xml).iter("node") if (item.get("text") or "") in (label, f"{label} *")), None)
     if label_node is None:
         raise LookupError(f"Product Field label not found: {label}")
     control = input_node(xml, input_label, editable=editable)

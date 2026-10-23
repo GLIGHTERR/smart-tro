@@ -56,6 +56,10 @@ class FieldMatrixTests(unittest.TestCase):
         with self.assertRaisesRegex(AssertionError, "Overlapping or reversed"):
             product_smoke.assert_field_layout(overlapping, "Họ và tên", "Họ và tên")
 
+    def test_field_layout_accepts_the_existing_required_marker(self):
+        required = EDIT_PROFILE_XML.replace('text="Họ và tên" bounds="[10,10][200,30]"', 'text="Họ và tên *" bounds="[10,10][200,30]"')
+        self.assertTrue(product_smoke.assert_field_layout(required, "Họ và tên", "Họ và tên")["vertical"])
+
     def test_missing_matrix_state_fails_clearly(self):
         missing_helper = EDIT_PROFILE_XML.replace('  <node text="Không bắt buộc. Ví dụ: 0901234567" bounds="[10,190][300,210]" />\n', "")
         with self.assertRaisesRegex(LookupError, "Product UI node not found"):

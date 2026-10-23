@@ -21,12 +21,6 @@ describe("production UI contracts", () => {
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
-  it("preserves a native test hook when evidence needs the rendered control state", () => {
-    let renderer!: TestRenderer.ReactTestRenderer;
-    act(() => { renderer = TestRenderer.create(<Button label="Save" onPress={jest.fn()} testID="profile-save-disabled" />); });
-    expect(renderer.root.findByType(Pressable).props.testID).toBe("profile-save-disabled");
-  });
-
   it("blocks disabled and loading controls without changing their accessibility state", () => {
     let renderer!: TestRenderer.ReactTestRenderer;
     act(() => { renderer = TestRenderer.create(<><Button disabled label="Disabled" onPress={jest.fn()} /><Button label="Loading" loading onPress={jest.fn()} /></>); });

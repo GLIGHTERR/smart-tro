@@ -19,7 +19,7 @@ EDIT_PROFILE_XML = """<hierarchy>
   <node text="Email" bounds="[10,220][200,240]" />
   <node content-desc="Email chỉ đọc" class="android.widget.TextView" bounds="[10,250][300,300]" />
   <node text="Email không thể chỉnh sửa." bounds="[10,310][300,330]" />
-  <node resource-id="com.smartplatform.smarttro:id/profile-save-disabled" text="Lưu" enabled="true" bounds="[10,340][300,390]" />
+  <node content-desc="Lưu — bị vô hiệu" text="Lưu" enabled="true" bounds="[10,340][300,390]" />
 </hierarchy>"""
 
 HOME_XML = """<hierarchy><node text="Xin chào" bounds="[0,0][1,1]" /><node text="Tài khoản: UC-04 — Tài khoản/Cá nhân" bounds="[0,2][1,3]" /></hierarchy>"""
@@ -69,14 +69,14 @@ class FieldMatrixTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Invalid UI bounds"):
             product_smoke.bounds(ET.fromstring('<node bounds="bad" />'))
 
-    def test_product_and_disabled_guards_reject_pilot_wrong_foreground_and_missing_save_hook(self):
+    def test_product_and_disabled_guards_reject_pilot_wrong_foreground_and_missing_save_accessibility_state(self):
         with self.assertRaisesRegex(AssertionError, "Pilot identifier"):
             product_smoke.assert_product("G1 UI pilot")
         with patch.object(product_smoke, "foreground", return_value={"package": "wrong", "activity": None}):
             with self.assertRaisesRegex(AssertionError, "Expected com.smartplatform.smarttro foreground"):
                 product_smoke.assert_product(EDIT_PROFILE_XML)
-        with self.assertRaisesRegex(LookupError, "Product test hook not found"):
-            product_smoke.assert_save_disabled(EDIT_PROFILE_XML.replace("profile-save-disabled", "profile-save-enabled"))
+        with self.assertRaisesRegex(LookupError, "Product UI node not found"):
+            product_smoke.assert_save_disabled(EDIT_PROFILE_XML.replace("Lưu — bị vô hiệu", "Lưu — có thể lưu"))
 
     def test_clear_input_uses_delete_keys_without_saving(self):
         item = product_smoke.input_node(EDIT_PROFILE_XML, "Họ và tên")

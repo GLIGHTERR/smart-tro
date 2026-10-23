@@ -8,10 +8,10 @@ export const smartTroAntTheme = Object.freeze({ brand_primary: colors.action, br
 
 export function UiProvider({ children }: { children: React.ReactNode }) { return <Provider theme={smartTroAntTheme}>{children}</Provider>; }
 
-export type ButtonProps = { label: string; onPress: () => void; disabled?: boolean; loading?: boolean; tone?: "primary" | "secondary" | "danger"; accessibilityLabel?: string; testID?: string };
-export function Button({ label, onPress, disabled = false, loading = false, tone = "primary", accessibilityLabel, testID }: ButtonProps) {
+export type ButtonProps = { label: string; onPress: () => void; disabled?: boolean; loading?: boolean; tone?: "primary" | "secondary" | "danger"; accessibilityLabel?: string };
+export function Button({ label, onPress, disabled = false, loading = false, tone = "primary", accessibilityLabel }: ButtonProps) {
   const blocked = disabled || loading;
-  return <AntButton accessibilityLabel={accessibilityLabel} activeStyle={styles.pressed} disabled={blocked} loading={loading} onPress={onPress} style={styles.button} testID={testID} type={tone === "secondary" ? "ghost" : tone === "danger" ? "warning" : "primary"}>{label}</AntButton>;
+  return <AntButton accessibilityLabel={accessibilityLabel} activeStyle={styles.pressed} disabled={blocked} loading={loading} onPress={onPress} style={styles.button} type={tone === "secondary" ? "ghost" : tone === "danger" ? "warning" : "primary"}>{label}</AntButton>;
 }
 
 export type FieldProps = Pick<TextInputProps, "autoCapitalize" | "keyboardType" | "maxLength"> & { label: string; value: string; onChangeText: (value: string) => void; error?: string; hint?: string; required?: boolean; disabled?: boolean };

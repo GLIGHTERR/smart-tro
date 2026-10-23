@@ -69,14 +69,6 @@ def nodes(xml, value):
     return [item for item in root.iter("node") if value in (item.get("text"), item.get("content-desc"))]
 
 
-def test_hook(xml, value):
-    root = ET.fromstring(xml)
-    matches = [item for item in root.iter("node") if (item.get("resource-id") or "").endswith(f"/{value}") or item.get("content-desc") == value]
-    if not matches:
-        raise LookupError(f"Product test hook not found: {value}")
-    return matches[0]
-
-
 def input_node(xml, label, editable=True):
     """Find a Field control by its accessibility label, optionally requiring editable input."""
     matches = nodes(xml, label)
@@ -154,8 +146,8 @@ def assert_product(xml):
 
 def assert_save_disabled(xml):
     # Ant's visible Text child does not expose its parent's disabled state in Android XML.
-    # This test-only hook reflects the same `canSave` state passed to the native control.
-    test_hook(xml, "profile-save-disabled")
+    # The control's state-accurate accessibility label remains visible to native automation.
+    node(xml, "Lưu — bị vô hiệu")
 
 
 def edit_profile_matrix(xml):

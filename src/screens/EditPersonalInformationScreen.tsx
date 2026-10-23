@@ -95,7 +95,7 @@ export function EditPersonalInformationScreen({ profile = fixture, onExit, onSes
         <View style={styles.field}><Text style={styles.label}>Email</Text><Text accessibilityLabel="Email chỉ đọc" style={styles.readonly}>{maskEmail(profile.email)}</Text><Text style={styles.hint}>Email không thể chỉnh sửa.</Text></View>
         {notice?.kind === "error" ? <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={[styles.notice, styles.errorNotice]}>{notice.message}</Text> : null}
       </ScrollView>
-      <View style={styles.actions}><Button accessibilityLabel="Hủy chỉnh sửa" disabled={saving} label="Hủy" onPress={requestExit} tone="secondary" /><Button accessibilityLabel="Lưu" disabled={!canSave} label="Lưu" loading={saving} onPress={save} testID={canSave ? "profile-save-enabled" : "profile-save-disabled"} /></View>
+      <View style={styles.actions}><Button accessibilityLabel="Hủy chỉnh sửa" disabled={saving} label="Hủy" onPress={requestExit} tone="secondary" /><Button accessibilityLabel={canSave ? "Lưu — có thể lưu" : "Lưu — bị vô hiệu"} disabled={!canSave} label="Lưu" loading={saving} onPress={save} /></View>
     </KeyboardAvoidingView>
     {dialog ? <Dialog visible title="Hủy thay đổi?" message="Các thay đổi chưa lưu sẽ bị mất. Bạn có chắc muốn rời khỏi màn hình này?" onDismiss={stay}><Button label="Tiếp tục chỉnh sửa" onPress={stay} tone="secondary" /><Button label="Bỏ thay đổi" onPress={discard} tone="danger" /></Dialog> : null}
   </SafeAreaView>;

@@ -21,6 +21,7 @@ export function EditPersonalInformationScreen({ profile = fixture, onExit, onSes
   const [dialog, setDialog] = useState(false);
   const [notice, setNotice] = useState<{ kind: "success" | "error"; message: string } | null>(null);
   const stayRef = useRef<View>(null);
+  const formRef = useRef<ScrollView>(null);
   const validation = useMemo(() => validateEditableProfile(name, phone), [name, phone]);
   const dirty = isDirty(profile, name, phone);
   const valid = !validation.nameError && !validation.phoneError;
@@ -32,6 +33,9 @@ export function EditPersonalInformationScreen({ profile = fixture, onExit, onSes
   const saveInFlight = useRef(false);
   const profileGateway = useMemo(() => gateway ?? createConfiguredProfileGateway(), [gateway]);
   useEffect(() => { dirtyRef.current = dirty; savingRef.current = saving; }, [dirty, saving]);
+  useEffect(() => {
+    if (Platform.OS === "android" && validation.nameError) formRef.current?.scrollTo({ animated: false, y: 48 });
+  }, [validation.nameError]);
   useEffect(() => {
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
       if (savingRef.current) return true;
@@ -87,7 +91,7 @@ export function EditPersonalInformationScreen({ profile = fixture, onExit, onSes
   };
   return <SafeAreaView edges={["top", "left", "right", "bottom"]} style={styles.safe}>
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : Platform.OS === "android" ? "height" : undefined} style={styles.flex}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" ref={formRef}>
         <View style={styles.header}><Text accessibilityRole="header" style={styles.title}>Cập nhật thông tin cá nhân</Text></View>
         <Text style={styles.intro}>Kiểm tra và cập nhật thông tin liên hệ của bạn.</Text>
         <Field label="Họ và tên" value={name} onChangeText={setName} error={validation.nameError} required autoCapitalize="words" maxLength={240} disabled={saving} />

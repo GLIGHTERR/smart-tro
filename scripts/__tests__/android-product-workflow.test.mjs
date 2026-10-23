@@ -16,7 +16,7 @@ test("product fallback is isolated, exact-SHA pinned, and explicitly non-pilot",
   assert.doesNotMatch(workflow, /android-pilot|smart-tro-pilot/);
 });
 
-test("two product emulator attempts retain evidence and reject pilot UI", () => {
+test("two product emulator attempts retain a complete immutable Field-state matrix", () => {
   assert.match(workflow, /attempt: \[1, 2\]/);
   assert.match(workflow, /scripts\/gli178\/product_smoke\.py/);
   assert.match(workflow, /smart-tro-product-android-evidence/);
@@ -25,5 +25,12 @@ test("two product emulator attempts retain evidence and reject pilot UI", () => 
   assert.match(smoke, /Chỉnh sửa thông tin cá nhân/);
   assert.match(smoke, /def hierarchy\(retries=2\)/);
   assert.match(smoke, /except \(ET\.ParseError, subprocess\.CalledProcessError\)/);
+  assert.match(smoke, /assert_product_provenance/);
+  assert.match(smoke, /edit_profile_matrix/);
+  assert.match(smoke, /Full name focus state/);
+  assert.match(smoke, /Họ và tên là bắt buộc\./);
+  assert.match(smoke, /saveActivated": False/);
+  assert.match(workflow, /GLI178_EXPECTED_COMMIT/);
+  assert.match(workflow, /android-product-smoke\/provenance\.json/);
   assert.match(testWorkflow, /python3 -m unittest scripts\.gli178\.test_product_smoke/);
 });

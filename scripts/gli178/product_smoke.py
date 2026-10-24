@@ -13,6 +13,7 @@ OUT = Path(os.environ.get("GLI178_EVIDENCE_DIR", "android-product-smoke"))
 PILOT_MARKERS = ("G1 UI pilot", "pilot_", "QA preview only", "EXPO_PUBLIC_UI_PILOT=true")
 FIXTURE = "authorized offline review fixture; Save is tapped only while disabled"
 MIN_READABLE_TEXT_HEIGHT = 16
+FAILED_SAVE_NOTICES = ("Chưa thể lưu thay đổi. Vui lòng thử lại.", "Không thể lưu thay đổi")
 
 
 def adb(*args, check=True):
@@ -152,8 +153,13 @@ def assert_product(xml):
 
 
 def assert_disabled_save_attempt(before, after):
-    """Prove the visible Save control cannot leave or mutate the clean/invalid fixture."""
+    """Prove the accessible Save is disabled and its tap leaves the fixture untouched."""
     node(after, "Cập nhật thông tin cá nhân")
+    for xml, stage in ((before, "before"), (after, "after")):
+        if node(xml, "Lưu").get("enabled") != "false":
+            raise AssertionError(f"Save must be enabled=false {stage} a disabled-save tap")
+    if any(notice in after for notice in FAILED_SAVE_NOTICES):
+        raise AssertionError("Disabled Save displayed a failed-save notice")
     if input_node(before, "Họ và tên").get("text") != input_node(after, "Họ và tên").get("text"):
         raise AssertionError("Disabled Save changed the Full name fixture")
 
@@ -193,8 +199,8 @@ def run():
     after_disabled_save = hierarchy()
     assert_product(after_disabled_save)
     assert_disabled_save_attempt(edit, after_disabled_save)
-    matrix["saveDisabledBeforeMutation"] = True
     capture("03a-edit-profile-save-disabled", after_disabled_save)
+    matrix["saveDisabledBeforeMutation"] = True
 
     name_input = input_node(after_disabled_save, "Họ và tên")
     tap(name_input)
@@ -216,8 +222,8 @@ def run():
     assert_product(after_invalid_save)
     assert_disabled_save_attempt(invalid, after_invalid_save)
     matrix["fullName"]["invalidError"] = "Họ và tên là bắt buộc."
+    capture("05-edit-profile-full-name-error", after_invalid_save)
     matrix["saveDisabledAfterInvalidValue"] = True
-    capture("05-edit-profile-full-name-error", invalid)
 
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "result.json").write_text(json.dumps({
@@ -227,5 +233,5 @@ def run():
     }, indent=2), encoding="utf-8")
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover - process entry point; run() is unit-covered.
     run()

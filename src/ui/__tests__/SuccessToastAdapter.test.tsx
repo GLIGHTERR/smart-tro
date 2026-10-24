@@ -1,15 +1,22 @@
 import React from "react";
 import { Text } from "react-native";
 import TestRenderer, { act } from "react-test-renderer";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { SUCCESS_TOAST_DURATION_MS, SuccessToastAdapter } from "../SuccessToastAdapter";
+import { getResponsiveToastDimensions, SUCCESS_TOAST_DURATION_MS, SuccessToastAdapter } from "../SuccessToastAdapter";
 
 jest.mock("@ant-design/react-native", () => ({ Toast: { show: jest.fn(() => 42), remove: jest.fn() } }));
+jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: jest.fn() }));
 
 const toast = jest.requireMock("@ant-design/react-native").Toast;
+const mockSafeAreaInsets = useSafeAreaInsets as jest.Mock;
 
 describe("SuccessToastAdapter", () => {
-  beforeEach(() => { jest.useFakeTimers(); jest.clearAllMocks(); });
+  beforeEach(() => {
+    jest.useFakeTimers();
+    jest.clearAllMocks();
+    mockSafeAreaInsets.mockReturnValue({ bottom: 0, left: 0, right: 0, top: 0 });
+  });
   afterEach(() => jest.useRealTimers());
 
   it("consumes each event once, announces politely, and expires after the UC-05 duration", () => {
@@ -44,5 +51,24 @@ describe("SuccessToastAdapter", () => {
     act(() => { renderer.update(<SuccessToastAdapter event={second} onConsume={onConsume} />); });
     expect(onConsume).toHaveBeenLastCalledWith(second.id);
     expect(toast.show).toHaveBeenCalledTimes(2);
+  });
+
+  it("uses a readable, safe-area-aware width for narrow and typical Web or Android viewports", () => {
+    const event = { id: "profile-save-1", message: "Đã cập nhật thông tin cá nhân." };
+    const onConsume = jest.fn();
+    let renderer!: TestRenderer.ReactTestRenderer;
+
+    act(() => { renderer = TestRenderer.create(<SuccessToastAdapter event={event} onConsume={onConsume} />); });
+    let content!: TestRenderer.ReactTestRenderer;
+    act(() => { content = TestRenderer.create(toast.show.mock.calls[0][0].content); });
+    expect(content.root.findByType(Text).props.children).toBe(event.message);
+    expect(getResponsiveToastDimensions(320, { left: 12, right: 12 })).toEqual({ minWidth: 256, width: 256 });
+    act(() => { content.unmount(); renderer.unmount(); });
+
+    act(() => { renderer = TestRenderer.create(<SuccessToastAdapter event={{ ...event, id: "profile-save-2", message: "Một thông báo thành công dài vẫn được xuống dòng dễ đọc trên mọi kích thước màn hình." }} onConsume={onConsume} />); });
+    act(() => { content = TestRenderer.create(toast.show.mock.calls[1][0].content); });
+    expect(content.root.findByType(Text).props.children).toContain("dễ đọc");
+    expect(getResponsiveToastDimensions(768, { left: 24, right: 24 })).toEqual({ minWidth: 280, width: 480 });
+    act(() => { content.unmount(); renderer.unmount(); });
   });
 });

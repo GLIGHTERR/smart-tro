@@ -87,7 +87,7 @@ class FieldMatrixTests(unittest.TestCase):
     def test_field_layout_rejects_a_clipped_error_while_the_keyboard_is_visible(self):
         clipped = EDIT_PROFILE_XML.replace('  <node text="Số điện thoại"', '  <node text="Họ và tên là bắt buộc." bounds="[10,91][300,94]" />\n  <node text="Số điện thoại"')
         with self.assertRaisesRegex(AssertionError, "Clipped Field text"):
-            product_smoke.assert_readable_text(product_smoke.node(clipped, "Họ và tên là bắt buộc."), "Full name required error")
+            product_smoke.assert_field_layout(clipped, "Họ và tên", "Họ và tên", "Họ và tên là bắt buộc.", require_readable_detail=True)
 
     def test_field_layout_accepts_the_existing_required_marker(self):
         required = EDIT_PROFILE_XML.replace('text="Họ và tên" bounds="[10,10][200,30]"', 'text="Họ và tên *" bounds="[10,10][200,30]"')
@@ -168,6 +168,19 @@ class ProvenanceTests(unittest.TestCase):
         self.assertEqual(result["fieldStateMatrix"]["fullName"]["invalidError"], "Họ và tên là bắt buộc.")
         self.assertEqual(result["mutation"], {"saveControlTappedWhileDisabled": True, "validSaveActivated": False, "backendChanged": False})
         self.assertNotIn("Lưu", [arg for call in shell.call_args_list for arg in call.args])
+
+    def test_run_writes_a_failed_result_for_a_three_pixel_required_error(self):
+        focused = EDIT_PROFILE_XML.replace('focused="false"', 'focused="true"')
+        clipped = EDIT_PROFILE_XML.replace('  <node text="Số điện thoại"', '  <node text="Họ và tên là bắt buộc." bounds="[10,91][300,94]" />\n  <node text="Số điện thoại"')
+        dumps = [HOME_XML, HOME_XML, ACCOUNT_XML, ACCOUNT_XML, EDIT_PROFILE_XML, EDIT_PROFILE_XML, EDIT_PROFILE_XML, focused, focused, clipped, clipped]
+        png = subprocess.CompletedProcess(["adb"], 0, stdout=b"png", stderr=b"")
+        with tempfile.TemporaryDirectory() as directory, patch.object(product_smoke, "OUT", product_smoke.Path(directory)), patch.object(product_smoke, "assert_product_provenance", return_value={"commit": "a" * 40, "package": product_smoke.PACKAGE, "pilot": False}), patch.object(product_smoke, "foreground", return_value={"package": product_smoke.PACKAGE, "activity": ".MainActivity"}), patch.object(product_smoke, "hierarchy", side_effect=dumps), patch.object(product_smoke, "adb", return_value=png), patch.object(product_smoke, "shell"):
+            with self.assertRaisesRegex(AssertionError, "Clipped Field text"):
+                product_smoke.run()
+            result = json.loads((product_smoke.Path(directory) / "result.json").read_text(encoding="utf-8"))
+        self.assertEqual(result["status"], "FAIL")
+        self.assertIn("[10,91][300,94]", result["error"])
+        self.assertEqual(result["mutation"]["validSaveActivated"], False)
 
     def test_retries_adb_failure_and_preserves_the_last_failure(self):
         failed = subprocess.CalledProcessError(1, ["adb"])

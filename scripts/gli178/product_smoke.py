@@ -101,7 +101,7 @@ def assert_readable_text(item, description):
         raise AssertionError(f"Clipped Field text for {description}: {item.get('bounds')} is below {MIN_READABLE_TEXT_HEIGHT}px")
 
 
-def assert_field_layout(xml, label, input_label, detail=None, editable=True):
+def assert_field_layout(xml, label, input_label, detail=None, editable=True, require_readable_detail=False):
     label_node = next((item for item in ET.fromstring(xml).iter("node") if (item.get("text") or "") in (label, f"{label} *")), None)
     if label_node is None:
         raise LookupError(f"Product Field label not found: {label}")
@@ -110,6 +110,8 @@ def assert_field_layout(xml, label, input_label, detail=None, editable=True):
     if detail:
         detail_node = node(xml, detail)
         assert_below(control, detail_node, f"{label} input/helper")
+        if require_readable_detail:
+            assert_readable_text(detail_node, f"{label} helper/error")
     return {"label": label, "input": input_label, "detail": detail, "vertical": True}
 
 
@@ -172,7 +174,26 @@ def edit_profile_matrix(xml):
     }
 
 
+def write_failed_result(error):
+    """Leave a machine-readable verdict behind when evidence validation fails."""
+    OUT.mkdir(parents=True, exist_ok=True)
+    (OUT / "result.json").write_text(json.dumps({
+        "status": "FAIL",
+        "error": str(error),
+        "fixture": FIXTURE,
+        "mutation": {"saveControlTappedWhileDisabled": False, "validSaveActivated": False, "backendChanged": False},
+    }, indent=2), encoding="utf-8")
+
+
 def run():
+    try:
+        return run_matrix()
+    except (AssertionError, LookupError, ValueError) as error:
+        write_failed_result(error)
+        raise
+
+
+def run_matrix():
     provenance = assert_product_provenance()
     shell("am", "force-stop", PACKAGE)
     shell("am", "start", "-W", "-n", ACTIVITY)
@@ -214,15 +235,14 @@ def run():
     wait_for(lambda: "Họ và tên là bắt buộc." in hierarchy(), "Full name validation error")
     invalid = hierarchy()
     assert_product(invalid)
-    assert_field_layout(invalid, "Họ và tên", "Họ và tên", "Họ và tên là bắt buộc.")
-    assert_readable_text(node(invalid, "Họ và tên là bắt buộc."), "Full name required error")
+    capture("05-edit-profile-full-name-error", invalid)
+    assert_field_layout(invalid, "Họ và tên", "Họ và tên", "Họ và tên là bắt buộc.", require_readable_detail=True)
     tap(node(invalid, "Lưu"))
     time.sleep(0.4)
     after_invalid_save = hierarchy()
     assert_product(after_invalid_save)
     assert_disabled_save_attempt(invalid, after_invalid_save)
     matrix["fullName"]["invalidError"] = "Họ và tên là bắt buộc."
-    capture("05-edit-profile-full-name-error", after_invalid_save)
     matrix["saveDisabledAfterInvalidValue"] = True
 
     OUT.mkdir(parents=True, exist_ok=True)

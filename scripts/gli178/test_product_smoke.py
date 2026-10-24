@@ -19,7 +19,7 @@ EDIT_PROFILE_XML = """<hierarchy>
   <node text="Email" bounds="[10,220][200,240]" />
   <node content-desc="Email chỉ đọc" class="android.widget.TextView" bounds="[10,250][300,300]" />
   <node text="Email không thể chỉnh sửa." bounds="[10,310][300,330]" />
-  <node text="Lưu" enabled="true" bounds="[10,340][300,390]" />
+  <node text="Lưu" enabled="false" bounds="[10,340][300,390]" />
 </hierarchy>"""
 
 HOME_XML = """<hierarchy><node text="Xin chào" bounds="[0,0][1,1]" /><node text="Tài khoản: UC-04 — Tài khoản/Cá nhân" bounds="[0,2][1,3]" /></hierarchy>"""
@@ -27,6 +27,34 @@ ACCOUNT_XML = """<hierarchy><node text="Tài khoản" bounds="[0,0][1,1]" /><nod
 
 
 class HierarchyTests(unittest.TestCase):
+    def test_adb_and_shell_preserve_success_and_surface_failures(self):
+        successful = subprocess.CompletedProcess(["adb"], 0, stdout=b"ok", stderr=b"")
+        failed = subprocess.CompletedProcess(["adb"], 1, stdout=b"", stderr=b"failed")
+        with patch.object(product_smoke.subprocess, "run", return_value=successful) as run:
+            self.assertIs(product_smoke.adb("version"), successful)
+        self.assertEqual(run.call_args.args[0], ["adb", "version"])
+        with patch.object(product_smoke.subprocess, "run", return_value=failed):
+            with self.assertRaises(subprocess.CalledProcessError):
+                product_smoke.adb("version")
+            self.assertIs(product_smoke.adb("version", check=False), failed)
+        with patch.object(product_smoke, "adb", return_value=successful):
+            self.assertEqual(product_smoke.shell("getprop"), "ok")
+
+    def test_foreground_parses_activity_or_reports_no_matching_window(self):
+        with patch.object(product_smoke, "shell", side_effect=["mResumedActivity u0 com.smartplatform.smarttro/.MainActivity", ""]):
+            self.assertEqual(product_smoke.foreground(), {"package": product_smoke.PACKAGE, "activity": ".MainActivity"})
+        with patch.object(product_smoke, "shell", side_effect=["unrelated", "window"]):
+            self.assertEqual(product_smoke.foreground(), {"package": None, "activity": None})
+
+    def test_wait_for_retries_then_times_out_with_description(self):
+        with patch.object(product_smoke.time, "monotonic", side_effect=[0, 0, 0.1]), patch.object(product_smoke.time, "sleep") as sleep:
+            calls = iter([False, True])
+            product_smoke.wait_for(lambda: next(calls), "event")
+        sleep.assert_called_once_with(0.4)
+        with patch.object(product_smoke.time, "monotonic", side_effect=[0, 0, 1]), patch.object(product_smoke.time, "sleep"):
+            with self.assertRaisesRegex(TimeoutError, "missing event"):
+                product_smoke.wait_for(lambda: False, "missing event", timeout=1)
+
     def test_retries_an_incomplete_dump_then_returns_verified_xml(self):
         incomplete = subprocess.CompletedProcess(["adb"], 0, stdout=b"", stderr=b"")
         complete = subprocess.CompletedProcess(["adb"], 0, stdout=b"<hierarchy />", stderr=b"")
@@ -87,6 +115,18 @@ class FieldMatrixTests(unittest.TestCase):
         changed = EDIT_PROFILE_XML.replace('content-desc="Họ và tên" class="android.widget.EditText" focused="false"', 'content-desc="Họ và tên" class="android.widget.EditText" text="Mai An" focused="false"')
         with self.assertRaisesRegex(AssertionError, "Disabled Save changed"):
             product_smoke.assert_disabled_save_attempt(EDIT_PROFILE_XML, changed)
+
+    def test_disabled_save_guard_rejects_enabled_accessible_control_before_or_after_tap(self):
+        enabled = EDIT_PROFILE_XML.replace('enabled="false"', 'enabled="true"')
+        with self.assertRaisesRegex(AssertionError, "enabled=false before"):
+            product_smoke.assert_disabled_save_attempt(enabled, EDIT_PROFILE_XML)
+        with self.assertRaisesRegex(AssertionError, "enabled=false after"):
+            product_smoke.assert_disabled_save_attempt(EDIT_PROFILE_XML, enabled)
+
+    def test_disabled_save_guard_rejects_failed_save_notice_after_tap(self):
+        failed = EDIT_PROFILE_XML.replace("</hierarchy>", '  <node text="Chưa thể lưu thay đổi. Vui lòng thử lại." />\n</hierarchy>')
+        with self.assertRaisesRegex(AssertionError, "failed-save notice"):
+            product_smoke.assert_disabled_save_attempt(EDIT_PROFILE_XML, failed)
 
     def test_clear_input_uses_delete_keys_without_saving(self):
         item = product_smoke.input_node(EDIT_PROFILE_XML, "Họ và tên")

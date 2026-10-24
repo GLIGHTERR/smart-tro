@@ -27,13 +27,29 @@ describe("production UI contracts", () => {
     for (const control of renderer.root.findAllByType(Pressable)) expect(control.props.accessibilityState).toEqual({ disabled: true });
   });
 
+  it.each([
+    ["normal", {}],
+    ["focused", { value: "0901" }],
+    ["error", { error: "Invalid" }],
+    ["disabled", { disabled: true }],
+    ["helper", { hint: "Help" }],
+  ])("suppresses vendor error and separator treatment in the %s Field state", (_state, state) => {
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<Field label="Phone" onChangeText={jest.fn()} value="" {...state} />); });
+    const input = renderer.root.findByType(TextInput);
+    expect(input.props.error).toBeUndefined();
+    expect(input.props.last).toBe(true);
+    if ("error" in state) expect(input.props.styles.input).toMatchObject({ borderColor: "#B33A3A", borderWidth: 2 });
+  });
+
   it("renders every Field as a vertical label, input, helper/error contract", () => {
     const onChangeText = jest.fn(); let renderer!: TestRenderer.ReactTestRenderer;
     act(() => { renderer = TestRenderer.create(<Field disabled error="Invalid" hint="Help" label="Phone" maxLength={10} onChangeText={onChangeText} required value="0901" keyboardType="phone-pad" />); });
     const input = renderer.root.findByType(TextInput);
     expect(input.parent?.parent?.parent?.props.children).toBeUndefined();
     expect(renderer.root.findAllByType(Text).map((node) => node.props.children)).toEqual([["Phone", " *"], "Help", "Invalid"]);
-    expect(input.props).toMatchObject({ accessibilityHint: "Help", accessibilityLabel: "Phone", disabled: true, error: true, keyboardType: "phone-pad", maxLength: 10, value: "0901" });
+    expect(input.props).toMatchObject({ accessibilityHint: "Help", accessibilityLabel: "Phone", disabled: true, keyboardType: "phone-pad", maxLength: 10, value: "0901" });
+    expect(input.props.error).toBeUndefined();
     act(() => input.props.onChangeText("0902"));
     expect(onChangeText).toHaveBeenCalledWith("0902");
     expect(renderer.root.findByProps({ accessibilityLiveRegion: "polite" }).props).toMatchObject({ accessibilityRole: "alert", children: "Invalid", style: expect.objectContaining({ includeFontPadding: true, lineHeight: 19, minHeight: 19 }) });

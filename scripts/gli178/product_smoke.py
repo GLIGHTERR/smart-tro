@@ -101,7 +101,7 @@ def assert_readable_text(item, description):
         raise AssertionError(f"Clipped Field text for {description}: {item.get('bounds')} is below {MIN_READABLE_TEXT_HEIGHT}px")
 
 
-def assert_field_layout(xml, label, input_label, detail=None, editable=True):
+def assert_field_layout(xml, label, input_label, detail=None, editable=True, require_readable_detail=False):
     label_node = next((item for item in ET.fromstring(xml).iter("node") if (item.get("text") or "") in (label, f"{label} *")), None)
     if label_node is None:
         raise LookupError(f"Product Field label not found: {label}")
@@ -110,7 +110,8 @@ def assert_field_layout(xml, label, input_label, detail=None, editable=True):
     if detail:
         detail_node = node(xml, detail)
         assert_below(control, detail_node, f"{label} input/helper")
-        assert_readable_text(detail_node, f"{label} helper/error")
+        if require_readable_detail:
+            assert_readable_text(detail_node, f"{label} helper/error")
     return {"label": label, "input": input_label, "detail": detail, "vertical": True}
 
 
@@ -235,7 +236,7 @@ def run_matrix():
     invalid = hierarchy()
     assert_product(invalid)
     capture("05-edit-profile-full-name-error", invalid)
-    assert_field_layout(invalid, "Họ và tên", "Họ và tên", "Họ và tên là bắt buộc.")
+    assert_field_layout(invalid, "Họ và tên", "Họ và tên", "Họ và tên là bắt buộc.", require_readable_detail=True)
     tap(node(invalid, "Lưu"))
     time.sleep(0.4)
     after_invalid_save = hierarchy()

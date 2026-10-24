@@ -18,6 +18,21 @@ export function getResponsiveToastDimensions(viewportWidth: number, insets: { le
   return { minWidth: Math.min(280, width), width };
 }
 
+// Ant Design owns the overlay and animation, while this removes its default textToast surface.
+export const NEUTRAL_TOAST_WRAPPER_STYLE = Object.freeze({
+  backgroundColor: "transparent",
+  borderRadius: 0,
+  borderWidth: 0,
+  elevation: 0,
+  minWidth: 0,
+  padding: 0,
+  paddingHorizontal: 0,
+  paddingVertical: 0,
+  shadowColor: "transparent",
+  shadowOpacity: 0,
+  shadowRadius: 0,
+});
+
 function ToastContent({ message }: { message: string }) {
   const { width: viewportWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -41,7 +56,7 @@ export function Toast({ event, onConsume }: ToastProps) {
 
   useEffect(() => {
     if (!activeEvent) return;
-    const key = AntToast.show({ content: <ToastContent message={activeEvent.message} />, duration: 0, mask: false, position: "bottom" });
+    const key = AntToast.show({ content: <ToastContent message={activeEvent.message} />, duration: 0, mask: false, position: "bottom", styles: { innerWrap: NEUTRAL_TOAST_WRAPPER_STYLE, textToast: NEUTRAL_TOAST_WRAPPER_STYLE } });
     const timeout = setTimeout(() => setActiveEvent(null), SUCCESS_TOAST_DURATION_MS);
     return () => { clearTimeout(timeout); AntToast.remove(key); };
   }, [activeEvent]);

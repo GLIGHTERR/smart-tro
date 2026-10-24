@@ -3,7 +3,7 @@ import { Text } from "react-native";
 import TestRenderer, { act } from "react-test-renderer";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { getResponsiveToastDimensions, SUCCESS_TOAST_DURATION_MS, SuccessToastAdapter } from "../SuccessToastAdapter";
+import { getResponsiveToastDimensions, NEUTRAL_TOAST_WRAPPER_STYLE, SUCCESS_TOAST_DURATION_MS, SuccessToastAdapter } from "../SuccessToastAdapter";
 
 jest.mock("@ant-design/react-native", () => ({ Toast: { show: jest.fn(() => 42), remove: jest.fn() } }));
 jest.mock("react-native-safe-area-context", () => ({ useSafeAreaInsets: jest.fn() }));
@@ -24,7 +24,7 @@ describe("SuccessToastAdapter", () => {
     const event = { id: "profile-save-1", message: "Đã cập nhật thông tin cá nhân." };
     let renderer!: TestRenderer.ReactTestRenderer;
     act(() => { renderer = TestRenderer.create(<SuccessToastAdapter event={event} onConsume={onConsume} />); });
-    expect(toast.show).toHaveBeenCalledWith(expect.objectContaining({ duration: 0, mask: false, position: "bottom" }));
+    expect(toast.show).toHaveBeenCalledWith(expect.objectContaining({ duration: 0, mask: false, position: "bottom", styles: { innerWrap: NEUTRAL_TOAST_WRAPPER_STYLE, textToast: NEUTRAL_TOAST_WRAPPER_STYLE } }));
     let content!: TestRenderer.ReactTestRenderer;
     act(() => { content = TestRenderer.create(toast.show.mock.calls[0][0].content); });
     const toastContent = content.root.findByProps({ role: "status" });
@@ -70,5 +70,21 @@ describe("SuccessToastAdapter", () => {
     expect(content.root.findByType(Text).props.children).toContain("dễ đọc");
     expect(getResponsiveToastDimensions(768, { left: 24, right: 24 })).toEqual({ minWidth: 280, width: 480 });
     act(() => { content.unmount(); renderer.unmount(); });
+  });
+
+  it("neutralizes Ant Design's text wrapper so the SmartTro content is the only decorated surface", () => {
+    expect(NEUTRAL_TOAST_WRAPPER_STYLE).toMatchObject({
+      backgroundColor: "transparent",
+      borderRadius: 0,
+      borderWidth: 0,
+      elevation: 0,
+      minWidth: 0,
+      padding: 0,
+      paddingHorizontal: 0,
+      paddingVertical: 0,
+      shadowColor: "transparent",
+      shadowOpacity: 0,
+      shadowRadius: 0,
+    });
   });
 });

@@ -13,7 +13,7 @@ type AuthFieldProps = Pick<TextInputProps, "keyboardType" | "secureTextEntry"> &
 
 // These styles intentionally mirror the existing authentication screen palette.
 export function AuthField({ label, value, onChangeText, keyboardType = "default", secureTextEntry = false, passwordVisible = false, onTogglePassword }: AuthFieldProps) {
-  const reveal = secureTextEntry && onTogglePassword ? <Pressable accessibilityLabel={passwordVisible ? "Ẩn mật khẩu" : "Hiện mật khẩu"} accessibilityRole="button" accessibilityState={{ expanded: passwordVisible }} onPress={onTogglePassword} style={styles.eye}><FontAwesome color="#A84300" name={passwordVisible ? "eye-slash" : "eye"} size={17} /></Pressable> : undefined;
+  const reveal = secureTextEntry && onTogglePassword ? <Pressable aria-expanded={passwordVisible} accessibilityLabel={passwordVisible ? "Ẩn mật khẩu" : "Hiện mật khẩu"} accessibilityRole="button" accessibilityState={{ expanded: passwordVisible }} onPress={onTogglePassword} style={styles.eye}><FontAwesome color="#A84300" name={passwordVisible ? "eye-slash" : "eye"} size={17} /></Pressable> : undefined;
   return <View style={styles.field}><InputItem accessibilityLabel={label} autoCapitalize="none" autoCorrect={false} extra={reveal} last onChange={onChangeText} placeholder={label} placeholderTextColor="#A78B68" style={styles.input} styles={inputStyles} type={secureTextEntry && !passwordVisible ? "password" : keyboardType} value={value} /></View>;
 }
 

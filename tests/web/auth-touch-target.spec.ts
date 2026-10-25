@@ -23,6 +23,11 @@ for (const viewport of viewports) {
     await page.setViewportSize(viewport);
     await page.goto("");
 
+    const revealPassword = page.getByRole("button", { name: "Hiện mật khẩu", exact: true });
+    await expect(revealPassword).toHaveAttribute("aria-expanded", "false");
+    await revealPassword.click();
+    await expect(page.getByRole("button", { name: "Ẩn mật khẩu", exact: true })).toHaveAttribute("aria-expanded", "true");
+
     const forgotPassword = page.getByRole("button", { name: "Quên mật khẩu", exact: true });
     const signUp = page.getByRole("button", { name: "Đăng ký", exact: true });
     await expectTouchTarget(forgotPassword);

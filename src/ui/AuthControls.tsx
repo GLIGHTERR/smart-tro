@@ -40,7 +40,7 @@ const styles = StyleSheet.create({
   field: { marginBottom: 16 },
   input: { backgroundColor: "#FBC97E", borderRadius: 24, color: "#5B4126", fontFamily: "BeVietnamPro_400Regular", fontSize: 15, height: 48, paddingHorizontal: 28, paddingRight: 54 },
   eye: { alignItems: "center", height: 48, justifyContent: "center", width: 54 },
-  action: { backgroundColor: "#FFFFFF", borderColor: "#1684F7", borderRadius: 9, borderWidth: 1.5, height: 48, marginTop: 10 },
+  action: { alignItems: "center", backgroundColor: "#FFFFFF", borderColor: "#1684F7", borderRadius: 9, borderWidth: 1.5, height: 48, justifyContent: "center", marginTop: 10 },
   disabled: { opacity: 0.55 },
   link: { alignItems: "center", justifyContent: "center", minHeight: 48 },
   linkFocused: { borderColor: "#1684F7", borderWidth: 1.5 },

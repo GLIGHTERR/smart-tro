@@ -21,11 +21,15 @@ describe("auth UI adapters", () => {
     expect(password.props.styles.container).toMatchObject({ backgroundColor: "#FBC97E", borderRadius: 24, height: 48 });
     act(() => email.props.onChangeText("mai@example.com"));
     expect(onChangeText).toHaveBeenCalledWith("mai@example.com");
-    act(() => renderer.root.findByProps({ accessibilityLabel: "Hiện mật khẩu" }).props.onPress());
+    const reveal = renderer.root.findByProps({ accessibilityLabel: "Hiện mật khẩu" });
+    expect(reveal.props["aria-expanded"]).toBe(false);
+    act(() => reveal.props.onPress());
     expect(onTogglePassword).toHaveBeenCalledTimes(1);
     act(() => { renderer.update(<AuthField label="Password" onChangeText={onChangeText} onTogglePassword={onTogglePassword} passwordVisible secureTextEntry value="secret" />); });
     expect(renderer.root.findByType(TextInput).props.type).toBe("default");
-    expect(renderer.root.findByProps({ accessibilityLabel: "Ẩn mật khẩu" }).props.accessibilityState).toEqual({ expanded: true });
+    const hide = renderer.root.findByProps({ accessibilityLabel: "Ẩn mật khẩu" });
+    expect(hide.props.accessibilityState).toEqual({ expanded: true });
+    expect(hide.props["aria-expanded"]).toBe(true);
   });
 
   it("keeps auth button states and link focus accessible", () => {

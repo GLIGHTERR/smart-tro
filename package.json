@@ -75,6 +75,7 @@
       "src/screens/homeModel.ts",
       "src/startup/fontState.ts",
       "src/ui/contracts.tsx",
+      "src/ui/AuthControls.tsx",
       "src/ui/SuccessToastAdapter.tsx",
       "src/ui/pilot/renderer.tsx",
       "src/pilot/PilotApp.tsx"
@@ -153,6 +154,12 @@
         "statements": 100
       },
       "./src/ui/contracts.tsx": {
+        "branches": 100,
+        "functions": 100,
+        "lines": 100,
+        "statements": 100
+      },
+      "./src/ui/AuthControls.tsx": {
         "branches": 100,
         "functions": 100,
         "lines": 100,

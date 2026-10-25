@@ -2,7 +2,7 @@ import React from "react";
 import { Pressable, StyleSheet, Text } from "react-native";
 import TestRenderer, { act, type ReactTestInstance } from "react-test-renderer";
 
-import type { AuthGateway } from "../../auth/gateway";
+import { GatewayError, type AuthGateway } from "../../auth/gateway";
 import { AuthScreen } from "../AuthScreen";
 
 jest.mock("@expo/vector-icons/FontAwesome", () => "FontAwesome");
@@ -23,7 +23,8 @@ function button(root: ReactTestInstance, label: string): ReactTestInstance {
 }
 
 function input(root: ReactTestInstance, label: string): ReactTestInstance {
-  return root.findByProps({ accessibilityLabel: label }) as ReactTestInstance;
+  const matches = root.findAllByProps({ accessibilityLabel: label });
+  return (matches.find((node) => typeof node.props.onChangeText === "function") ?? matches[0]) as ReactTestInstance;
 }
 
 function buttonLabels(root: ReactTestInstance): string[] {
@@ -209,17 +210,17 @@ describe("AuthScreen signup", () => {
 });
 
 describe("AuthScreen sign in password field", () => {
-  it("clips the password container to the same 48px pill treatment and keeps the reveal control touch-sized", () => {
+  it("routes the locked auth field palette and reveal control through the public adapter", () => {
     const auth = gateway();
     let renderer!: TestRenderer.ReactTestRenderer;
     act(() => { renderer = TestRenderer.create(<AuthScreen gateway={auth} />); });
 
     const passwordInput = input(renderer.root, "Mật khẩu");
-    const container = passwordInput.parent;
     const reveal = renderer.root.findByProps({ accessibilityLabel: "Hiện mật khẩu" });
 
-    expect(StyleSheet.flatten(container?.props.style)).toMatchObject({ backgroundColor: "#FBC97E", borderRadius: 24, height: 48, overflow: "hidden" });
-    expect(StyleSheet.flatten(reveal.props.style)).toMatchObject({ alignItems: "center", height: 48, right: 0, width: 54 });
+    expect(passwordInput.props.styles.container).toMatchObject({ backgroundColor: "#FBC97E", borderBottomWidth: 0, borderRadius: 24, height: 48 });
+    expect(passwordInput.props.styles.input).toMatchObject({ color: "#5B4126", height: 48, paddingHorizontal: 28, paddingRight: 54 });
+    expect(StyleSheet.flatten(reveal.props.style)).toMatchObject({ alignItems: "center", height: 48, width: 54 });
     expect(reveal.props.accessibilityRole).toBe("button");
     expect(reveal.props.accessibilityState).toEqual({ expanded: false });
     act(() => reveal.props.onPress());
@@ -228,6 +229,50 @@ describe("AuthScreen sign in password field", () => {
     expect(hide.props.accessibilityState).toEqual({ expanded: true });
     act(() => hide.props.onPress());
     expect(renderer.root.findByProps({ accessibilityLabel: "Hiện mật khẩu" }).props.accessibilityState).toEqual({ expanded: false });
+    act(() => renderer.unmount());
+  });
+
+  it("keeps normalized successful login, session verification, and submitting guard", async () => {
+    const auth = gateway();
+    let resolveLogin!: (value: { accessToken: string; refreshToken: string }) => void;
+    (auth.signIn as jest.Mock).mockImplementation(() => new Promise((resolve) => { resolveLogin = resolve; }));
+    (auth.me as jest.Mock).mockResolvedValue({ id: "member-1" });
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<AuthScreen gateway={auth} />); });
+
+    act(() => input(renderer.root, "Email").props.onChangeText(" Mai@Example.COM "));
+    act(() => input(renderer.root, "Mật khẩu").props.onChangeText("Strong!1"));
+    act(() => { button(renderer.root, "Đăng nhập").props.onPress(); button(renderer.root, "Đăng nhập").props.onPress(); });
+    expect(auth.signIn).toHaveBeenCalledTimes(1);
+    expect(auth.signIn).toHaveBeenCalledWith("mai@example.com", "Strong!1");
+    expect(button(renderer.root, "Đang xử lý...").props.accessibilityState).toEqual({ disabled: true });
+
+    await act(async () => { resolveLogin({ accessToken: "access", refreshToken: "refresh" }); await Promise.resolve(); });
+    expect(auth.me).toHaveBeenCalledWith("access");
+    expect(mockSignIn).toHaveBeenCalledWith({ accessToken: "access", refreshToken: "refresh" });
+    expect(input(renderer.root, "Mật khẩu").props.value).toBe("");
+    act(() => renderer.unmount());
+  });
+
+  it("preserves login validation, gateway error feedback, and the unverified OTP transition", async () => {
+    const auth = gateway();
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<AuthScreen gateway={auth} />); });
+
+    act(() => button(renderer.root, "Đăng nhập").props.onPress());
+    expect(textOf(renderer.root)).toContain("Nhập địa chỉ email hợp lệ.");
+    act(() => input(renderer.root, "Email").props.onChangeText("blocked@example.com"));
+    act(() => input(renderer.root, "Mật khẩu").props.onChangeText("Strong!1"));
+    (auth.signIn as jest.Mock).mockRejectedValueOnce(new GatewayError("INVALID_CREDENTIALS"));
+    await act(async () => { button(renderer.root, "Đăng nhập").props.onPress(); await Promise.resolve(); });
+    expect(textOf(renderer.root)).toContain("Email hoặc mật khẩu không đúng.");
+
+    (auth.signIn as jest.Mock).mockRejectedValueOnce(new GatewayError("ACCOUNT_UNVERIFIED"));
+    (auth.requestOtp as jest.Mock).mockResolvedValueOnce({ attemptId: "unverified-attempt", expiresAt: 601_000, resendAvailableAt: 0 });
+    await act(async () => { button(renderer.root, "Đăng nhập").props.onPress(); await Promise.resolve(); });
+    expect(auth.requestOtp).toHaveBeenCalledWith("blocked@example.com");
+    expect(input(renderer.root, "Mã OTP")).toBeTruthy();
+    expect(textOf(renderer.root)).toContain("Email này chưa được xác thực. Hãy kiểm tra mã OTP.");
     act(() => renderer.unmount());
   });
 });

@@ -43,6 +43,7 @@ describe("auth UI adapters", () => {
     expect(enabled.props).toMatchObject({ accessibilityLabel: "Đăng nhập", accessibilityState: { disabled: false } });
     expect(disabled.props.accessibilityState).toEqual({ disabled: true });
     expect(loading.props.accessibilityState).toEqual({ disabled: true });
+    expect(StyleSheet.flatten(enabled.props.style({ pressed: false }))).toMatchObject({ alignItems: "center", justifyContent: "center" });
     expect(StyleSheet.flatten(enabled.props.style({ pressed: false })).opacity).toBeUndefined();
     expect(StyleSheet.flatten(enabled.props.style({ pressed: true }))).toMatchObject({ opacity: 0.55 });
     expect(StyleSheet.flatten(disabled.props.style({ pressed: false }))).toMatchObject({ opacity: 0.55 });

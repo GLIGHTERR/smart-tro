@@ -22,13 +22,24 @@ async function expectPressedOpacity(page: Page, button: Locator, pointer: "mouse
   await expect(button).toHaveCSS("opacity", "1");
 }
 
+async function expectCenteredLabel(button: Locator) {
+  const buttonBox = await button.boundingBox();
+  const labelBox = await button.getByText("Đăng nhập", { exact: true }).boundingBox();
+  if (!buttonBox || !labelBox) throw new Error("Sign-in button or label is not visible");
+
+  expect(Math.abs((labelBox.x + labelBox.width / 2) - (buttonBox.x + buttonBox.width / 2))).toBeLessThanOrEqual(1);
+  expect(Math.abs((labelBox.y + labelBox.height / 2) - (buttonBox.y + buttonBox.height / 2))).toBeLessThanOrEqual(1);
+}
+
 for (const pointer of ["mouse", "touch"] as const) {
-  test(`applies the sign-in pressed opacity during ${pointer} pointer input`, async ({ page }) => {
+  test(`keeps the sign-in label centered and applies pressed opacity during ${pointer} pointer input`, async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await page.goto("");
     const button = page.getByRole("button", { name: "Đăng nhập", exact: true });
     await button.hover();
     await expect(button).toHaveCSS("opacity", "1");
+    await expectCenteredLabel(button);
     await expectPressedOpacity(page, button, pointer);
+    await expectCenteredLabel(button);
   });
 }

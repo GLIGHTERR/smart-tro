@@ -17,7 +17,7 @@
     "export:web": "expo export --platform web --clear && node scripts/write-pages-fallback.mjs",
     "test:web": "EXPO_PUBLIC_UI_PILOT= npm run export:web && npm run verify:product-bundle && playwright test",
     "test:web:ui-pilot": "EXPO_PUBLIC_UI_PILOT=true npm run export:web && UI_PILOT_REVIEW=true playwright test tests/web/ui-pilot.spec.ts",
-    "test:web:auth": "EXPO_PUBLIC_API_BASE_URL=https://auth-fixture.invalid EXPO_PUBLIC_AUTH_USE_MOCK=false EXPO_PUBLIC_REVIEW_SOCIALS=true npm run export:web && AUTH_VISUAL_REVIEW=true AUTH_CHANGE_EMAIL_REVIEW=true AUTH_TOUCH_TARGET_REVIEW=true AUTH_SIGNUP_FLOW_REVIEW=true AUTH_DEEP_LINK_REVIEW=true AUTH_PASSWORD_RADIUS_REVIEW=true playwright test tests/web/auth-visual.spec.ts tests/web/auth-change-email.spec.ts tests/web/auth-touch-target.spec.ts tests/web/auth-signup-flow.spec.ts tests/web/auth-deep-link.spec.ts tests/web/auth-password-radius.spec.ts"
+    "test:web:auth": "EXPO_PUBLIC_API_BASE_URL=https://auth-fixture.invalid EXPO_PUBLIC_AUTH_USE_MOCK=false EXPO_PUBLIC_REVIEW_SOCIALS=true npm run export:web && AUTH_VISUAL_REVIEW=true AUTH_CHANGE_EMAIL_REVIEW=true AUTH_TOUCH_TARGET_REVIEW=true AUTH_SIGNUP_FLOW_REVIEW=true AUTH_DEEP_LINK_REVIEW=true AUTH_PASSWORD_RADIUS_REVIEW=true AUTH_PRESSED_REVIEW=true playwright test tests/web/auth-visual.spec.ts tests/web/auth-change-email.spec.ts tests/web/auth-touch-target.spec.ts tests/web/auth-signup-flow.spec.ts tests/web/auth-deep-link.spec.ts tests/web/auth-password-radius.spec.ts tests/web/auth-pressed.spec.ts"
   },
   "dependencies": {
     "@ant-design/icons-react-native": "^2.3.2",

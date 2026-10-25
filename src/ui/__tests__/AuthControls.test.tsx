@@ -1,5 +1,5 @@
 import React from "react";
-import { Pressable, TextInput } from "react-native";
+import { Pressable, StyleSheet, TextInput } from "react-native";
 import TestRenderer, { act } from "react-test-renderer";
 
 import { AuthButton, AuthField, AuthLink } from "../AuthControls";
@@ -40,9 +40,12 @@ describe("auth UI adapters", () => {
     const controls = renderer.root.findAllByType(Pressable);
     const [enabled, disabled, loading] = controls;
     if (!enabled || !disabled || !loading) throw new Error("Missing auth buttons");
-    expect(enabled.props).toMatchObject({ accessibilityLabel: "Đăng nhập", accessibilityState: { disabled: false }, type: "primary" });
+    expect(enabled.props).toMatchObject({ accessibilityLabel: "Đăng nhập", accessibilityState: { disabled: false } });
     expect(disabled.props.accessibilityState).toEqual({ disabled: true });
     expect(loading.props.accessibilityState).toEqual({ disabled: true });
+    expect(StyleSheet.flatten(enabled.props.style({ pressed: false })).opacity).toBeUndefined();
+    expect(StyleSheet.flatten(enabled.props.style({ pressed: true }))).toMatchObject({ opacity: 0.55 });
+    expect(StyleSheet.flatten(disabled.props.style({ pressed: false }))).toMatchObject({ opacity: 0.55 });
     act(() => enabled.props.onPress());
     expect(onPress).toHaveBeenCalledTimes(1);
     const link = renderer.root.findAllByType(Pressable).find((control) => typeof control.props.onFocus === "function");

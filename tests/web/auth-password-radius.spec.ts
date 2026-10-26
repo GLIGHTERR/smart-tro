@@ -19,14 +19,22 @@ for (const viewport of [
     const field = container.locator("..");
     const reveal = page.getByRole("button", { name: "Hiện mật khẩu", exact: true });
     const expectedField = { radius: "24px", height: "48px", background: "rgb(251, 201, 126)" };
+    const expectSingleChromeOwner = async (focused: boolean) => {
+      await expect(field).toHaveCSS("border-radius", expectedField.radius);
+      await expect(field).toHaveCSS("border-top-width", focused ? "1px" : "0px");
+      if (focused) await expect(field).toHaveCSS("border-top-color", "rgb(0, 0, 0)");
+      for (const property of ["border-top-width", "border-right-width", "border-bottom-width", "border-left-width", "outline-width", "border-top-left-radius", "border-top-right-radius", "border-bottom-right-radius", "border-bottom-left-radius"]) {
+        await expect(password).toHaveCSS(property, "0px");
+      }
+    };
 
-    await expect(email).toHaveCSS("border-radius", expectedField.radius);
     await expect(email).toHaveCSS("height", expectedField.height);
     await expect(email).toHaveCSS("background-color", expectedField.background);
-    await expect(container).toHaveCSS("border-radius", expectedField.radius);
+    await expect(container).toHaveCSS("border-radius", "0px");
     await expect(container).toHaveCSS("height", expectedField.height);
     await expect(container).toHaveCSS("background-color", expectedField.background);
     await expect(container).toHaveCSS("overflow", "hidden");
+    await expectSingleChromeOwner(false);
 
     // The visual field must contain the entire interactive reveal target, not
     // merely leave it in the DOM beside a clipped input.
@@ -51,11 +59,15 @@ for (const viewport of [
     await page.getByRole("button", { name: "Ẩn mật khẩu", exact: true }).tap();
     await expect(reveal).toBeVisible();
 
+    // Each supported focus origin must leave chrome on the common wrapper.
     await password.focus();
-    await expect(password).toHaveCSS("outline-width", "0px");
-    await expect(field).toHaveCSS("border-top-width", "1px");
-    await expect(field).toHaveCSS("border-top-color", "rgb(0, 0, 0)");
-    await expect(field).toHaveCSS("border-radius", expectedField.radius);
+    await expectSingleChromeOwner(true);
+    await page.locator("body").press("Tab");
+    await password.click();
+    await expectSingleChromeOwner(true);
+    await page.locator("body").press("Tab");
+    await password.tap();
+    await expectSingleChromeOwner(true);
 
     await password.fill("Strong!1");
     await reveal.focus();
@@ -67,9 +79,9 @@ for (const viewport of [
     await expect(reveal).toBeFocused();
     await page.keyboard.press("Enter");
     await expect(conceal).toBeFocused();
-    await expect(container).toHaveCSS("border-radius", expectedField.radius);
+    await expect(field).toHaveCSS("border-radius", expectedField.radius);
     await expect(conceal).toBeVisible();
-    await expect(container).toHaveCSS("border-radius", expectedField.radius);
+    await expect(field).toHaveCSS("border-radius", expectedField.radius);
     const concealBox = await conceal.boundingBox();
     expect(concealBox?.width).toBeGreaterThanOrEqual(48);
     expect(concealBox?.height).toBeGreaterThanOrEqual(48);
@@ -77,6 +89,6 @@ for (const viewport of [
     await email.fill("invalid");
     await page.getByRole("button", { name: "Đăng nhập", exact: true }).click();
     await expect(page.getByText("Nhập địa chỉ email hợp lệ.")).toBeVisible();
-    await expect(container).toHaveCSS("border-radius", expectedField.radius);
+    await expect(field).toHaveCSS("border-radius", expectedField.radius);
   });
 }

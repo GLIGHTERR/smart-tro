@@ -15,6 +15,7 @@ for (const viewport of [
     const email = page.getByLabel("Email");
     const password = page.getByLabel("Mật khẩu", { exact: true });
     const container = password.locator("..");
+    const field = container.locator("..");
     const reveal = page.getByRole("button", { name: "Hiện mật khẩu", exact: true });
     const expectedField = { radius: "24px", height: "48px", background: "rgb(251, 201, 126)" };
 
@@ -25,6 +26,12 @@ for (const viewport of [
     await expect(container).toHaveCSS("height", expectedField.height);
     await expect(container).toHaveCSS("background-color", expectedField.background);
     await expect(container).toHaveCSS("overflow", "hidden");
+
+    await password.focus();
+    await expect(password).toHaveCSS("outline-width", "0px");
+    await expect(field).toHaveCSS("border-top-width", "1px");
+    await expect(field).toHaveCSS("border-top-color", "rgb(0, 0, 0)");
+    await expect(field).toHaveCSS("border-radius", expectedField.radius);
 
     await password.fill("Strong!1");
     await reveal.focus();

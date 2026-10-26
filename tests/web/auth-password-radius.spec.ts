@@ -26,6 +26,8 @@ for (const viewport of [
       for (const property of ["border-top-width", "border-right-width", "border-bottom-width", "border-left-width", "outline-width", "border-top-left-radius", "border-top-right-radius", "border-bottom-right-radius", "border-bottom-left-radius"]) {
         await expect(password).toHaveCSS(property, "0px");
       }
+      await expect(password).toHaveCSS("outline-style", "solid");
+      await expect(password).toHaveCSS("outline-color", "rgba(0, 0, 0, 0)");
     };
 
     await expect(email).toHaveCSS("height", expectedField.height);

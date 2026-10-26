@@ -1,5 +1,5 @@
 import React from "react";
-import { Pressable, StyleSheet, TextInput } from "react-native";
+import { Pressable, StyleSheet, TextInput, View } from "react-native";
 import TestRenderer, { act } from "react-test-renderer";
 
 import { AuthButton, AuthField, AuthLink } from "../AuthControls";
@@ -19,6 +19,12 @@ describe("auth UI adapters", () => {
     expect(email.props).toMatchObject({ autoCapitalize: "none", autoCorrect: false, placeholder: "Email", placeholderTextColor: "#A78B68", type: "default" });
     expect(password.props).toMatchObject({ type: "password", value: "secret" });
     expect(password.props.styles.container).toMatchObject({ backgroundColor: "#FBC97E", borderRadius: 24, height: 48 });
+    const passwordField = renderer.root.findAllByType(View).filter((field) => (StyleSheet.flatten(field.props.style) ?? {}).marginBottom === 16)[1];
+    if (!passwordField) throw new Error("Missing password field frame");
+    act(() => password.props.onFocus());
+    expect(StyleSheet.flatten(passwordField.props.style)).toMatchObject({ borderColor: "#000000", borderRadius: 24, borderWidth: 1, height: 48, overflow: "hidden" });
+    act(() => password.props.onBlur());
+    expect(StyleSheet.flatten(passwordField.props.style).borderWidth).toBeUndefined();
     act(() => email.props.onChangeText("mai@example.com"));
     expect(onChangeText).toHaveBeenCalledWith("mai@example.com");
     const reveal = renderer.root.findByProps({ accessibilityLabel: "Hiện mật khẩu" });

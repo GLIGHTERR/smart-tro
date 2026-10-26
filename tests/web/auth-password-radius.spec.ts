@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 test.skip(process.env.AUTH_PASSWORD_RADIUS_REVIEW !== "true", "Password field radius checks use the dedicated auth export.");
+test.use({ hasTouch: true });
 
 for (const viewport of [
   { name: "320x568", width: 320, height: 568 },
@@ -27,6 +28,29 @@ for (const viewport of [
     await expect(container).toHaveCSS("background-color", expectedField.background);
     await expect(container).toHaveCSS("overflow", "hidden");
 
+    // The visual field must contain the entire interactive reveal target, not
+    // merely leave it in the DOM beside a clipped input.
+    const fieldBox = await field.boundingBox();
+    const revealBox = await reveal.boundingBox();
+    expect(fieldBox).not.toBeNull();
+    expect(revealBox).not.toBeNull();
+    expect(revealBox!.x).toBeGreaterThanOrEqual(fieldBox!.x);
+    expect(revealBox!.y).toBeGreaterThanOrEqual(fieldBox!.y);
+    expect(revealBox!.x + revealBox!.width).toBeLessThanOrEqual(fieldBox!.x + fieldBox!.width);
+    expect(revealBox!.y + revealBox!.height).toBeLessThanOrEqual(fieldBox!.y + fieldBox!.height);
+    await expect(reveal).toHaveJSProperty("tagName", "BUTTON");
+    await expect(reveal).toHaveJSProperty("disabled", false);
+    const revealReceivesPointer = await reveal.evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+      return hit === element || element.contains(hit);
+    });
+    expect(revealReceivesPointer).toBe(true);
+    await reveal.click();
+    await expect(page.getByRole("button", { name: "Ẩn mật khẩu", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Ẩn mật khẩu", exact: true }).tap();
+    await expect(reveal).toBeVisible();
+
     await password.focus();
     await expect(password).toHaveCSS("outline-width", "0px");
     await expect(field).toHaveCSS("border-top-width", "1px");
@@ -46,9 +70,9 @@ for (const viewport of [
     await expect(container).toHaveCSS("border-radius", expectedField.radius);
     await expect(conceal).toBeVisible();
     await expect(container).toHaveCSS("border-radius", expectedField.radius);
-    const revealBox = await conceal.boundingBox();
-    expect(revealBox?.width).toBeGreaterThanOrEqual(48);
-    expect(revealBox?.height).toBeGreaterThanOrEqual(48);
+    const concealBox = await conceal.boundingBox();
+    expect(concealBox?.width).toBeGreaterThanOrEqual(48);
+    expect(concealBox?.height).toBeGreaterThanOrEqual(48);
 
     await email.fill("invalid");
     await page.getByRole("button", { name: "Đăng nhập", exact: true }).click();

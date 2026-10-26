@@ -18,12 +18,12 @@ describe("auth UI adapters", () => {
     if (!email || !password) throw new Error("Missing auth inputs");
     expect(email.props).toMatchObject({ autoCapitalize: "none", autoCorrect: false, placeholder: "Email", placeholderTextColor: "#A78B68", type: "default" });
     expect(password.props).toMatchObject({ type: "password", value: "secret" });
-    expect(password.props.styles.container).toMatchObject({ backgroundColor: "#FBC97E", borderRadius: 24, height: 48 });
-    expect(password.props.styles.input).toMatchObject({ minWidth: 0 });
+    expect(password.props.styles.container).toMatchObject({ backgroundColor: "#FBC97E", borderRadius: 0, height: 48 });
+    expect(password.props.styles.input).toMatchObject({ borderRadius: 0, borderWidth: 0, minWidth: 0, outlineWidth: 0 });
     const passwordField = renderer.root.findAllByType(View).filter((field) => (StyleSheet.flatten(field.props.style) ?? {}).marginBottom === 16)[1];
     if (!passwordField) throw new Error("Missing password field frame");
     act(() => password.props.onFocus());
-    expect(StyleSheet.flatten(passwordField.props.style)).toMatchObject({ borderColor: "#000000", borderRadius: 24, borderWidth: 1, height: 48, overflow: "hidden" });
+    expect(StyleSheet.flatten(passwordField.props.style)).toMatchObject({ backgroundColor: "#FBC97E", borderColor: "#000000", borderRadius: 24, borderWidth: 1, height: 48, overflow: "hidden" });
     act(() => password.props.onBlur());
     expect(StyleSheet.flatten(passwordField.props.style).borderWidth).toBeUndefined();
     act(() => email.props.onChangeText("mai@example.com"));

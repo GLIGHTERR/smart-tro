@@ -33,7 +33,7 @@ export function AuthLink({ label, onPress }: { label: string; onPress: () => voi
 
 const inputStyles = StyleSheet.create({
   container: { backgroundColor: "#FBC97E", borderBottomWidth: 0, borderRadius: 24, height: 48, marginLeft: 0, overflow: "hidden", paddingRight: 0 },
-  input: { backgroundColor: "#FBC97E", borderRadius: 24, color: "#5B4126", fontFamily: "BeVietnamPro_400Regular", fontSize: 15, height: 48, outlineWidth: 0, paddingHorizontal: 28, paddingRight: 54 },
+  input: { backgroundColor: "#FBC97E", borderRadius: 24, color: "#5B4126", fontFamily: "BeVietnamPro_400Regular", fontSize: 15, height: 48, minWidth: 0, outlineWidth: 0, paddingHorizontal: 28, paddingRight: 54 },
   extra: { alignItems: "center", height: 48, justifyContent: "center", marginRight: 0, width: 54 },
 });
 const buttonStyles = { primaryDisabledRawText: { color: "#F09200", fontFamily: "BeVietnamPro_600SemiBold", fontSize: 14 }, primaryRawText: { color: "#F09200", fontFamily: "BeVietnamPro_600SemiBold", fontSize: 14 } };

@@ -29,6 +29,11 @@ for (const viewport of [
       await expect(wrapper).toHaveCSS("border-top-width", "1px");
       await expect(wrapper).toHaveCSS("border-top-color", "rgb(0, 0, 0)");
     };
+    const expectRevealHasNoChrome = async () => {
+      await expect(reveal).toHaveCSS("outline-width", "0px");
+      await expect(reveal).toHaveCSS("outline-style", "solid");
+      await expect(reveal).toHaveCSS("outline-color", "rgba(0, 0, 0, 0)");
+    };
     const expectSingleChromeOwner = async (focused: boolean) => {
       await expect(field).toHaveCSS("border-radius", expectedField.radius);
       await expect(field).toHaveCSS("border-top-width", focused ? "1px" : "0px");
@@ -97,9 +102,19 @@ for (const viewport of [
     expect(await readWrapperChrome(field)).toEqual(touchEmailChrome);
 
     await password.fill("Strong!1");
+    await email.focus();
+    await page.keyboard.press("Tab");
+    await expect(password).toBeFocused();
+    await page.keyboard.press("Tab");
+    await page.keyboard.press("Tab");
+    await expect(reveal).toBeFocused();
+    await expectSingleChromeOwner(true);
+    await expectRevealHasNoChrome();
+
     await reveal.focus();
     await expect(reveal).toBeFocused();
     await expectSingleChromeOwner(true);
+    await expectRevealHasNoChrome();
     await page.keyboard.press("Space");
     const conceal = page.getByRole("button", { name: "Ẩn mật khẩu", exact: true });
     await expect(conceal).toBeFocused();

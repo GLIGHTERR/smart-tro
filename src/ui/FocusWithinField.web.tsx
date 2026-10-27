@@ -8,7 +8,7 @@ const webDataSet = { dataSet: { focusWithin: "auth-field" } };
 if (typeof document !== "undefined" && !document.getElementById(focusWithinStyleId)) {
   const stylesheet = document.createElement("style");
   stylesheet.id = focusWithinStyleId;
-  stylesheet.textContent = '[data-focus-within="auth-field"]:focus-within { border-color: #000000; border-radius: 24px; border-width: 1px; }';
+  stylesheet.textContent = '[data-focus-within="auth-field"]:focus-within { border-color: #000000; border-radius: 24px; border-width: 1px; } [data-focus-within="auth-field"] button:focus { outline: 0 solid transparent; }';
   document.head.append(stylesheet);
 }
 

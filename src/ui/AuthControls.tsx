@@ -1,7 +1,8 @@
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { InputItem } from "@ant-design/react-native";
 import { useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View, type TextInputProps } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, type TextInputProps } from "react-native";
+import { FocusWithinField } from "./FocusWithinField";
 
 type AuthFieldProps = Pick<TextInputProps, "keyboardType" | "secureTextEntry"> & {
   label: string;
@@ -14,8 +15,8 @@ type AuthFieldProps = Pick<TextInputProps, "keyboardType" | "secureTextEntry"> &
 // These styles intentionally mirror the existing authentication screen palette.
 export function AuthField({ label, value, onChangeText, keyboardType = "default", secureTextEntry = false, passwordVisible = false, onTogglePassword }: AuthFieldProps) {
   const [focused, setFocused] = useState(false);
-  const reveal = secureTextEntry && onTogglePassword ? <Pressable aria-expanded={passwordVisible} accessibilityLabel={passwordVisible ? "Ẩn mật khẩu" : "Hiện mật khẩu"} accessibilityRole="button" accessibilityState={{ expanded: passwordVisible }} onPress={onTogglePassword} style={styles.eye}><FontAwesome color="#A84300" name={passwordVisible ? "eye-slash" : "eye"} size={17} /></Pressable> : undefined;
-  return <View style={[styles.field, focused && styles.fieldFocused]} testID={`auth-field-${label}`}><InputItem accessibilityLabel={label} autoCapitalize="none" autoCorrect={false} extra={reveal} last onBlur={() => setFocused(false)} onChange={onChangeText} onFocus={() => setFocused(true)} placeholder={label} placeholderTextColor="#A78B68" style={styles.input} styles={inputStyles} type={secureTextEntry && !passwordVisible ? "password" : keyboardType} value={value} /></View>;
+  const reveal = secureTextEntry && onTogglePassword ? <Pressable aria-expanded={passwordVisible} accessibilityLabel={passwordVisible ? "Ẩn mật khẩu" : "Hiện mật khẩu"} accessibilityRole="button" accessibilityState={{ expanded: passwordVisible }} onBlur={() => setFocused(false)} onFocus={() => setFocused(true)} onPress={onTogglePassword} style={styles.eye}><FontAwesome color="#A84300" name={passwordVisible ? "eye-slash" : "eye"} size={17} /></Pressable> : undefined;
+  return <FocusWithinField style={[styles.field, focused && styles.fieldFocused]} testID={`auth-field-${label}`}><InputItem accessibilityLabel={label} autoCapitalize="none" autoCorrect={false} extra={reveal} last onBlur={() => setFocused(false)} onChange={onChangeText} onFocus={() => setFocused(true)} placeholder={label} placeholderTextColor="#A78B68" style={styles.input} styles={inputStyles} type={secureTextEntry && !passwordVisible ? "password" : keyboardType} value={value} /></FocusWithinField>;
 }
 
 export function AuthButton({ label, onPress, disabled = false, loading = false }: { label: string; onPress: () => void; disabled?: boolean; loading?: boolean }) {

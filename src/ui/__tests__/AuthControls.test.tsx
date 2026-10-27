@@ -30,6 +30,10 @@ describe("auth UI adapters", () => {
     expect(onChangeText).toHaveBeenCalledWith("mai@example.com");
     const reveal = renderer.root.findByProps({ accessibilityLabel: "Hiện mật khẩu" });
     expect(reveal.props["aria-expanded"]).toBe(false);
+    act(() => reveal.props.onFocus());
+    expect(StyleSheet.flatten(passwordField.props.style)).toMatchObject({ borderColor: "#000000", borderRadius: 24, borderWidth: 1 });
+    act(() => reveal.props.onBlur());
+    expect(StyleSheet.flatten(passwordField.props.style).borderWidth).toBeUndefined();
     act(() => reveal.props.onPress());
     expect(onTogglePassword).toHaveBeenCalledTimes(1);
     act(() => { renderer.update(<AuthField label="Password" onChangeText={onChangeText} onTogglePassword={onTogglePassword} passwordVisible secureTextEntry value="secret" />); });

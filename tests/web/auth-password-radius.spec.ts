@@ -19,6 +19,16 @@ for (const viewport of [
     const field = container.locator("..");
     const reveal = page.getByRole("button", { name: "Hiện mật khẩu", exact: true });
     const expectedField = { radius: "24px", height: "48px", background: "rgb(251, 201, 126)" };
+    const emailField = email.locator("..").locator("..");
+    const readWrapperChrome = (wrapper: typeof field) => wrapper.evaluate((element) => {
+      const computed = getComputedStyle(element);
+      return [computed.borderTopWidth, computed.borderTopColor, computed.borderRadius];
+    });
+    const expectFocusedWrapper = async (wrapper: typeof field) => {
+      await expect(wrapper).toHaveCSS("border-radius", expectedField.radius);
+      await expect(wrapper).toHaveCSS("border-top-width", "1px");
+      await expect(wrapper).toHaveCSS("border-top-color", "rgb(0, 0, 0)");
+    };
     const expectSingleChromeOwner = async (focused: boolean) => {
       await expect(field).toHaveCSS("border-radius", expectedField.radius);
       await expect(field).toHaveCSS("border-top-width", focused ? "1px" : "0px");
@@ -32,6 +42,7 @@ for (const viewport of [
 
     await expect(email).toHaveCSS("height", expectedField.height);
     await expect(email).toHaveCSS("background-color", expectedField.background);
+    await expect(emailField).toHaveCSS("border-top-width", "0px");
     await expect(container).toHaveCSS("border-radius", "0px");
     await expect(container).toHaveCSS("height", expectedField.height);
     await expect(container).toHaveCSS("background-color", expectedField.background);
@@ -58,22 +69,37 @@ for (const viewport of [
     expect(revealReceivesPointer).toBe(true);
     await reveal.click();
     await expect(page.getByRole("button", { name: "Ẩn mật khẩu", exact: true })).toBeVisible();
+    await expectSingleChromeOwner(true);
     await page.getByRole("button", { name: "Ẩn mật khẩu", exact: true }).tap();
     await expect(reveal).toBeVisible();
+    await expectSingleChromeOwner(true);
 
-    // Each supported focus origin must leave chrome on the common wrapper.
+    // Email and Password must expose identical wrapper chrome for each focus origin.
+    await email.focus();
+    await expectFocusedWrapper(emailField);
+    const keyboardEmailChrome = await readWrapperChrome(emailField);
     await password.focus();
     await expectSingleChromeOwner(true);
-    await page.locator("body").press("Tab");
+    expect(await readWrapperChrome(field)).toEqual(keyboardEmailChrome);
+
+    await email.click();
+    await expectFocusedWrapper(emailField);
+    const mouseEmailChrome = await readWrapperChrome(emailField);
     await password.click();
     await expectSingleChromeOwner(true);
-    await page.locator("body").press("Tab");
+    expect(await readWrapperChrome(field)).toEqual(mouseEmailChrome);
+
+    await email.tap();
+    await expectFocusedWrapper(emailField);
+    const touchEmailChrome = await readWrapperChrome(emailField);
     await password.tap();
     await expectSingleChromeOwner(true);
+    expect(await readWrapperChrome(field)).toEqual(touchEmailChrome);
 
     await password.fill("Strong!1");
     await reveal.focus();
     await expect(reveal).toBeFocused();
+    await expectSingleChromeOwner(true);
     await page.keyboard.press("Space");
     const conceal = page.getByRole("button", { name: "Ẩn mật khẩu", exact: true });
     await expect(conceal).toBeFocused();

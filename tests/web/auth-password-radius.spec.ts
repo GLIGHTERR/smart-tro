@@ -34,6 +34,17 @@ for (const viewport of [
       await expect(reveal).toHaveCSS("outline-style", "solid");
       await expect(reveal).toHaveCSS("outline-color", "rgba(0, 0, 0, 0)");
     };
+    const expectUnifiedRevealSurface = async () => {
+      await expect(reveal).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+      const revealBox = await reveal.boundingBox();
+      expect(revealBox).not.toBeNull();
+      const samples = await page.evaluate(({ x, y }) => [x - 2, x + 2].map((sampleX) => {
+        let element = document.elementFromPoint(sampleX, y);
+        while (element && getComputedStyle(element).backgroundColor === "rgba(0, 0, 0, 0)") element = element.parentElement;
+        return element ? getComputedStyle(element).backgroundColor : null;
+      }), { x: Math.round(revealBox!.x), y: Math.round(revealBox!.y + revealBox!.height / 2) });
+      expect(samples[0]).toEqual(samples[1]);
+    };
     const expectSingleChromeOwner = async (focused: boolean) => {
       await expect(field).toHaveCSS("border-radius", expectedField.radius);
       await expect(field).toHaveCSS("border-top-width", focused ? "1px" : "0px");
@@ -72,6 +83,7 @@ for (const viewport of [
       return hit === element || element.contains(hit);
     });
     expect(revealReceivesPointer).toBe(true);
+    await expectUnifiedRevealSurface();
     await reveal.click();
     await expect(page.getByRole("button", { name: "Ẩn mật khẩu", exact: true })).toBeVisible();
     await expectSingleChromeOwner(true);
@@ -85,6 +97,7 @@ for (const viewport of [
     const keyboardEmailChrome = await readWrapperChrome(emailField);
     await password.focus();
     await expectSingleChromeOwner(true);
+    await expectUnifiedRevealSurface();
     expect(await readWrapperChrome(field)).toEqual(keyboardEmailChrome);
 
     await email.click();
@@ -110,6 +123,16 @@ for (const viewport of [
     await expect(reveal).toBeFocused();
     await expectSingleChromeOwner(true);
     await expectRevealHasNoChrome();
+    await expectUnifiedRevealSurface();
+
+    const pressedBox = await reveal.boundingBox();
+    expect(pressedBox).not.toBeNull();
+    await page.mouse.move(pressedBox!.x + pressedBox!.width / 2, pressedBox!.y + pressedBox!.height / 2);
+    await page.mouse.down();
+    await expectUnifiedRevealSurface();
+    await page.mouse.up();
+    await page.getByRole("button", { name: "Ẩn mật khẩu", exact: true }).click();
+    await expect(reveal).toBeVisible();
 
     await reveal.focus();
     await expect(reveal).toBeFocused();

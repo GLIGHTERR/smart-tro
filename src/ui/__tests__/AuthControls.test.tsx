@@ -16,11 +16,9 @@ describe("auth UI adapters", () => {
     const inputs = renderer.root.findAllByType(TextInput);
     const [email, password] = inputs;
     if (!email || !password) throw new Error("Missing auth inputs");
-    expect(email.props).toMatchObject({ autoCapitalize: "none", autoCorrect: false, placeholder: "Email", placeholderTextColor: "#A78B68", type: "default" });
-    expect(password.props).toMatchObject({ type: "password", value: "secret" });
-    expect(password.props.styles.container).toMatchObject({ backgroundColor: "#FBC97E", borderRadius: 0, height: 48 });
-    expect(password.props.styles.extra).toMatchObject({ backgroundColor: "transparent", height: 48, width: 54 });
-    expect(password.props.styles.input).toMatchObject({ borderRadius: 0, borderWidth: 0, minWidth: 0, outlineColor: "transparent", outlineStyle: "solid", outlineWidth: 0 });
+    expect(email.props).toMatchObject({ autoCapitalize: "none", autoCorrect: false, placeholder: "Email", placeholderTextColor: "#A78B68", secureTextEntry: false, type: "default" });
+    expect(password.props).toMatchObject({ secureTextEntry: true, type: "password", value: "secret" });
+    expect(StyleSheet.flatten(password.props.style)).toMatchObject({ backgroundColor: "transparent", borderRadius: 0, borderWidth: 0, height: 48, outlineColor: "transparent", outlineStyle: "solid", outlineWidth: 0 });
     const passwordField = renderer.root.findAllByType(View).filter((field) => (StyleSheet.flatten(field.props.style) ?? {}).marginBottom === 16)[1];
     if (!passwordField) throw new Error("Missing password field frame");
     act(() => password.props.onFocus());
@@ -30,7 +28,7 @@ describe("auth UI adapters", () => {
     act(() => email.props.onChangeText("mai@example.com"));
     expect(onChangeText).toHaveBeenCalledWith("mai@example.com");
     const reveal = renderer.root.findByProps({ accessibilityLabel: "Hiện mật khẩu" });
-    expect(StyleSheet.flatten(reveal.props.style)).toMatchObject({ backgroundColor: "transparent", borderRadius: 0, borderWidth: 0, height: 48, width: 54 });
+    expect(StyleSheet.flatten(reveal.props.style)).toMatchObject({ backgroundColor: "transparent", borderRadius: 0, borderWidth: 0, height: 48, position: "absolute", width: 54 });
     expect(reveal.props["aria-expanded"]).toBe(false);
     act(() => reveal.props.onFocus());
     expect(StyleSheet.flatten(passwordField.props.style)).toMatchObject({ borderColor: "#000000", borderRadius: 24, borderWidth: 1 });
@@ -39,7 +37,7 @@ describe("auth UI adapters", () => {
     act(() => reveal.props.onPress());
     expect(onTogglePassword).toHaveBeenCalledTimes(1);
     act(() => { renderer.update(<AuthField label="Password" onChangeText={onChangeText} onTogglePassword={onTogglePassword} passwordVisible secureTextEntry value="secret" />); });
-    expect(renderer.root.findByType(TextInput).props.type).toBe("default");
+    expect(renderer.root.findByType(TextInput).props).toMatchObject({ secureTextEntry: false, type: "default" });
     const hide = renderer.root.findByProps({ accessibilityLabel: "Ẩn mật khẩu" });
     expect(hide.props.accessibilityState).toEqual({ expanded: true });
     expect(hide.props["aria-expanded"]).toBe(true);

@@ -218,9 +218,8 @@ describe("AuthScreen sign in password field", () => {
     const passwordInput = input(renderer.root, "Mật khẩu");
     const reveal = renderer.root.findByProps({ accessibilityLabel: "Hiện mật khẩu" });
 
-    expect(passwordInput.props.styles.container).toMatchObject({ backgroundColor: "#FBC97E", borderBottomWidth: 0, borderRadius: 0, height: 48 });
-    expect(passwordInput.props.styles.input).toMatchObject({ borderRadius: 0, borderWidth: 0, color: "#5B4126", height: 48, outlineWidth: 0, paddingHorizontal: 28, paddingRight: 54 });
-    expect(StyleSheet.flatten(reveal.props.style)).toMatchObject({ alignItems: "center", height: 48, width: 54 });
+    expect(StyleSheet.flatten(passwordInput.props.style)).toMatchObject({ backgroundColor: "transparent", borderRadius: 0, borderWidth: 0, color: "#5B4126", height: 48, outlineWidth: 0, paddingHorizontal: 28, paddingRight: 54 });
+    expect(StyleSheet.flatten(reveal.props.style)).toMatchObject({ alignItems: "center", backgroundColor: "transparent", height: 48, position: "absolute", width: 54 });
     expect(reveal.props.accessibilityRole).toBe("button");
     expect(reveal.props.accessibilityState).toEqual({ expanded: false });
     act(() => reveal.props.onPress());

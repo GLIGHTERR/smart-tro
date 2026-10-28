@@ -24,6 +24,7 @@ EDIT_PROFILE_XML = """<hierarchy>
 
 HOME_XML = """<hierarchy><node text="Xin chào" bounds="[0,0][1,1]" /><node text="Tài khoản: UC-04 — Tài khoản/Cá nhân" bounds="[0,2][1,3]" /></hierarchy>"""
 ACCOUNT_XML = """<hierarchy><node text="Tài khoản" bounds="[0,0][1,1]" /><node text="Chỉnh sửa thông tin cá nhân" bounds="[0,2][1,3]" /></hierarchy>"""
+AUTH_XML = """<hierarchy><node text="Đăng nhập" bounds="[0,0][1,1]" /><node text="Đăng ký" bounds="[0,2][1,3]" /></hierarchy>"""
 
 
 class HierarchyTests(unittest.TestCase):
@@ -155,32 +156,26 @@ class ProvenanceTests(unittest.TestCase):
             with self.assertRaisesRegex(AssertionError, "Expected installed product package"):
                 product_smoke.assert_product_provenance()
 
-    def test_run_captures_normal_focus_and_error_evidence_without_activating_save(self):
-        focused = EDIT_PROFILE_XML.replace('focused="false"', 'focused="true"')
-        invalid = EDIT_PROFILE_XML.replace('  <node text="Số điện thoại"', '  <node text="Họ và tên là bắt buộc." bounds="[10,91][300,110]" />\n  <node text="Số điện thoại"')
-        dumps = [HOME_XML, HOME_XML, ACCOUNT_XML, ACCOUNT_XML, EDIT_PROFILE_XML, EDIT_PROFILE_XML, EDIT_PROFILE_XML, focused, focused, invalid, invalid, invalid]
+    def test_run_captures_the_clean_unauthenticated_entry_without_touching_backend_data(self):
+        dumps = [AUTH_XML, AUTH_XML]
         png = subprocess.CompletedProcess(["adb"], 0, stdout=b"png", stderr=b"")
-        with tempfile.TemporaryDirectory() as directory, patch.object(product_smoke, "OUT", product_smoke.Path(directory)), patch.object(product_smoke, "assert_product_provenance", return_value={"commit": "a" * 40, "package": product_smoke.PACKAGE, "pilot": False}), patch.object(product_smoke, "foreground", return_value={"package": product_smoke.PACKAGE, "activity": ".MainActivity"}), patch.object(product_smoke, "hierarchy", side_effect=dumps), patch.object(product_smoke, "adb", return_value=png), patch.object(product_smoke, "shell") as shell:
+        with tempfile.TemporaryDirectory() as directory, patch.object(product_smoke, "OUT", product_smoke.Path(directory)), patch.object(product_smoke, "assert_product_provenance", return_value={"commit": "a" * 40, "package": product_smoke.PACKAGE, "pilot": False}), patch.object(product_smoke, "foreground", return_value={"package": product_smoke.PACKAGE, "activity": ".MainActivity"}), patch.object(product_smoke, "hierarchy", side_effect=dumps), patch.object(product_smoke, "adb", return_value=png), patch.object(product_smoke, "shell"):
             product_smoke.run()
             result = json.loads((product_smoke.Path(directory) / "result.json").read_text(encoding="utf-8"))
         self.assertEqual(result["status"], "PASS")
-        self.assertTrue(result["fieldStateMatrix"]["fullName"]["focused"])
-        self.assertEqual(result["fieldStateMatrix"]["fullName"]["invalidError"], "Họ và tên là bắt buộc.")
-        self.assertEqual(result["mutation"], {"saveControlTappedWhileDisabled": True, "validSaveActivated": False, "backendChanged": False})
-        self.assertNotIn("Lưu", [arg for call in shell.call_args_list for arg in call.args])
+        self.assertEqual(result["flow"], ["Auth", "Đăng ký"])
+        self.assertEqual(result["mutation"], {"backendChanged": False})
 
-    def test_run_writes_a_failed_result_for_a_three_pixel_required_error(self):
-        focused = EDIT_PROFILE_XML.replace('focused="false"', 'focused="true"')
-        clipped = EDIT_PROFILE_XML.replace('  <node text="Số điện thoại"', '  <node text="Họ và tên là bắt buộc." bounds="[10,91][300,94]" />\n  <node text="Số điện thoại"')
-        dumps = [HOME_XML, HOME_XML, ACCOUNT_XML, ACCOUNT_XML, EDIT_PROFILE_XML, EDIT_PROFILE_XML, EDIT_PROFILE_XML, focused, focused, clipped, clipped]
+    def test_run_rejects_an_authenticated_review_home_at_clean_entry(self):
+        unsafe_auth = AUTH_XML.replace("</hierarchy>", '<node text="Xin chào" bounds="[0,4][1,5]" /></hierarchy>')
+        dumps = [unsafe_auth, unsafe_auth]
         png = subprocess.CompletedProcess(["adb"], 0, stdout=b"png", stderr=b"")
         with tempfile.TemporaryDirectory() as directory, patch.object(product_smoke, "OUT", product_smoke.Path(directory)), patch.object(product_smoke, "assert_product_provenance", return_value={"commit": "a" * 40, "package": product_smoke.PACKAGE, "pilot": False}), patch.object(product_smoke, "foreground", return_value={"package": product_smoke.PACKAGE, "activity": ".MainActivity"}), patch.object(product_smoke, "hierarchy", side_effect=dumps), patch.object(product_smoke, "adb", return_value=png), patch.object(product_smoke, "shell"):
-            with self.assertRaisesRegex(AssertionError, "Clipped Field text"):
+            with self.assertRaisesRegex(AssertionError, "Unauthenticated product entry"):
                 product_smoke.run()
             result = json.loads((product_smoke.Path(directory) / "result.json").read_text(encoding="utf-8"))
         self.assertEqual(result["status"], "FAIL")
-        self.assertIn("[10,91][300,94]", result["error"])
-        self.assertEqual(result["mutation"]["validSaveActivated"], False)
+        self.assertIn("Unauthenticated product entry", result["error"])
 
     def test_retries_adb_failure_and_preserves_the_last_failure(self):
         failed = subprocess.CalledProcessError(1, ["adb"])

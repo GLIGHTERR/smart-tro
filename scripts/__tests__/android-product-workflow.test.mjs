@@ -11,6 +11,8 @@ test("product fallback is isolated, exact-SHA pinned, and explicitly non-pilot",
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /ref: \$\{\{ github\.event\.pull_request\.head\.sha \|\| inputs\.ref \|\| github\.sha \}\}/);
   assert.match(workflow, /EXPO_PUBLIC_UI_PILOT: "false"/);
+  assert.match(workflow, /EXPO_PUBLIC_HOME_REVIEW: "false"/);
+  assert.match(workflow, /EXPO_PUBLIC_ACCOUNT_REVIEW: "false"/);
   assert.match(workflow, /smart-tro-product-apk-\$\{\{ github\.event\.pull_request\.head\.sha \|\| inputs\.ref \|\| github\.sha \}\}/);
   assert.match(workflow, /retention-days: 14/);
   assert.doesNotMatch(workflow, /android-pilot|smart-tro-pilot/);
@@ -21,15 +23,12 @@ test("two product emulator attempts retain a complete immutable Field-state matr
   assert.match(workflow, /scripts\/gli178\/product_smoke\.py/);
   assert.match(workflow, /smart-tro-product-android-evidence/);
   assert.match(smoke, /PILOT_MARKERS/);
-  assert.match(smoke, /Home", "Account", "Edit Profile/);
-  assert.match(smoke, /Chỉnh sửa thông tin cá nhân/);
+  assert.match(smoke, /Auth", "Đăng ký/);
+  assert.match(smoke, /unauthenticated product entry/);
   assert.match(smoke, /def hierarchy\(retries=2\)/);
   assert.match(smoke, /except \(ET\.ParseError, subprocess\.CalledProcessError\)/);
   assert.match(smoke, /assert_product_provenance/);
-  assert.match(smoke, /edit_profile_matrix/);
-  assert.match(smoke, /Full name focus state/);
-  assert.match(smoke, /Họ và tên là bắt buộc\./);
-  assert.match(smoke, /validSaveActivated": False/);
+  assert.match(smoke, /Unauthenticated product entry must not expose authenticated review content/);
   assert.match(workflow, /GLI178_EXPECTED_COMMIT="\$\(git rev-parse HEAD\)" python3 scripts\/gli178\/product_smoke\.py/);
   assert.match(workflow, /android-product-smoke\/provenance\.json/);
   assert.match(testWorkflow, /python3 -m unittest scripts\.gli178\.test_product_smoke/);

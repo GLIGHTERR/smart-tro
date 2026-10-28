@@ -33,12 +33,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      # This is the normal product entry; the fixture only supplies offline QA data.
+      # Product artifacts must begin unauthenticated; review fixtures are covered separately.
       EXPO_PUBLIC_UI_PILOT: "false"
-      EXPO_PUBLIC_HOME_REVIEW: "true"
-      EXPO_PUBLIC_HOME_REVIEW_SCENARIO: "single"
-      EXPO_PUBLIC_ACCOUNT_REVIEW: "true"
-      EXPO_PUBLIC_ACCOUNT_REVIEW_SCENARIO: "one"
+      EXPO_PUBLIC_HOME_REVIEW: "false"
+      EXPO_PUBLIC_ACCOUNT_REVIEW: "false"
     steps:
       - uses: actions/checkout@v4
         with:

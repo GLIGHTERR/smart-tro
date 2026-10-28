@@ -11,7 +11,7 @@ PACKAGE = "com.smartplatform.smarttro"
 ACTIVITY = f"{PACKAGE}/.MainActivity"
 OUT = Path(os.environ.get("GLI178_EVIDENCE_DIR", "android-product-smoke"))
 PILOT_MARKERS = ("G1 UI pilot", "pilot_", "QA preview only", "EXPO_PUBLIC_UI_PILOT=true")
-FIXTURE = "authorized offline review fixture; Save is tapped only while disabled"
+FIXTURE = "clean unauthenticated product entry; no review fixture is enabled"
 MIN_READABLE_TEXT_HEIGHT = 16
 FAILED_SAVE_NOTICES = ("Chưa thể lưu thay đổi. Vui lòng thử lại.", "Không thể lưu thay đổi")
 
@@ -198,58 +198,18 @@ def run_matrix():
     shell("am", "force-stop", PACKAGE)
     shell("am", "start", "-W", "-n", ACTIVITY)
     wait_for(lambda: foreground()["package"] == PACKAGE, "product foreground")
-    wait_for(lambda: "Xin chào" in hierarchy(), "product Home entry")
-    home = hierarchy()
-    assert_product(home)
-    capture("01-product-home", home)
-    tap(node(home, "Tài khoản: UC-04 — Tài khoản/Cá nhân"))
-    wait_for(lambda: "Tài khoản" in hierarchy(), "Account entry")
-    account = hierarchy()
-    assert_product(account)
-    node(account, "Chỉnh sửa thông tin cá nhân")
-    capture("02-product-account", account)
-    tap(node(account, "Chỉnh sửa thông tin cá nhân"))
-    wait_for(lambda: "Cập nhật thông tin cá nhân" in hierarchy(), "Edit Profile entry")
-    edit = hierarchy()
-    assert_product(edit)
-    capture("03-edit-profile-normal-disabled", edit)
-    matrix = edit_profile_matrix(edit)
-
-    tap(node(edit, "Lưu"))
-    time.sleep(0.4)
-    after_disabled_save = hierarchy()
-    assert_product(after_disabled_save)
-    assert_disabled_save_attempt(edit, after_disabled_save)
-    capture("03a-edit-profile-save-disabled", after_disabled_save)
-    matrix["saveDisabledBeforeMutation"] = True
-
-    name_input = input_node(after_disabled_save, "Họ và tên")
-    tap(name_input)
-    wait_for(lambda: input_node(hierarchy(), "Họ và tên").get("focused") == "true", "Full name focus state")
-    focused = hierarchy()
-    assert_product(focused)
-    matrix["fullName"]["focused"] = True
-    capture("04-edit-profile-full-name-focused", focused)
-
-    clear_input(name_input)
-    wait_for(lambda: "Họ và tên là bắt buộc." in hierarchy(), "Full name validation error")
-    invalid = hierarchy()
-    assert_product(invalid)
-    capture("05-edit-profile-full-name-error", invalid)
-    assert_field_layout(invalid, "Họ và tên", "Họ và tên", "Họ và tên là bắt buộc.", require_readable_detail=True)
-    tap(node(invalid, "Lưu"))
-    time.sleep(0.4)
-    after_invalid_save = hierarchy()
-    assert_product(after_invalid_save)
-    assert_disabled_save_attempt(invalid, after_invalid_save)
-    matrix["fullName"]["invalidError"] = "Họ và tên là bắt buộc."
-    matrix["saveDisabledAfterInvalidValue"] = True
+    wait_for(lambda: "Đăng ký" in hierarchy(), "unauthenticated product entry")
+    auth = hierarchy()
+    assert_product(auth)
+    node(auth, "Đăng ký")
+    if "Xin chào" in auth or "Tài khoản" in auth:
+        raise AssertionError("Unauthenticated product entry must not expose authenticated review content")
+    capture("01-product-auth", auth)
 
     OUT.mkdir(parents=True, exist_ok=True)
     (OUT / "result.json").write_text(json.dumps({
-        "status": "PASS", "entry": "src/App", "flow": ["Home", "Account", "Edit Profile"],
-        "provenance": provenance, "fixture": FIXTURE, "mutation": {"saveControlTappedWhileDisabled": True, "validSaveActivated": False, "backendChanged": False},
-        "fieldStateMatrix": matrix,
+        "status": "PASS", "entry": "src/App", "flow": ["Auth", "Đăng ký"],
+        "provenance": provenance, "fixture": FIXTURE, "mutation": {"backendChanged": False},
     }, indent=2), encoding="utf-8")
 
 

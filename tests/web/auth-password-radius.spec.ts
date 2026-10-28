@@ -16,10 +16,10 @@ for (const viewport of [
     const email = page.getByLabel("Email");
     const password = page.getByLabel("Mật khẩu", { exact: true });
     const container = password.locator("..");
-    const field = container.locator("..");
+    const field = page.getByTestId("auth-field-Mật khẩu");
     const reveal = page.getByRole("button", { name: "Hiện mật khẩu", exact: true });
     const expectedField = { radius: "24px", height: "48px", background: "rgb(251, 201, 126)" };
-    const emailField = email.locator("..").locator("..");
+    const emailField = page.getByTestId("auth-field-Email");
     const readWrapperChrome = (wrapper: typeof field) => wrapper.evaluate((element) => {
       const computed = getComputedStyle(element);
       return [computed.borderTopWidth, computed.borderTopColor, computed.borderRadius];
@@ -57,12 +57,12 @@ for (const viewport of [
     };
 
     await expect(email).toHaveCSS("height", expectedField.height);
-    await expect(email).toHaveCSS("background-color", expectedField.background);
+    await expect(email).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
     await expect(emailField).toHaveCSS("border-top-width", "0px");
     await expect(container).toHaveCSS("border-radius", "0px");
     await expect(container).toHaveCSS("height", expectedField.height);
     await expect(container).toHaveCSS("background-color", expectedField.background);
-    await expect(container).toHaveCSS("overflow", "hidden");
+    await expect(field).toHaveCSS("overflow", "hidden");
     await expectSingleChromeOwner(false);
 
     // The visual field must contain the entire interactive reveal target, not
@@ -118,7 +118,6 @@ for (const viewport of [
     await email.focus();
     await page.keyboard.press("Tab");
     await expect(password).toBeFocused();
-    await page.keyboard.press("Tab");
     await page.keyboard.press("Tab");
     await expect(reveal).toBeFocused();
     await expectSingleChromeOwner(true);

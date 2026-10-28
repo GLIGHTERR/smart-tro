@@ -1,0 +1,34 @@
+{
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "environment": "preview",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://smart-platform-renter-api.onrender.com",
+        "EXPO_PUBLIC_AUTH_USE_MOCK": "false",
+        "EXPO_PUBLIC_REVIEW_SOCIALS": "true",
+        "EXPO_PUBLIC_UC03_REVIEW": "true"
+      }
+    },
+    "pilot": {
+      "extends": "preview",
+      "env": {
+        "EXPO_PUBLIC_UI_PILOT": "true"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "environment": "production",
+      "env": {
+        "EXPO_PUBLIC_UC03_REVIEW": "false"
+      }
+    }
+  }
+}

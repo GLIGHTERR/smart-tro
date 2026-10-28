@@ -1,0 +1,277 @@
+import React from "react";
+import { Pressable, StyleSheet, Text } from "react-native";
+import TestRenderer, { act, type ReactTestInstance } from "react-test-renderer";
+
+import { GatewayError, type AuthGateway } from "../../auth/gateway";
+import { AuthScreen } from "../AuthScreen";
+
+jest.mock("@expo/vector-icons/FontAwesome", () => "FontAwesome");
+jest.mock("@expo-google-fonts/be-vietnam-pro/useFonts", () => ({ useFonts: () => [true, null] }));
+jest.mock("react-native-safe-area-context", () => ({ SafeAreaView: "SafeAreaView" }));
+const mockSignIn = jest.fn();
+jest.mock("@/auth/AuthProvider", () => ({ useAuth: () => ({ signIn: mockSignIn }) }));
+jest.mock("@/auth/recoveryReview", () => ({ getRecoveryReviewStep: () => null }));
+
+function textOf(node: ReactTestInstance): string {
+  return node.findAllByType(Text).map((text) => text.props.children).flat(Infinity).join("");
+}
+
+function button(root: ReactTestInstance, label: string): ReactTestInstance {
+  const result = root.findAllByType(Pressable).find((pressable) => textOf(pressable) === label);
+  if (!result) throw new Error(`Missing button: ${label}`);
+  return result;
+}
+
+function input(root: ReactTestInstance, label: string): ReactTestInstance {
+  const matches = root.findAllByProps({ accessibilityLabel: label });
+  return (matches.find((node) => typeof node.props.onChangeText === "function") ?? matches[0]) as ReactTestInstance;
+}
+
+function buttonLabels(root: ReactTestInstance): string[] {
+  return root.findAllByType(Pressable).map(textOf);
+}
+
+function gateway(): AuthGateway {
+  return {
+    requestOtp: jest.fn().mockResolvedValue({ attemptId: "attempt-1", expiresAt: 601_000, resendAvailableAt: 0 }),
+    resendOtp: jest.fn(),
+    verifyOtp: jest.fn().mockResolvedValue(undefined),
+    createAccount: jest.fn().mockResolvedValue(undefined),
+    signIn: jest.fn(),
+    refresh: jest.fn(),
+    me: jest.fn(),
+    logout: jest.fn(),
+    requestPasswordRecovery: jest.fn(),
+    verifyPasswordRecovery: jest.fn(),
+    resetPassword: jest.fn()
+  } as AuthGateway;
+}
+
+async function startSignup(renderer: TestRenderer.ReactTestRenderer, auth: AuthGateway) {
+  act(() => button(renderer.root, "Đăng ký").props.onPress());
+  act(() => input(renderer.root, "Email").props.onChangeText(" Mai@Example.COM "));
+  await act(async () => { button(renderer.root, "Gửi OTP").props.onPress(); await Promise.resolve(); });
+  expect(auth.requestOtp).toHaveBeenCalledWith("mai@example.com");
+  act(() => input(renderer.root, "Mã OTP").props.onChangeText("123456"));
+  await act(async () => { button(renderer.root, "Tiếp tục").props.onPress(); await Promise.resolve(); });
+  expect(auth.verifyOtp).toHaveBeenCalledWith("mai@example.com", "attempt-1", "123456");
+}
+
+describe("AuthScreen signup", () => {
+  beforeEach(() => { mockSignIn.mockReset(); jest.useFakeTimers(); });
+  afterEach(() => { jest.useRealTimers(); });
+
+  it("completes the approved four-step flow with normalized profile data and no auto-login", async () => {
+    const auth = gateway();
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<AuthScreen gateway={auth} />); });
+
+    await startSignup(renderer, auth);
+    act(() => input(renderer.root, "Họ và tên (bắt buộc)").props.onChangeText("  Mai   An  "));
+    act(() => input(renderer.root, "Số điện thoại (không bắt buộc)").props.onChangeText(" +84 (901) 234-567 "));
+    act(() => button(renderer.root, "Tiếp tục").props.onPress());
+    act(() => input(renderer.root, "Mật khẩu").props.onChangeText("Strong!1"));
+    act(() => input(renderer.root, "Nhập lại mật khẩu").props.onChangeText("Strong!1"));
+    await act(async () => { button(renderer.root, "Tạo tài khoản").props.onPress(); await Promise.resolve(); });
+
+    expect(auth.createAccount).toHaveBeenCalledWith("mai@example.com", "attempt-1", "123456", "Strong!1", { displayName: "Mai An", phone: "+84 (901) 234-567" });
+    expect(mockSignIn).not.toHaveBeenCalled();
+    expect(textOf(renderer.root)).toContain("Đăng ký thành công. Hãy đăng nhập để tiếp tục.");
+    act(() => renderer.unmount());
+  });
+
+  it("sends one OTP request for two synchronous taps and permits retry after failure", async () => {
+    const auth = gateway();
+    let rejectRequest!: (reason: Error) => void;
+    (auth.requestOtp as jest.Mock).mockImplementationOnce(() => new Promise((_, reject) => { rejectRequest = reject; }));
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<AuthScreen gateway={auth} />); });
+
+    act(() => button(renderer.root, "Đăng ký").props.onPress());
+    act(() => input(renderer.root, "Email").props.onChangeText("race@example.com"));
+    act(() => { button(renderer.root, "Gửi OTP").props.onPress(); button(renderer.root, "Gửi OTP").props.onPress(); });
+    expect(auth.requestOtp).toHaveBeenCalledTimes(1);
+
+    await act(async () => { rejectRequest(new Error("offline")); await Promise.resolve(); });
+    await act(async () => { button(renderer.root, "Gửi OTP").props.onPress(); await Promise.resolve(); });
+    expect(auth.requestOtp).toHaveBeenCalledTimes(2);
+    act(() => renderer.unmount());
+  });
+
+  it("clears entered OTP on email change and clears passwords while retaining personal data on Back", async () => {
+    const auth = gateway();
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<AuthScreen gateway={auth} />); });
+
+    act(() => button(renderer.root, "Đăng ký").props.onPress());
+    act(() => input(renderer.root, "Email").props.onChangeText("mai@example.com"));
+    await act(async () => { button(renderer.root, "Gửi OTP").props.onPress(); await Promise.resolve(); });
+    act(() => input(renderer.root, "Mã OTP").props.onChangeText("123456"));
+    act(() => button(renderer.root, "Đổi email").props.onPress());
+    expect(input(renderer.root, "Email").props.value).toBe("mai@example.com");
+    await act(async () => { button(renderer.root, "Gửi OTP").props.onPress(); await Promise.resolve(); });
+    expect(auth.requestOtp).toHaveBeenCalledTimes(1);
+    expect(input(renderer.root, "Mã OTP").props.value).toBe("");
+
+    act(() => input(renderer.root, "Mã OTP").props.onChangeText("123456"));
+    await act(async () => { button(renderer.root, "Tiếp tục").props.onPress(); await Promise.resolve(); });
+    act(() => input(renderer.root, "Họ và tên (bắt buộc)").props.onChangeText("Mai"));
+    act(() => input(renderer.root, "Số điện thoại (không bắt buộc)").props.onChangeText("0901234567"));
+    act(() => button(renderer.root, "Tiếp tục").props.onPress());
+    act(() => input(renderer.root, "Mật khẩu").props.onChangeText("Strong!1"));
+    act(() => input(renderer.root, "Nhập lại mật khẩu").props.onChangeText("Strong!1"));
+    act(() => button(renderer.root, "Quay lại").props.onPress());
+    expect(input(renderer.root, "Họ và tên (bắt buộc)").props.value).toBe("Mai");
+    expect(input(renderer.root, "Số điện thoại (không bắt buộc)").props.value).toBe("0901234567");
+    act(() => button(renderer.root, "Tiếp tục").props.onPress());
+    expect(input(renderer.root, "Mật khẩu").props.value).toBe("");
+    expect(input(renderer.root, "Nhập lại mật khẩu").props.value).toBe("");
+    act(() => renderer.unmount());
+  });
+
+  it.each(["before resend", "after resend"]) ("requests and verifies a new OTP for a changed email %s", async (variant) => {
+    const auth = gateway();
+    const requestOtp = auth.requestOtp as jest.Mock;
+    const resendOtp = auth.resendOtp as jest.Mock;
+    requestOtp
+      .mockResolvedValueOnce({ attemptId: "old-attempt", expiresAt: 601_000, resendAvailableAt: 0 })
+      .mockResolvedValueOnce({ attemptId: "new-attempt", expiresAt: 601_000, resendAvailableAt: 0 });
+    resendOtp.mockResolvedValue({ attemptId: "old-attempt", expiresAt: 601_000, resendAvailableAt: 0 });
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<AuthScreen gateway={auth} />); });
+
+    act(() => button(renderer.root, "Đăng ký").props.onPress());
+    act(() => input(renderer.root, "Email").props.onChangeText("qa-original@example.com"));
+    await act(async () => { button(renderer.root, "Gửi OTP").props.onPress(); await Promise.resolve(); });
+    act(() => input(renderer.root, "Mã OTP").props.onChangeText("12"));
+    if (variant === "after resend") await act(async () => { button(renderer.root, "Gửi lại mã OTP").props.onPress(); await Promise.resolve(); });
+    act(() => button(renderer.root, "Đổi email").props.onPress());
+    expect(input(renderer.root, "Email").props.value).toBe("qa-original@example.com");
+    act(() => input(renderer.root, "Email").props.onChangeText("zz-changed@example.com"));
+    await act(async () => { button(renderer.root, "Gửi OTP").props.onPress(); await Promise.resolve(); });
+
+    expect(auth.requestOtp).toHaveBeenNthCalledWith(2, "zz-changed@example.com", "old-attempt");
+    expect(auth.resendOtp).toHaveBeenCalledTimes(variant === "after resend" ? 1 : 0);
+    expect(input(renderer.root, "Mã OTP").props.value).toBe("");
+    act(() => input(renderer.root, "Mã OTP").props.onChangeText("123456"));
+    await act(async () => { button(renderer.root, "Tiếp tục").props.onPress(); await Promise.resolve(); });
+    expect(auth.verifyOtp).toHaveBeenLastCalledWith("zz-changed@example.com", "new-attempt", "123456");
+    expect(input(renderer.root, "Họ và tên (bắt buộc)")).toBeTruthy();
+    act(() => renderer.unmount());
+  });
+
+  it("keeps the live attempt when a changed-email replacement request fails", async () => {
+    const auth = gateway();
+    const requestOtp = auth.requestOtp as jest.Mock;
+    requestOtp
+      .mockResolvedValueOnce({ attemptId: "old-attempt", expiresAt: 601_000, resendAvailableAt: 0 })
+      .mockRejectedValueOnce(new Error("offline"));
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<AuthScreen gateway={auth} />); });
+
+    act(() => button(renderer.root, "Đăng ký").props.onPress());
+    act(() => input(renderer.root, "Email").props.onChangeText("old@example.com"));
+    await act(async () => { button(renderer.root, "Gửi OTP").props.onPress(); await Promise.resolve(); });
+    act(() => button(renderer.root, "Đổi email").props.onPress());
+    act(() => input(renderer.root, "Email").props.onChangeText("new@example.com"));
+    await act(async () => { button(renderer.root, "Gửi OTP").props.onPress(); await Promise.resolve(); });
+
+    expect(requestOtp).toHaveBeenLastCalledWith("new@example.com", "old-attempt");
+    expect(input(renderer.root, "Email").props.value).toBe("new@example.com");
+    expect(button(renderer.root, "Gửi OTP")).toBeTruthy();
+    act(() => input(renderer.root, "Email").props.onChangeText("old@example.com"));
+    await act(async () => { button(renderer.root, "Gửi OTP").props.onPress(); await Promise.resolve(); });
+    expect(requestOtp).toHaveBeenCalledTimes(2);
+    expect(input(renderer.root, "Mã OTP").props.value).toBe("");
+    act(() => renderer.unmount());
+  });
+
+  it("uses the approved action order and keeps all three social buttons behind the review flag", async () => {
+    const auth = gateway();
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<AuthScreen gateway={auth} showSocials />); });
+
+    expect(buttonLabels(renderer.root)).toEqual(expect.arrayContaining(["Đăng nhập với Facebook", "Đăng nhập với Google", "Đăng nhập với Apple"]));
+    act(() => button(renderer.root, "Đăng ký").props.onPress());
+    act(() => input(renderer.root, "Email").props.onChangeText("mai@example.com"));
+    await act(async () => { button(renderer.root, "Gửi OTP").props.onPress(); await Promise.resolve(); });
+    const otpButtons = buttonLabels(renderer.root);
+    expect(otpButtons.indexOf("Đổi email")).toBeLessThan(otpButtons.indexOf("Tiếp tục"));
+    expect(otpButtons.indexOf("Tiếp tục")).toBeLessThan(otpButtons.findIndex((label) => label.startsWith("Gửi lại mã OTP")));
+
+    act(() => input(renderer.root, "Mã OTP").props.onChangeText("123456"));
+    await act(async () => { button(renderer.root, "Tiếp tục").props.onPress(); await Promise.resolve(); });
+    act(() => input(renderer.root, "Họ và tên (bắt buộc)").props.onChangeText("Mai"));
+    act(() => button(renderer.root, "Tiếp tục").props.onPress());
+    const passwordButtons = buttonLabels(renderer.root);
+    expect(passwordButtons.indexOf("Tạo tài khoản")).toBeLessThan(passwordButtons.indexOf("Quay lại"));
+    act(() => renderer.unmount());
+  });
+});
+
+describe("AuthScreen sign in password field", () => {
+  it("routes the locked auth field palette and reveal control through the public adapter", () => {
+    const auth = gateway();
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<AuthScreen gateway={auth} />); });
+
+    const passwordInput = input(renderer.root, "Mật khẩu");
+    const reveal = renderer.root.findByProps({ accessibilityLabel: "Hiện mật khẩu" });
+
+    expect(StyleSheet.flatten(passwordInput.props.style)).toMatchObject({ backgroundColor: "transparent", borderRadius: 0, borderWidth: 0, color: "#5B4126", height: 48, outlineWidth: 0, paddingHorizontal: 28, paddingRight: 54 });
+    expect(StyleSheet.flatten(reveal.props.style)).toMatchObject({ alignItems: "center", backgroundColor: "transparent", height: 48, position: "absolute", width: 54 });
+    expect(reveal.props.accessibilityRole).toBe("button");
+    expect(reveal.props.accessibilityState).toEqual({ expanded: false });
+    act(() => reveal.props.onPress());
+    const hide = renderer.root.findByProps({ accessibilityLabel: "Ẩn mật khẩu" });
+    expect(hide.props.accessibilityRole).toBe("button");
+    expect(hide.props.accessibilityState).toEqual({ expanded: true });
+    act(() => hide.props.onPress());
+    expect(renderer.root.findByProps({ accessibilityLabel: "Hiện mật khẩu" }).props.accessibilityState).toEqual({ expanded: false });
+    act(() => renderer.unmount());
+  });
+
+  it("keeps normalized successful login, session verification, and submitting guard", async () => {
+    const auth = gateway();
+    let resolveLogin!: (value: { accessToken: string; refreshToken: string }) => void;
+    (auth.signIn as jest.Mock).mockImplementation(() => new Promise((resolve) => { resolveLogin = resolve; }));
+    (auth.me as jest.Mock).mockResolvedValue({ id: "member-1" });
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<AuthScreen gateway={auth} />); });
+
+    act(() => input(renderer.root, "Email").props.onChangeText(" Mai@Example.COM "));
+    act(() => input(renderer.root, "Mật khẩu").props.onChangeText("Strong!1"));
+    act(() => { button(renderer.root, "Đăng nhập").props.onPress(); button(renderer.root, "Đăng nhập").props.onPress(); });
+    expect(auth.signIn).toHaveBeenCalledTimes(1);
+    expect(auth.signIn).toHaveBeenCalledWith("mai@example.com", "Strong!1");
+    expect(button(renderer.root, "Đang xử lý...").props.accessibilityState).toEqual({ disabled: true });
+
+    await act(async () => { resolveLogin({ accessToken: "access", refreshToken: "refresh" }); await Promise.resolve(); });
+    expect(auth.me).toHaveBeenCalledWith("access");
+    expect(mockSignIn).toHaveBeenCalledWith({ accessToken: "access", refreshToken: "refresh" });
+    expect(input(renderer.root, "Mật khẩu").props.value).toBe("");
+    act(() => renderer.unmount());
+  });
+
+  it("preserves login validation, gateway error feedback, and the unverified OTP transition", async () => {
+    const auth = gateway();
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<AuthScreen gateway={auth} />); });
+
+    act(() => button(renderer.root, "Đăng nhập").props.onPress());
+    expect(textOf(renderer.root)).toContain("Nhập địa chỉ email hợp lệ.");
+    act(() => input(renderer.root, "Email").props.onChangeText("blocked@example.com"));
+    act(() => input(renderer.root, "Mật khẩu").props.onChangeText("Strong!1"));
+    (auth.signIn as jest.Mock).mockRejectedValueOnce(new GatewayError("INVALID_CREDENTIALS"));
+    await act(async () => { button(renderer.root, "Đăng nhập").props.onPress(); await Promise.resolve(); });
+    expect(textOf(renderer.root)).toContain("Email hoặc mật khẩu không đúng.");
+
+    (auth.signIn as jest.Mock).mockRejectedValueOnce(new GatewayError("ACCOUNT_UNVERIFIED"));
+    (auth.requestOtp as jest.Mock).mockResolvedValueOnce({ attemptId: "unverified-attempt", expiresAt: 601_000, resendAvailableAt: 0 });
+    await act(async () => { button(renderer.root, "Đăng nhập").props.onPress(); await Promise.resolve(); });
+    expect(auth.requestOtp).toHaveBeenCalledWith("blocked@example.com");
+    expect(input(renderer.root, "Mã OTP")).toBeTruthy();
+    expect(textOf(renderer.root)).toContain("Email này chưa được xác thực. Hãy kiểm tra mã OTP.");
+    act(() => renderer.unmount());
+  });
+});

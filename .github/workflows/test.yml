@@ -1,0 +1,26 @@
+name: Test
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test:coverage
+      - run: python3 -m unittest scripts.gli178.test_product_smoke
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:web
+        env:
+          EXPO_PUBLIC_HOME_REVIEW: "true"
+      - run: npm run test:web:ui-pilot

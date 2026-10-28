@@ -1,0 +1,41 @@
+{
+  "expo": {
+    "name": "SmartTrọ",
+    "slug": "smart-tro",
+    "icon": "./assets/app/icon.png",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "android": {
+      "package": "com.smartplatform.smarttro",
+      "icon": "./assets/app/icon.png",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/app/adaptive-icon-foreground.png",
+        "backgroundColor": "#FF9800",
+        "monochromeImage": "./assets/app/adaptive-icon-monochrome.png"
+      }
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "plugins": [
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/fonts/BeVietnamPro_400Regular.ttf",
+            "./assets/fonts/BeVietnamPro_600SemiBold.ttf",
+            "./node_modules/@ant-design/icons-react-native/fonts/antoutline.ttf"
+          ]
+        }
+      ],
+      "expo-asset"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "66c6315d-1950-4c15-9280-f1d2c495f7d3"
+      }
+    },
+    "owner": "josephnguyen1509"
+  }
+}

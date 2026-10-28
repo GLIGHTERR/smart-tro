@@ -1,0 +1,128 @@
+{
+  "title": {
+    "fontFamily": "Poppins_600SemiBold",
+    "fontSize": "48px",
+    "fontWeight": "400",
+    "lineHeight": "71px",
+    "box": {
+      "x": 75.890625,
+      "y": 73,
+      "width": 223.203125,
+      "height": 142,
+      "top": 73,
+      "right": 299.09375,
+      "bottom": 215,
+      "left": 75.890625
+    },
+    "scrollWidth": 223,
+    "scrollHeight": 142
+  },
+  "input": {
+    "fontFamily": "Poppins_300Light",
+    "fontSize": "15px",
+    "fontWeight": "400",
+    "lineHeight": "normal",
+    "box": {
+      "x": 42.5,
+      "y": 244,
+      "width": 290,
+      "height": 48,
+      "top": 244,
+      "right": 332.5,
+      "bottom": 292,
+      "left": 42.5
+    },
+    "scrollWidth": 290,
+    "scrollHeight": 48
+  },
+  "cta": {
+    "fontFamily": "Poppins_700Bold",
+    "fontSize": "14px",
+    "fontWeight": "400",
+    "lineHeight": "normal",
+    "box": {
+      "x": 149.359375,
+      "y": 395.5,
+      "width": 76.265625,
+      "height": 21,
+      "top": 395.5,
+      "right": 225.625,
+      "bottom": 416.5,
+      "left": 149.359375
+    },
+    "scrollWidth": 76,
+    "scrollHeight": 21
+  },
+  "or": {
+    "fontFamily": "Poppins_700Bold",
+    "fontSize": "15px",
+    "fontWeight": "400",
+    "lineHeight": "normal",
+    "box": {
+      "x": 169.359375,
+      "y": 438,
+      "width": 36.265625,
+      "height": 23,
+      "top": 438,
+      "right": 205.625,
+      "bottom": 461,
+      "left": 169.359375
+    },
+    "scrollWidth": 36,
+    "scrollHeight": 23
+  },
+  "social": {
+    "fontFamily": "Poppins_700Bold",
+    "fontSize": "15px",
+    "fontWeight": "400",
+    "lineHeight": "normal",
+    "box": {
+      "x": 94.953125,
+      "y": 484.5,
+      "width": 185.09375,
+      "height": 23,
+      "top": 484.5,
+      "right": 280.046875,
+      "bottom": 507.5,
+      "left": 94.953125
+    },
+    "scrollWidth": 185,
+    "scrollHeight": 23
+  },
+  "link": {
+    "fontFamily": "Poppins_700Bold",
+    "fontSize": "12px",
+    "fontWeight": "400",
+    "lineHeight": "normal",
+    "box": {
+      "x": 142.53125,
+      "y": 652,
+      "width": 89.9375,
+      "height": 18,
+      "top": 652,
+      "right": 232.46875,
+      "bottom": 670,
+      "left": 142.53125
+    },
+    "scrollWidth": 90,
+    "scrollHeight": 18
+  },
+  "secondary": {
+    "fontFamily": "Poppins_400Regular",
+    "fontSize": "12px",
+    "fontWeight": "400",
+    "lineHeight": "normal",
+    "box": {
+      "x": 42.5,
+      "y": 683,
+      "width": 290,
+      "height": 18,
+      "top": 683,
+      "right": 332.5,
+      "bottom": 701,
+      "left": 42.5
+    },
+    "scrollWidth": 290,
+    "scrollHeight": 18
+  }
+}

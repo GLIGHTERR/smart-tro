@@ -37,6 +37,8 @@ jobs:
       EXPO_PUBLIC_UI_PILOT: "false"
       EXPO_PUBLIC_HOME_REVIEW: "false"
       EXPO_PUBLIC_ACCOUNT_REVIEW: "false"
+      # Isolated fixture gateway: no production request or credentials are embedded.
+      EXPO_PUBLIC_AUTH_USE_MOCK: "true"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -45,6 +47,7 @@ jobs:
         run: |
           test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || inputs.ref || github.sha }}"
           test "$EXPO_PUBLIC_UI_PILOT" = "false"
+          node scripts/assert-product-auth-config.mjs
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -61,6 +64,8 @@ jobs:
       - name: Build bundled product APK with debug signing
         working-directory: android
         run: ./gradlew :app:assembleRelease --no-daemon --stacktrace --max-workers=2 -Dorg.gradle.jvmargs="-Xmx4g -XX:MaxMetaspaceSize=1g"
+      - name: Verify APK binds the authorized fixture auth gateway
+        run: unzip -p android/app/build/outputs/apk/release/app-release.apk assets/index.android.bundle | grep -aq "preview-access-token"
       - name: Record immutable provenance
         run: |
           mkdir -p product-artifact
@@ -88,6 +93,7 @@ jobs:
         attempt: [1, 2]
     env:
       EXPO_PUBLIC_UI_PILOT: "false"
+      EXPO_PUBLIC_AUTH_USE_MOCK: "true"
     steps:
       - uses: actions/checkout@v4
         with:

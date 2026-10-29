@@ -12,7 +12,7 @@ npm run start
 
 Set `EXPO_PUBLIC_API_BASE_URL` to the deployed renter API (the current review URL is `https://smart-platform-renter-api.onrender.com`). It is public configuration only: never add credentials or service secrets to this application. Review and production builds fail closed when it is missing.
 
-`EXPO_PUBLIC_AUTH_USE_MOCK=true` enables the preview-only mock adapter. It is permitted for automated tests and local visual preview only; do not set it in review or production builds.
+`EXPO_PUBLIC_AUTH_USE_MOCK=true` enables the isolated in-process fixture adapter. It is permitted for automated tests, local visual preview, and the explicitly labeled Android product QA artifact; it never sends provider requests or embeds production credentials. Do not enable it for a production API release.
 
 `EXPO_PUBLIC_REVIEW_SOCIALS=true` keeps the Facebook, Google, and Apple controls visible for visual review. These controls are UI-only in the current foundation and do not perform social authentication yet.
 

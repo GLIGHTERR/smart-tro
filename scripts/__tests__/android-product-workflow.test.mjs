@@ -13,6 +13,10 @@ test("product fallback is isolated, exact-SHA pinned, and explicitly non-pilot",
   assert.match(workflow, /EXPO_PUBLIC_UI_PILOT: "false"/);
   assert.match(workflow, /EXPO_PUBLIC_HOME_REVIEW: "false"/);
   assert.match(workflow, /EXPO_PUBLIC_ACCOUNT_REVIEW: "false"/);
+  assert.match(workflow, /EXPO_PUBLIC_AUTH_USE_MOCK: "true"/);
+  assert.match(workflow, /node scripts\/assert-product-auth-config\.mjs/);
+  assert.match(workflow, /Verify APK binds the authorized fixture auth gateway/);
+  assert.match(workflow, /assets\/index\.android\.bundle.*preview-access-token/);
   assert.match(workflow, /smart-tro-product-apk-\$\{\{ github\.event\.pull_request\.head\.sha \|\| inputs\.ref \|\| github\.sha \}\}/);
   assert.match(workflow, /retention-days: 14/);
   assert.doesNotMatch(workflow, /android-pilot|smart-tro-pilot/);

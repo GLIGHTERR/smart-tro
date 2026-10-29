@@ -67,6 +67,7 @@
       "src/auth/gateway.ts",
       "src/auth/restoreSession.ts",
       "src/auth/mockGateway.ts",
+      "src/auth/runtimeGateway.ts",
       "src/auth/recoveryState.ts",
       "src/auth/validation.ts",
       "src/profile/gateway.ts",
@@ -107,6 +108,12 @@
         "statements": 100
       },
       "./src/auth/mockGateway.ts": {
+        "branches": 100,
+        "functions": 100,
+        "lines": 100,
+        "statements": 100
+      },
+      "./src/auth/runtimeGateway.ts": {
         "branches": 100,
         "functions": 100,
         "lines": 100,

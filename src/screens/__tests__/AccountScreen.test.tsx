@@ -68,6 +68,21 @@ describe("AccountScreen", () => {
     act(() => renderer.unmount());
   });
 
+  it("keeps a visible, confirmation-backed logout path when profile loading fails", async () => {
+    process.env.EXPO_PUBLIC_ACCOUNT_REVIEW = "false";
+    const onSignOut = jest.fn().mockResolvedValue(undefined);
+    const gateway = { read: jest.fn().mockRejectedValue(new Error("offline")), update: jest.fn() };
+    let renderer!: TestRenderer.ReactTestRenderer;
+    await act(async () => { renderer = TestRenderer.create(<AccountScreen gateway={gateway} onBack={jest.fn()} onChangePassword={jest.fn()} onEditProfile={jest.fn()} onSignOut={onSignOut} sessionKey="renter-a" />); });
+    expect(text(renderer.root)).toContain("Chưa thể tải thông tin tài khoản.");
+    press(renderer.root, "Đăng xuất");
+    expect(text(renderer.root)).toContain("Đăng xuất?");
+    const confirm = renderer.root.findAllByType(Pressable).find((node) => text(node).includes("Đăng xuất") && node.props.accessibilityState?.disabled === false);
+    await act(async () => { confirm!.props.onPress(); await Promise.resolve(); });
+    expect(onSignOut).toHaveBeenCalledTimes(1);
+    act(() => renderer.unmount());
+  });
+
   it("switches tabs without rendering a Home action in the signature placeholder", () => {
     process.env.EXPO_PUBLIC_ACCOUNT_REVIEW_SCENARIO = "one";
     let renderer!: TestRenderer.ReactTestRenderer;

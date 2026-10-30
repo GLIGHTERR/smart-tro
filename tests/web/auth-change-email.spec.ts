@@ -19,7 +19,7 @@ for (const viewport of viewports) {
       await page.getByRole("button", { name: "Đăng ký" }).click();
       await page.getByLabel("Email").fill("qa-original@example.com");
       await page.getByRole("button", { name: "Gửi OTP" }).click();
-      await page.getByLabel("Mã OTP").fill("12");
+      await page.getByLabel("Mã OTP", { exact: true }).fill("12");
 
       if (variant === "after resend") {
         const resend = page.getByRole("button", { name: "Gửi lại mã OTP" });
@@ -31,8 +31,8 @@ for (const viewport of viewports) {
       await expect(page.getByLabel("Email")).toHaveValue("qa-original@example.com");
       await page.getByLabel("Email").fill("zz-changed@example.com");
       await page.getByRole("button", { name: "Gửi OTP" }).click();
-      await expect(page.getByLabel("Mã OTP")).toHaveValue("");
-      await page.getByLabel("Mã OTP").fill("123456");
+      await expect(page.getByLabel("Mã OTP", { exact: true })).toHaveValue("");
+      await page.getByLabel("Mã OTP", { exact: true }).fill("123456");
       await page.getByRole("button", { name: "Tiếp tục" }).click();
       await expect(page.getByLabel("Họ và tên (bắt buộc)")).toBeVisible();
     });

@@ -26,8 +26,8 @@ for (const viewport of [
     });
     const expectFocusedWrapper = async (wrapper: typeof field) => {
       await expect(wrapper).toHaveCSS("border-radius", expectedField.radius);
-      await expect(wrapper).toHaveCSS("border-top-width", "1px");
-      await expect(wrapper).toHaveCSS("border-top-color", "rgb(0, 0, 0)");
+      await expect(wrapper).toHaveCSS("border-top-width", "0px");
+      await expect(wrapper).toHaveCSS("box-shadow", "rgb(0, 0, 0) 0px 0px 0px 2px");
     };
     const expectRevealHasNoChrome = async () => {
       await expect(reveal).toHaveCSS("outline-width", "0px");
@@ -47,8 +47,8 @@ for (const viewport of [
     };
     const expectSingleChromeOwner = async (focused: boolean) => {
       await expect(field).toHaveCSS("border-radius", expectedField.radius);
-      await expect(field).toHaveCSS("border-top-width", focused ? "1px" : "0px");
-      if (focused) await expect(field).toHaveCSS("border-top-color", "rgb(0, 0, 0)");
+      await expect(field).toHaveCSS("border-top-width", "0px");
+      await expect(field).toHaveCSS("box-shadow", focused ? "rgb(0, 0, 0) 0px 0px 0px 2px" : "none");
       for (const property of ["border-top-width", "border-right-width", "border-bottom-width", "border-left-width", "outline-width", "border-top-left-radius", "border-top-right-radius", "border-bottom-right-radius", "border-bottom-left-radius"]) {
         await expect(password).toHaveCSS(property, "0px");
       }
@@ -59,10 +59,10 @@ for (const viewport of [
     await expect(email).toHaveCSS("height", expectedField.height);
     await expect(email).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
     await expect(emailField).toHaveCSS("border-top-width", "0px");
-    await expect(container).toHaveCSS("border-radius", "0px");
+    await expect(container).toHaveCSS("border-radius", expectedField.radius);
     await expect(container).toHaveCSS("height", expectedField.height);
     await expect(container).toHaveCSS("background-color", expectedField.background);
-    await expect(field).toHaveCSS("overflow", "hidden");
+    await expect(field).toHaveCSS("overflow", "visible");
     await expectSingleChromeOwner(false);
 
     // The visual field must contain the entire interactive reveal target, not

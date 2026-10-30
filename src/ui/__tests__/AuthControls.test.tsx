@@ -1,4 +1,5 @@
 import React from "react";
+import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import TestRenderer, { act, type ReactTestInstance } from "react-test-renderer";
 
@@ -34,6 +35,7 @@ describe("auth UI adapters", () => {
     const reveal = renderer.root.findByProps({ accessibilityLabel: "Hiện mật khẩu" });
     expect(StyleSheet.flatten(reveal.props.style)).toMatchObject({ backgroundColor: "transparent", borderRadius: 0, borderWidth: 0, height: 48, position: "absolute", width: 54 });
     expect(reveal.props["aria-expanded"]).toBe(false);
+    expect(reveal.findByType(FontAwesome).props).toMatchObject({ color: "#A84300", name: "eye", size: 17 });
     act(() => reveal.props.onFocus());
     expect(StyleSheet.flatten(passwordField.props.style)).toMatchObject({ borderColor: "#000000", borderRadius: 24, borderWidth: 1 });
     act(() => reveal.props.onBlur());
@@ -45,6 +47,7 @@ describe("auth UI adapters", () => {
     const hide = renderer.root.findByProps({ accessibilityLabel: "Ẩn mật khẩu" });
     expect(hide.props.accessibilityState).toEqual({ expanded: true });
     expect(hide.props["aria-expanded"]).toBe(true);
+    expect(hide.findByType(FontAwesome).props).toMatchObject({ color: "#A84300", name: "eye-slash", size: 17 });
   });
 
   it("keeps auth button states and link focus accessible", () => {

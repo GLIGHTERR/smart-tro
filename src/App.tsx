@@ -1,4 +1,5 @@
 import { useFonts } from "expo-font";
+import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, StatusBar, StyleSheet, Text, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -10,12 +11,14 @@ import { FONT_STARTUP_TIMEOUT_MS, getFontStartupDiagnostic, getFontStartupState 
 
 export default function App() {
   // Native builds embed these TTFs through the expo-font config plugin; this also
-  // verifies the registered families before any branded screen is rendered.
+  // verifies every visible icon family before any branded screen is rendered.
   const [fontsLoaded, fontError] = useFonts({
     BeVietnamPro_400Regular: require("../assets/fonts/BeVietnamPro_400Regular.ttf"),
     BeVietnamPro_600SemiBold: require("../assets/fonts/BeVietnamPro_600SemiBold.ttf"),
     // The approved Ant Design outline source uses this registered family.
     antoutline: require("@ant-design/icons-react-native/fonts/antoutline.ttf"),
+    // Password reveal controls use FontAwesome and must not mount as an empty icon.
+    ...FontAwesome.font,
   });
   const [fontTimedOut, setFontTimedOut] = useState(false);
   const isDebugBuild = process.env.EXPO_PUBLIC_DEBUG_REVISION === "true";

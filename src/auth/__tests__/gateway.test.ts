@@ -100,9 +100,15 @@ describe("email auth gateway", () => {
     await expect(operation).rejects.toEqual(expect.objectContaining({ code: "SERVER_ERROR" }));
   });
 
-  it.each([["INVALID_OTP", 400, "INVALID_OTP"], ["EMAIL_EXISTS", 409, "ACCOUNT_EXISTS"], ["ignored", 429, "AUTH_RATE_LIMITED"], ["ignored", 503, "SERVER_ERROR"], ["ignored", 400, "NETWORK_ERROR"]] as const)("maps %s responses", async (backendCode, status, expected) => {
+  it.each([["INVALID_OTP", 400, "INVALID_OTP"], ["EMAIL_EXISTS", 409, "ACCOUNT_EXISTS"], ["BAD_REQUEST", 400, "VALIDATION_ERROR"], ["ignored", 429, "AUTH_RATE_LIMITED"], ["ignored", 503, "SERVER_ERROR"], ["ignored", 400, "NETWORK_ERROR"]] as const)("maps %s responses", async (backendCode, status, expected) => {
     fetchMock.mockResolvedValue(json({ code: backendCode }, status));
     await expect(gateway().requestOtp("mai@example.com")).rejects.toEqual(expect.objectContaining({ code: expected }));
+  });
+
+  it("maps the nested validation response from signup completion without treating it as a network failure", async () => {
+    fetchMock.mockResolvedValue(json({ error: { code: "BAD_REQUEST" } }, 400));
+
+    await expect(gateway().createAccount("mai@example.com", "attempt-1", "123456", "Strong!1", { displayName: "Mai An", phone: "+84901234567" })).rejects.toEqual(expect.objectContaining({ code: "VALIDATION_ERROR" }));
   });
 
   it("preserves the backend retry duration for rate limits", async () => {

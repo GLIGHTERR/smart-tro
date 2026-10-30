@@ -18,6 +18,7 @@ export type GatewayErrorCode =
   | "PASSWORD_RESET_TOKEN_INVALID"
   | "PASSWORD_CONFIRMATION_MISMATCH"
   | "PASSWORD_UNCHANGED"
+  | "VALIDATION_ERROR"
   | "INVALID_SESSION"
   | "NETWORK_ERROR"
   | "SERVER_WAKING"
@@ -75,7 +76,7 @@ type RecoveryVerificationResponse = { verified: true; resetToken: string; expire
 type RecoveryCompletionResponse = { reset: true; next: "sign_in"; email: string };
 
 const knownCodes = new Set<GatewayErrorCode>([
-  "INVALID_CREDENTIALS", "ACCOUNT_UNVERIFIED", "ACCOUNT_INACTIVE", "INVALID_OTP", "OTP_EXPIRED", "OTP_ATTEMPTS_EXHAUSTED", "RESEND_COOLDOWN", "RESEND_LIMIT", "ACCOUNT_EXISTS", "AUTH_RATE_LIMITED", "OTP_PROVIDER_UNAVAILABLE", "SIGNUP_UNAVAILABLE", "PASSWORD_RECOVERY_OTP_INVALID", "PASSWORD_RESET_TOKEN_INVALID", "PASSWORD_CONFIRMATION_MISMATCH", "PASSWORD_UNCHANGED", "INVALID_SESSION"
+  "INVALID_CREDENTIALS", "ACCOUNT_UNVERIFIED", "ACCOUNT_INACTIVE", "INVALID_OTP", "OTP_EXPIRED", "OTP_ATTEMPTS_EXHAUSTED", "RESEND_COOLDOWN", "RESEND_LIMIT", "ACCOUNT_EXISTS", "AUTH_RATE_LIMITED", "OTP_PROVIDER_UNAVAILABLE", "SIGNUP_UNAVAILABLE", "PASSWORD_RECOVERY_OTP_INVALID", "PASSWORD_RESET_TOKEN_INVALID", "PASSWORD_CONFIRMATION_MISMATCH", "PASSWORD_UNCHANGED", "VALIDATION_ERROR", "INVALID_SESSION"
 ]);
 const DEFAULT_DEVICE_ID_TIMEOUT_MS = 5_000;
 const DEFAULT_REQUEST_TIMEOUT_MS = 60_000;
@@ -104,6 +105,8 @@ function gatewayError(status: number, payload: ErrorPayload | undefined): Gatewa
   const code = payload?.code ?? payload?.error?.code;
   const mapped = code === "EMAIL_EXISTS"
     ? "ACCOUNT_EXISTS"
+    : code === "BAD_REQUEST"
+      ? "VALIDATION_ERROR"
     : code && knownCodes.has(code as GatewayErrorCode)
       ? code as GatewayErrorCode
       : status === 429

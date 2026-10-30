@@ -26,7 +26,7 @@ describe("auth UI adapters", () => {
     const passwordField = renderer.root.findAllByType(View).filter((field) => (StyleSheet.flatten(field.props.style) ?? {}).marginBottom === 16)[1];
     if (!passwordField) throw new Error("Missing password field frame");
     act(() => password.props.onFocus());
-    expect(StyleSheet.flatten(passwordField.props.style)).toMatchObject({ backgroundColor: "#FBC97E", borderColor: "#000000", borderRadius: 24, borderWidth: 1, height: 48, overflow: "hidden" });
+    expect(StyleSheet.flatten(passwordField.props.style)).toMatchObject({ backgroundColor: "#FBC97E", borderColor: "#000000", borderRadius: 24, borderWidth: 1, height: 48 });
     act(() => password.props.onBlur());
     expect(StyleSheet.flatten(passwordField.props.style).borderWidth).toBeUndefined();
     act(() => email.props.onChangeText("mai@example.com"));

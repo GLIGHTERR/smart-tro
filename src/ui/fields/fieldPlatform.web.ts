@@ -10,3 +10,5 @@ if (typeof document !== "undefined" && !document.getElementById(autofillStyleId)
 }
 
 export const fieldPlatformProps = { dataSet: { authField: "shell" } };
+// The browser paints the focus ring with :focus-within so it never changes layout.
+export const fieldFocusStyle: Record<string, never> = {};

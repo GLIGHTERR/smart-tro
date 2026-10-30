@@ -16,7 +16,7 @@ test("completes the mock signup fixture without creating a session", async ({ pa
   await page.getByRole("button", { name: "Tiếp tục", exact: true }).click();
 
   await page.getByLabel("Họ và tên (bắt buộc)").fill("Auth Review");
-  await page.getByLabel("Số điện thoại (không bắt buộc)").fill("0901234567");
+  await page.getByLabel("Số điện thoại (không bắt buộc)").fill("+84901234567");
   await page.getByRole("button", { name: "Tiếp tục", exact: true }).click();
   await page.getByLabel("Mật khẩu", { exact: true }).fill("Strong!1");
   await page.getByLabel("Nhập lại mật khẩu").fill("Strong!1");

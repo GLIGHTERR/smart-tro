@@ -19,11 +19,12 @@ describe("signup validation", () => {
     expect(validateDisplayName("  ")).toBeDefined();
     expect(validateDisplayName("Mai")).toBeUndefined();
   });
-  it("permits an absent phone and validates supplied phone text only", () => {
+  it("permits an absent phone, canonicalizes formatted E.164 input, and rejects local numbers", () => {
     expect(normalizePhone("  ")).toBeNull();
-    expect(normalizePhone(" 0901 234 567 ")).toBe("0901 234 567");
+    expect(normalizePhone(" +84 (901) 234-567 ")).toBe("+84901234567");
     expect(validatePhone("")).toBeUndefined();
     expect(validatePhone("+84 (901) 234-567")).toBeUndefined();
+    expect(validatePhone("0901234567")).toBeDefined();
     expect(validatePhone("not-a-phone")).toBeDefined();
   });
   it("normalizes email and rejects empty or malformed email", () => {

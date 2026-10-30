@@ -74,9 +74,27 @@ describe("AuthScreen signup", () => {
     act(() => input(renderer.root, "Nhập lại mật khẩu").props.onChangeText("Strong!1"));
     await act(async () => { button(renderer.root, "Tạo tài khoản").props.onPress(); await Promise.resolve(); });
 
-    expect(auth.createAccount).toHaveBeenCalledWith("mai@example.com", "attempt-1", "123456", "Strong!1", { displayName: "Mai An", phone: "+84 (901) 234-567" });
+    expect(auth.createAccount).toHaveBeenCalledWith("mai@example.com", "attempt-1", "123456", "Strong!1", { displayName: "Mai An", phone: "+84901234567" });
     expect(mockSignIn).not.toHaveBeenCalled();
     expect(textOf(renderer.root)).toContain("Đăng ký thành công. Hãy đăng nhập để tiếp tục.");
+    act(() => renderer.unmount());
+  });
+
+  it("shows validation feedback instead of a connectivity error when signup completion returns BAD_REQUEST", async () => {
+    const auth = gateway();
+    (auth.createAccount as jest.Mock).mockRejectedValue(new GatewayError("VALIDATION_ERROR"));
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<AuthScreen gateway={auth} />); });
+
+    await startSignup(renderer, auth);
+    act(() => input(renderer.root, "Họ và tên (bắt buộc)").props.onChangeText("Mai An"));
+    act(() => button(renderer.root, "Tiếp tục").props.onPress());
+    act(() => input(renderer.root, "Mật khẩu").props.onChangeText("Strong!1"));
+    act(() => input(renderer.root, "Nhập lại mật khẩu").props.onChangeText("Strong!1"));
+    await act(async () => { button(renderer.root, "Tạo tài khoản").props.onPress(); await Promise.resolve(); });
+
+    expect(textOf(renderer.root)).toContain("Dữ liệu không hợp lệ. Vui lòng kiểm tra lại.");
+    expect(textOf(renderer.root)).not.toContain("Không thể kết nối máy chủ. Vui lòng thử lại.");
     act(() => renderer.unmount());
   });
 
@@ -116,13 +134,13 @@ describe("AuthScreen signup", () => {
     act(() => input(renderer.root, "Mã OTP").props.onChangeText("123456"));
     await act(async () => { button(renderer.root, "Tiếp tục").props.onPress(); await Promise.resolve(); });
     act(() => input(renderer.root, "Họ và tên (bắt buộc)").props.onChangeText("Mai"));
-    act(() => input(renderer.root, "Số điện thoại (không bắt buộc)").props.onChangeText("0901234567"));
+    act(() => input(renderer.root, "Số điện thoại (không bắt buộc)").props.onChangeText("+84901234567"));
     act(() => button(renderer.root, "Tiếp tục").props.onPress());
     act(() => input(renderer.root, "Mật khẩu").props.onChangeText("Strong!1"));
     act(() => input(renderer.root, "Nhập lại mật khẩu").props.onChangeText("Strong!1"));
     act(() => button(renderer.root, "Quay lại").props.onPress());
     expect(input(renderer.root, "Họ và tên (bắt buộc)").props.value).toBe("Mai");
-    expect(input(renderer.root, "Số điện thoại (không bắt buộc)").props.value).toBe("0901234567");
+    expect(input(renderer.root, "Số điện thoại (không bắt buộc)").props.value).toBe("+84901234567");
     act(() => button(renderer.root, "Tiếp tục").props.onPress());
     expect(input(renderer.root, "Mật khẩu").props.value).toBe("");
     expect(input(renderer.root, "Nhập lại mật khẩu").props.value).toBe("");

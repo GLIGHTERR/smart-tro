@@ -23,13 +23,13 @@ export function validateDisplayName(displayName: unknown): string | undefined {
 
 export function normalizePhone(phone: string): string | null {
   const normalized = phone.trim();
-  return normalized || null;
+  if (!normalized) return null;
+  return normalized.startsWith("+") ? `+${normalized.slice(1).replace(/[ ()-]/g, "")}` : normalized;
 }
 
 export function validatePhone(phone: unknown): string | undefined {
   if (typeof phone !== "string" || !normalizePhone(phone)) return undefined;
-  // The approved UI contract permits common phone punctuation but rejects non-phone text.
-  return /^\+?[\d ()-]+$/.test(phone.trim()) ? undefined : "Nhập số điện thoại hợp lệ.";
+  return /^\+[1-9]\d{7,14}$/.test(normalizePhone(phone)!) ? undefined : "Nhập số điện thoại theo định dạng +84901234567.";
 }
 
 export function validateAuthForm(form: AuthForm, requiresName = false): Partial<Record<keyof AuthForm, string>> {

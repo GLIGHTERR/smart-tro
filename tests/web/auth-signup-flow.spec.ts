@@ -4,7 +4,7 @@ import { mockSignupApi } from "./auth-api-fixture";
 test.skip(process.env.AUTH_SIGNUP_FLOW_REVIEW !== "true", "Signup flow coverage uses the dedicated mock-auth export.");
 
 test("completes the mock signup fixture without creating a session", async ({ page }) => {
-  await mockSignupApi(page);
+  const api = await mockSignupApi(page);
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto("");
   await expect(page.getByRole("button", { name: "Đăng nhập", exact: true })).toBeVisible();
@@ -16,7 +16,7 @@ test("completes the mock signup fixture without creating a session", async ({ pa
   await page.getByRole("button", { name: "Tiếp tục", exact: true }).click();
 
   await page.getByLabel("Họ và tên (bắt buộc)").fill("Auth Review");
-  await page.getByLabel("Số điện thoại (không bắt buộc)").fill("+84901234567");
+  await page.getByLabel("Số điện thoại (không bắt buộc)").fill("0901234567");
   await page.getByRole("button", { name: "Tiếp tục", exact: true }).click();
   const password = page.getByLabel("Mật khẩu", { exact: true });
   const confirmation = page.getByLabel("Nhập lại mật khẩu");
@@ -36,6 +36,7 @@ test("completes the mock signup fixture without creating a session", async ({ pa
   await page.getByRole("button", { name: "Tạo tài khoản", exact: true }).click();
 
   await expect(page.getByText("Đăng ký thành công. Hãy đăng nhập để tiếp tục.")).toBeVisible();
+  expect(api.completedProfiles).toEqual([{ phone: "+84901234567" }]);
   await expect(page.getByRole("button", { name: "Đăng nhập", exact: true })).toBeVisible();
   await expect(page.getByText("Trang chủ")).toHaveCount(0);
 });

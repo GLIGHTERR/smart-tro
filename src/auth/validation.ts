@@ -24,12 +24,13 @@ export function validateDisplayName(displayName: unknown): string | undefined {
 export function normalizePhone(phone: string): string | null {
   const normalized = phone.trim();
   if (!normalized) return null;
+  if (/^0(?:3|5|7|8|9)\d{8}$/.test(normalized)) return `+84${normalized.slice(1)}`;
   return normalized.startsWith("+") ? `+${normalized.slice(1).replace(/[ ()-]/g, "")}` : normalized;
 }
 
 export function validatePhone(phone: unknown): string | undefined {
   if (typeof phone !== "string" || !normalizePhone(phone)) return undefined;
-  return /^\+[1-9]\d{7,14}$/.test(normalizePhone(phone)!) ? undefined : "Nhập số điện thoại theo định dạng +84901234567.";
+  return /^\+84(?:3|5|7|8|9)\d{8}$/.test(normalizePhone(phone)!) ? undefined : "Nhập số điện thoại theo định dạng +84901234567.";
 }
 
 export function validateAuthForm(form: AuthForm, requiresName = false): Partial<Record<keyof AuthForm, string>> {

@@ -19,13 +19,16 @@ describe("signup validation", () => {
     expect(validateDisplayName("  ")).toBeDefined();
     expect(validateDisplayName("Mai")).toBeUndefined();
   });
-  it("permits an absent phone, canonicalizes formatted E.164 input, and rejects local numbers", () => {
+  it("permits absent, domestic Vietnamese, and canonical Vietnamese mobile inputs", () => {
     expect(normalizePhone("  ")).toBeNull();
     expect(normalizePhone(" +84 (901) 234-567 ")).toBe("+84901234567");
+    expect(normalizePhone("0901234567")).toBe("+84901234567");
     expect(validatePhone("")).toBeUndefined();
     expect(validatePhone("+84 (901) 234-567")).toBeUndefined();
-    expect(validatePhone("0901234567")).toBeDefined();
-    expect(validatePhone("not-a-phone")).toBeDefined();
+    expect(validatePhone("0901234567")).toBeUndefined();
+  });
+  it.each(["090123456", "09012345678", "0101234567", "0201234567", "not-a-phone", "---", "+8490123456", "+849012345678", "+84012345678", "+12025550123"]) ("rejects malformed or non-Vietnamese mobile input %p", (phone) => {
+    expect(validatePhone(phone)).toBe("Nhập số điện thoại theo định dạng +84901234567.");
   });
   it("normalizes email and rejects empty or malformed email", () => {
     expect(normalizeEmail(" Mai@Example.COM ")).toBe("mai@example.com");

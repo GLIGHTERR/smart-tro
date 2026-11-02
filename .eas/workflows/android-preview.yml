@@ -1,9 +1,12 @@
 name: Android preview build
 
 on:
-  push:
-    branches:
-      - master
+  # Manual only. EAS records `commit_sha` with each requested workflow run.
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        type: string
+        required: true
 
 jobs:
   build_android_preview:

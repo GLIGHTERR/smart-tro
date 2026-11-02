@@ -1,23 +1,10 @@
 name: Android product artifact
 
 on:
-  pull_request:
-    branches: [master]
-    paths:
-      - ".github/workflows/android-product.yml"
-      - "scripts/gli178/**"
-      - "src/**"
-      - "index.ts"
-      - "metro.config.js"
-      - "app.json"
-      - "package.json"
-      - "package-lock.json"
-  push:
-    branches: [master]
   workflow_dispatch:
     inputs:
-      ref:
-        description: Exact commit SHA to build
+      commit_sha:
+        description: Exact lowercase 40-character commit SHA to build
         required: true
         type: string
 
@@ -25,11 +12,25 @@ permissions:
   contents: read
 
 concurrency:
-  group: android-product-${{ github.event.pull_request.number || inputs.ref || github.sha }}
+  group: android-product-${{ inputs.commit_sha }}
   cancel-in-progress: false
 
 jobs:
+  validate_manual_ref:
+    runs-on: ubuntu-latest
+    outputs:
+      commit_sha: ${{ steps.validate.outputs.commit_sha }}
+    steps:
+      - id: validate
+        name: Require an immutable commit SHA
+        env:
+          COMMIT_SHA: ${{ inputs.commit_sha }}
+        run: |
+          [[ "$COMMIT_SHA" =~ ^[0-9a-f]{40}$ ]]
+          echo "commit_sha=$COMMIT_SHA" >> "$GITHUB_OUTPUT"
+
   apk:
+    needs: validate_manual_ref
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
@@ -42,10 +43,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha || inputs.ref || github.sha }}
+          ref: ${{ needs.validate_manual_ref.outputs.commit_sha }}
       - name: Verify exact checked-out SHA and product flag
         run: |
-          test "$(git rev-parse HEAD)" = "${{ github.event.pull_request.head.sha || inputs.ref || github.sha }}"
+          test "$(git rev-parse HEAD)" = "${{ needs.validate_manual_ref.outputs.commit_sha }}"
           test "$EXPO_PUBLIC_UI_PILOT" = "false"
           node scripts/assert-product-auth-config.mjs
       - uses: actions/setup-node@v4
@@ -77,13 +78,13 @@ jobs:
           EOF
       - uses: actions/upload-artifact@v4
         with:
-          name: smart-tro-product-apk-${{ github.event.pull_request.head.sha || inputs.ref || github.sha }}
+          name: smart-tro-product-apk-${{ needs.validate_manual_ref.outputs.commit_sha }}
           path: product-artifact/
           if-no-files-found: error
           retention-days: 14
 
   emulator:
-    needs: apk
+    needs: [apk, validate_manual_ref]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -97,10 +98,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha || inputs.ref || github.sha }}
+          ref: ${{ needs.validate_manual_ref.outputs.commit_sha }}
       - uses: actions/download-artifact@v4
         with:
-          name: smart-tro-product-apk-${{ github.event.pull_request.head.sha || inputs.ref || github.sha }}
+          name: smart-tro-product-apk-${{ needs.validate_manual_ref.outputs.commit_sha }}
           path: product-artifact
       - name: Verify product provenance before install
         run: |
@@ -126,7 +127,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: smart-tro-product-android-evidence-${{ github.event.pull_request.head.sha || inputs.ref || github.sha }}-attempt-${{ matrix.attempt }}
+          name: smart-tro-product-android-evidence-${{ needs.validate_manual_ref.outputs.commit_sha }}-attempt-${{ matrix.attempt }}
           path: android-product-smoke/
           if-no-files-found: warn
           retention-days: 14

@@ -53,10 +53,14 @@ npm run test:coverage
 
 The `preview` EAS profile builds an internally distributed APK against the deployed renter API. It uses the real auth gateway and mobile `expo-secure-store`; it never embeds backend, Brevo, database, or other service secrets.
 
+Android artifact workflows are manual-only. Do not use a branch name or a moving tag: enter a lowercase 40-character commit SHA and retain the resulting workflow/build URL as provenance. This policy does not affect the automatic Web Pages deployment or normal test workflow.
+
 ```bash
 npx eas-cli login
 npx eas-cli init
-npx eas-cli build --platform android --profile preview
+git checkout <40-character-commit-sha>
+test "$(git rev-parse HEAD)" = "<40-character-commit-sha>"
+npx eas-cli workflow:run .eas/workflows/android-preview.yml -F commit_sha=<40-character-commit-sha>
 ```
 
 Install the resulting APK on a review device and validate sign-in, app restart/session restoration, refresh-token rotation, `/auth/me`, and logout/revocation. The GitHub Pages review remains intentionally memory-only and is not evidence for persistent mobile session behavior.

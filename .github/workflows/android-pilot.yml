@@ -1,39 +1,48 @@
 name: Android pilot artifact
 
 on:
-  push:
-    branches: [agent/codex-dev/01a1523d]
-  pull_request:
-    branches: [master]
-    paths:
-      - ".github/workflows/android-pilot.yml"
-      - "src/pilot/**"
-      - "src/ui/**"
-      - "scripts/gli156/**"
-      - "index.ts"
-      - "metro.config.js"
-      - "package.json"
-      - "package-lock.json"
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: Exact lowercase 40-character commit SHA to build
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: android-pilot-${{ github.event.pull_request.number || github.ref }}
+  group: android-pilot-${{ inputs.commit_sha }}
   cancel-in-progress: true
 
 jobs:
+  validate_manual_ref:
+    runs-on: ubuntu-latest
+    outputs:
+      commit_sha: ${{ steps.validate.outputs.commit_sha }}
+    steps:
+      - id: validate
+        name: Require an immutable commit SHA
+        env:
+          COMMIT_SHA: ${{ inputs.commit_sha }}
+        run: |
+          [[ "$COMMIT_SHA" =~ ^[0-9a-f]{40}$ ]]
+          echo "commit_sha=$COMMIT_SHA" >> "$GITHUB_OUTPUT"
+
   harness-preflight:
+    needs: validate_manual_ref
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ needs.validate_manual_ref.outputs.commit_sha }}
+      - name: Verify exact checked-out SHA
+        run: test "$(git rev-parse HEAD)" = "${{ needs.validate_manual_ref.outputs.commit_sha }}"
       - name: Verify Android interaction contract and artifact fixtures
         run: python3 -m unittest discover -s scripts/gli156 -t . -p 'test_*.py' -v
 
   apk:
-    needs: harness-preflight
+    needs: [harness-preflight, validate_manual_ref]
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
@@ -41,7 +50,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ needs.validate_manual_ref.outputs.commit_sha }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -68,13 +77,13 @@ jobs:
           echo "Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" > pilot-artifact/run.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: smart-tro-pilot-apk-${{ github.event.pull_request.head.sha || github.sha }}
+          name: smart-tro-pilot-apk-${{ needs.validate_manual_ref.outputs.commit_sha }}
           path: pilot-artifact/
           if-no-files-found: error
           retention-days: 14
 
   emulator:
-    needs: apk
+    needs: [apk, validate_manual_ref]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -86,10 +95,10 @@ jobs:
       # The emulator runner needs the checked-in interaction harness, not just the APK artifact.
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ needs.validate_manual_ref.outputs.commit_sha }}
       - uses: actions/download-artifact@v4
         with:
-          name: smart-tro-pilot-apk-${{ github.event.pull_request.head.sha || github.sha }}
+          name: smart-tro-pilot-apk-${{ needs.validate_manual_ref.outputs.commit_sha }}
           path: pilot-artifact
       - name: Enable KVM
         run: |
@@ -108,7 +117,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: smart-tro-pilot-android-evidence-${{ github.event.pull_request.head.sha || github.sha }}-attempt-${{ matrix.attempt }}
+          name: smart-tro-pilot-android-evidence-${{ needs.validate_manual_ref.outputs.commit_sha }}-attempt-${{ matrix.attempt }}
           path: android-interactions/
           if-no-files-found: warn
           retention-days: 14

@@ -6,10 +6,15 @@ const workflow = readFileSync(new URL("../../.github/workflows/android-product.y
 const testWorkflow = readFileSync(new URL("../../.github/workflows/test.yml", import.meta.url), "utf8");
 const smoke = readFileSync(new URL("../gli178/product_smoke.py", import.meta.url), "utf8");
 
-test("product fallback is isolated, exact-SHA pinned, and explicitly non-pilot", () => {
+test("product artifact is manual-only, exact-SHA pinned, and explicitly non-pilot", () => {
   assert.match(workflow, /name: Android product artifact/);
   assert.match(workflow, /workflow_dispatch:/);
-  assert.match(workflow, /ref: \$\{\{ github\.event\.pull_request\.head\.sha \|\| inputs\.ref \|\| github\.sha \}\}/);
+  assert.match(workflow, /commit_sha:/);
+  assert.match(workflow, /Exact lowercase 40-character commit SHA to build/);
+  assert.match(workflow, /\[\[ "\$COMMIT_SHA" =~ \^\[0-9a-f\]\{40\}\$ \]\]/);
+  assert.match(workflow, /ref: \$\{\{ needs\.validate_manual_ref\.outputs\.commit_sha \}\}/);
+  assert.match(workflow, /test "\$\(git rev-parse HEAD\)" = "\$\{\{ needs\.validate_manual_ref\.outputs\.commit_sha \}\}"/);
+  assert.doesNotMatch(workflow, /^\s*(push|pull_request):/m);
   assert.match(workflow, /EXPO_PUBLIC_UI_PILOT: "false"/);
   assert.match(workflow, /EXPO_PUBLIC_HOME_REVIEW: "false"/);
   assert.match(workflow, /EXPO_PUBLIC_ACCOUNT_REVIEW: "false"/);
@@ -17,7 +22,7 @@ test("product fallback is isolated, exact-SHA pinned, and explicitly non-pilot",
   assert.match(workflow, /node scripts\/assert-product-auth-config\.mjs/);
   assert.match(workflow, /Verify APK binds the authorized fixture auth gateway/);
   assert.match(workflow, /assets\/index\.android\.bundle.*preview-access-token/);
-  assert.match(workflow, /smart-tro-product-apk-\$\{\{ github\.event\.pull_request\.head\.sha \|\| inputs\.ref \|\| github\.sha \}\}/);
+  assert.match(workflow, /smart-tro-product-apk-\$\{\{ needs\.validate_manual_ref\.outputs\.commit_sha \}\}/);
   assert.match(workflow, /retention-days: 14/);
   assert.doesNotMatch(workflow, /android-pilot|smart-tro-pilot/);
 });

@@ -15,7 +15,7 @@ test("the Home account action opens UC-04 instead of a placeholder", async ({ pa
   await page.setViewportSize({ width: 375, height: 812 });
   await page.goto("?home=single");
   await page.getByRole("button", { name: "Tài khoản: UC-04 — Tài khoản/Cá nhân" }).click();
-  await expect(page).toHaveURL(/\/account$/);
+  await expect(page).toHaveURL(/\/account(?:\?|$)/);
   await expect(page.getByRole("tab", { name: "Cá nhân" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Chữ ký" })).toBeVisible();
   await page.getByRole("button", { name: "Quay lại" }).click();
@@ -56,6 +56,31 @@ test("direct cancel discard leaves dirty UC-05 for Account without a profile PAT
   await expect(page.getByText("Hủy thay đổi?")).toBeVisible();
   await page.getByRole("button", { name: "Bỏ thay đổi" }).click();
   await expect(page.getByRole("heading", { name: "Tài khoản" })).toBeVisible();
+});
+
+test("a successful profile save removes Edit from browser history and preserves one toast", async ({ page }) => {
+  const profile = { displayName: "Mai An", email: "mai@example.com", phone: "+84901234567", avatar: null };
+  await page.route("https://profile-fixture.invalid/profile", async (route) => {
+    if (route.request().method() === "PATCH") return route.fulfill({ contentType: "application/json", body: JSON.stringify({ profile }) });
+    return route.fulfill({ contentType: "application/json", body: JSON.stringify({ profile, rentals: [] }) });
+  });
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto("?home=single&account=one");
+  await page.getByRole("button", { name: "Tài khoản: UC-04 — Tài khoản/Cá nhân" }).click();
+  await expect(page.getByRole("heading", { name: "Tài khoản" })).toBeVisible();
+  await page.waitForTimeout(300);
+  await page.getByRole("button", { name: "Chỉnh sửa thông tin cá nhân" }).click();
+  await page.getByRole("textbox", { name: "Họ và tên" }).fill(profile.displayName);
+  await page.getByRole("button", { name: "Lưu" }).click();
+  await expect(page).toHaveURL(/\/account(?:\?|$)/);
+  await expect(page.getByRole("heading", { name: "Tài khoản" })).toBeVisible();
+  const toast = page.getByText("Đã cập nhật thông tin cá nhân.", { exact: true });
+  await expect(toast).toHaveCount(1);
+  await page.waitForTimeout(5100);
+  await expect(toast).toHaveCount(0);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/smart-tro\/\?home=single&account=one$/);
+  await expect(page.getByRole("heading", { name: "Cập nhật thông tin cá nhân" })).toHaveCount(0);
 });
 
 test("UC-05 keeps profile labels, controls, and helper text vertically separated", async ({ page }) => {

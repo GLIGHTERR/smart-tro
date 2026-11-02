@@ -1,6 +1,6 @@
 import FontAwesome from "@expo/vector-icons/FontAwesome";
 import { useEffect, useRef, useState } from "react";
-import { AppState, BackHandler, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
+import { AppState, BackHandler, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import {
@@ -25,6 +25,7 @@ import {
   type RecoveryStep,
 } from "@/auth/recoveryState";
 import { GatewayError, type AuthGateway } from "@/auth/gateway";
+import { AuthButton, AuthField, AuthLink } from "@/ui";
 
 type Props = {
   gateway: AuthGateway;
@@ -162,54 +163,36 @@ export function ForgotPasswordScreen({ gateway, initialStep = "email", onExit, o
       <ScrollView contentContainerStyle={[styles.content, { paddingTop: height < 650 ? 18 : 70 }]} keyboardShouldPersistTaps="handled">
         <View style={[styles.header, height < 650 && styles.compactHeader]}><Text style={styles.title}>Quên mật{`\n`}khẩu</Text></View>
         <View style={[styles.form, { width: formWidth }, height < 650 && styles.compactForm]}>
-          {state.step === "email" && <RecoveryInput autoFocus={focusEmail} editable={!submitting} label="Email" selectTextOnFocus={focusEmail} value={state.email} onChangeText={(email) => update({ email })} type="email-address" />}
+          {state.step === "email" && <AuthField autoFocus={focusEmail} editable={!submitting} keyboardType="email-address" label="Email" selectTextOnFocus={focusEmail} value={state.email} onChangeText={(email) => update({ email })} />}
           {state.step === "otp" && <>
             <View style={styles.otpDestination}>
               <Text style={styles.otpDestinationCopy}>Mã xác thực đã được gửi tới</Text>
               <Text style={styles.maskedEmail}>{maskRecoveryEmail(state.email)}</Text>
-              <Pressable accessibilityLabel="Đổi email" accessibilityRole="button" onPress={changeEmail} style={styles.changeEmail}>
-                <Text style={styles.changeEmailText}>Đổi email</Text>
-              </Pressable>
+              <AuthLink label="Đổi email" onPress={changeEmail} />
             </View>
-            <RecoveryInput editable={!submitting} label="Mã OTP" value={state.otp} onChangeText={(otp) => update({ otp: sanitizeRecoveryOtp(otp) })} type="numeric" />
+            <AuthField editable={!submitting} keyboardType="numeric" label="Mã OTP" value={state.otp} onChangeText={(otp) => update({ otp: sanitizeRecoveryOtp(otp) })} />
           </>}
           {state.step === "password" && <>
-            <SecretRecoveryInput editable={!submitting} label="Mật khẩu" value={state.password} visible={showPassword} onChangeText={(password) => update({ password })} onToggle={() => setShowPassword((visible) => !visible)} />
-            <SecretRecoveryInput editable={!submitting} label="Nhập lại mật khẩu" value={state.confirmPassword} visible={showConfirm} onChangeText={(confirmPassword) => update({ confirmPassword })} onToggle={() => setShowConfirm((visible) => !visible)} />
+            <AuthField editable={!submitting} label="Mật khẩu" passwordVisible={showPassword} secureTextEntry value={state.password} onChangeText={(password) => update({ password })} onTogglePassword={() => setShowPassword((visible) => !visible)} />
+            <AuthField editable={!submitting} label="Nhập lại mật khẩu" passwordVisible={showConfirm} secureTextEntry value={state.confirmPassword} onChangeText={(confirmPassword) => update({ confirmPassword })} onTogglePassword={() => setShowConfirm((visible) => !visible)} />
           </>}
           {!!state.notice && state.step !== "otp" && <Text accessibilityLiveRegion="polite" style={styles.notice}>{state.notice}</Text>}
           {!!state.error && <Text accessibilityLiveRegion="polite" style={styles.error}>{state.error}</Text>}
-          <RecoveryAction
+          <AuthButton
             disabled={submitting || retrySeconds > 0 || (state.step === "otp" && state.otp.length !== 6)}
             label={submitting ? "Đang xử lý..." : retrySeconds ? `${actionLabel} (${retrySeconds}s)` : actionLabel}
             onPress={submit}
           />
-          {state.step === "otp" && <RecoveryAction
+          {state.step === "otp" && <AuthButton
             disabled={submitting || resendSeconds > 0}
             label={resendSeconds ? `Gửi lại mã OTP (${resendSeconds}s)` : "Gửi lại mã OTP"}
             onPress={resend}
-            variant="inverse"
+            variant="secondary"
           />}
         </View>
       </ScrollView>
     </SafeAreaView>
   </View>;
-}
-
-function RecoveryInput({ autoFocus = false, editable, label, selectTextOnFocus = false, value, onChangeText, type = "default" }: { autoFocus?: boolean; editable: boolean; label: string; selectTextOnFocus?: boolean; value: string; onChangeText: (value: string) => void; type?: "default" | "email-address" | "numeric" }) {
-  return <TextInput accessibilityLabel={label} autoCapitalize="none" autoCorrect={false} autoFocus={autoFocus} editable={editable} keyboardType={type} onChangeText={onChangeText} placeholder={label} placeholderTextColor="#A78B68" selectTextOnFocus={selectTextOnFocus} style={styles.input} value={value} />;
-}
-
-function SecretRecoveryInput({ editable, label, value, visible, onChangeText, onToggle }: { editable: boolean; label: string; value: string; visible: boolean; onChangeText: (value: string) => void; onToggle: () => void }) {
-  return <View style={styles.secret}>
-    <TextInput accessibilityLabel={label} autoCapitalize="none" editable={editable} onChangeText={onChangeText} placeholder={label} placeholderTextColor="#A78B68" secureTextEntry={!visible} style={styles.secretInput} value={value} />
-    <Pressable accessibilityLabel={visible ? "Ẩn mật khẩu" : "Hiện mật khẩu"} disabled={!editable} onPress={onToggle} style={styles.eye}><FontAwesome color="#A84300" name={visible ? "eye-slash" : "eye"} size={17} /></Pressable>
-  </View>;
-}
-
-function RecoveryAction({ label, onPress, disabled = false, variant = "default" }: { label: string; onPress: () => void; disabled?: boolean; variant?: "default" | "inverse" }) {
-  const inverse = variant === "inverse";
-  return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={[styles.action, inverse && styles.inverseAction, disabled && (inverse ? styles.inverseDisabled : styles.disabled)]}><Text style={[styles.actionText, inverse && styles.inverseActionText]}>{label}</Text></Pressable>;
 }
 
 const styles = StyleSheet.create({
@@ -223,21 +206,9 @@ const styles = StyleSheet.create({
   title: { color: "#FFFFFF", fontFamily: "BeVietnamPro_600SemiBold", fontSize: 48, lineHeight: 71, textAlign: "center" },
   form: { marginTop: 28 },
   compactForm: { marginTop: 14 },
-  input: { backgroundColor: "#FBC97E", borderRadius: 24, color: "#5B4126", fontFamily: "BeVietnamPro_400Regular", fontSize: 15, height: 48, marginBottom: 16, paddingHorizontal: 28 },
   otpDestination: { alignItems: "center", marginBottom: 4 },
   otpDestinationCopy: { color: "#FFFFFF", fontFamily: "BeVietnamPro_400Regular", fontSize: 12, lineHeight: 18, textAlign: "center" },
   maskedEmail: { color: "#FFFFFF", fontFamily: "BeVietnamPro_600SemiBold", fontSize: 12, lineHeight: 18, textAlign: "center" },
-  changeEmail: { alignItems: "center", justifyContent: "center", minHeight: 44, minWidth: 88 },
-  changeEmailText: { color: "#FFFFFF", fontFamily: "BeVietnamPro_600SemiBold", fontSize: 12, textDecorationLine: "underline" },
-  secret: { backgroundColor: "#FBC97E", borderRadius: 24, height: 48, marginBottom: 16 },
-  secretInput: { color: "#5B4126", fontFamily: "BeVietnamPro_400Regular", fontSize: 15, height: 48, paddingHorizontal: 28, paddingRight: 54 },
-  eye: { height: 48, justifyContent: "center", position: "absolute", right: 18 },
-  action: { alignItems: "center", backgroundColor: "#FFFFFF", borderColor: "#1684F7", borderRadius: 9, borderWidth: 1.5, height: 33, justifyContent: "center", marginTop: 10 },
-  actionText: { color: "#F09200", fontFamily: "BeVietnamPro_600SemiBold", fontSize: 14 },
-  disabled: { opacity: 0.55 },
-  inverseAction: { backgroundColor: "#FF9A05" },
-  inverseActionText: { color: "#FFFFFF" },
-  inverseDisabled: { backgroundColor: "#C97900", borderColor: "#126DCC" },
   notice: { color: "#5B4126", fontFamily: "BeVietnamPro_400Regular", fontSize: 12, lineHeight: 18, marginBottom: 2, textAlign: "center" },
   error: { color: "#8B1C1C", fontFamily: "BeVietnamPro_400Regular", fontSize: 12, lineHeight: 18, marginBottom: 2, textAlign: "center" },
 });

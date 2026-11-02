@@ -67,7 +67,7 @@ describe("ForgotPasswordScreen email change", () => {
     act(() => renderer.unmount());
   });
 
-  it("uses a readable inverse resend button in both cooldown and enabled states", () => {
+  it("uses the shared secondary action in both cooldown and enabled states", () => {
     let renderer!: TestRenderer.ReactTestRenderer;
     act(() => {
       renderer = TestRenderer.create(<ForgotPasswordScreen gateway={gateway()} initialStep="otp" onComplete={jest.fn()} onExit={jest.fn()} />);
@@ -75,13 +75,13 @@ describe("ForgotPasswordScreen email change", () => {
 
     const coolingDown = resendButton(renderer.root);
     expect(coolingDown.props.disabled).toBe(true);
-    expect(StyleSheet.flatten(coolingDown.props.style)).toMatchObject({ backgroundColor: "#C97900", borderColor: "#126DCC", borderWidth: 1.5, borderRadius: 9, height: 33 });
+    expect(StyleSheet.flatten(coolingDown.props.style({ pressed: false }))).toMatchObject({ borderRadius: 9, height: 48, opacity: 0.55 });
     expect(StyleSheet.flatten(coolingDown.findByType(Text).props.style)).toMatchObject({ color: "#FFFFFF", fontFamily: "BeVietnamPro_600SemiBold" });
 
     act(() => { jest.advanceTimersByTime(60_000); });
     const enabled = resendButton(renderer.root);
     expect(enabled.props.disabled).toBe(false);
-    expect(StyleSheet.flatten(enabled.props.style)).toMatchObject({ backgroundColor: "#FF9A05", borderColor: "#1684F7", borderWidth: 1.5, borderRadius: 9, height: 33 });
+    expect(StyleSheet.flatten(enabled.props.style({ pressed: false }))).toMatchObject({ borderRadius: 9, height: 48 });
     expect(StyleSheet.flatten(enabled.findByType(Text).props.style)).toMatchObject({ color: "#FFFFFF", fontFamily: "BeVietnamPro_600SemiBold" });
     act(() => renderer.unmount());
   });

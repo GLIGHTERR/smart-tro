@@ -132,6 +132,8 @@ test("UC-04 tabs expose exactly one selected DOM state after pointer, touch, and
   await expect(signature).toHaveAttribute("aria-selected", "true");
 
   await personal.focus();
+  await expect(personal).toBeFocused();
+  await expect.poll(() => personal.evaluate((element) => getComputedStyle(element).outlineColor)).toBe("rgb(168, 67, 0)");
   await page.keyboard.press("Enter");
   await expect(personal).toHaveAttribute("aria-selected", "true");
   await expect(signature).toHaveAttribute("aria-selected", "false");

@@ -1,5 +1,5 @@
 import React from "react";
-import { Platform, Pressable, Text, TextInput, View } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import TestRenderer, { act } from "react-test-renderer";
 
 import { Button, Dialog, Field, PressableControl, ScreenState, UiProvider, smartTroAntTheme } from "../contracts";
@@ -85,6 +85,18 @@ describe("production UI contracts", () => {
     expect(renderer.root.findByType(Pressable).props.children.props.children).toBe("Đăng nhập lại");
     expect(renderer.root.findByProps({ accessibilityRole: "alert" })).toBeTruthy();
     act(() => { renderer.update(<ScreenState kind="empty" message="State" />); });
+  });
+
+  it("keeps dialog content inside narrow native viewports while preserving full-width actions", () => {
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<Dialog visible title="Đăng xuất?" message="Bạn có chắc chắn muốn đăng xuất khỏi tài khoản này?" onDismiss={jest.fn()}><Button label="Hủy" onPress={jest.fn()} tone="secondary" /><Button label="Đăng xuất" onPress={jest.fn()} tone="danger" /></Dialog>); });
+    const modal = renderer.root.findAllByType(View).find((node) => node.props.title === "Đăng xuất?")!;
+    expect(StyleSheet.flatten(modal.props.style)).toMatchObject({ alignSelf: "center", marginHorizontal: 24, maxWidth: 480, width: "auto" });
+    const content = renderer.root.findByProps({ accessibilityLabel: "Đăng xuất?" });
+    expect(StyleSheet.flatten(content.findAllByType(Text)[0]!.props.style)).toMatchObject({ flexShrink: 1, lineHeight: 23 });
+    const actions = content.findAllByType(View).find((node) => StyleSheet.flatten(node.props.style)?.width === "100%")!;
+    expect(StyleSheet.flatten(actions.props.style)).toMatchObject({ flexDirection: "row", flexWrap: "wrap", width: "100%" });
+    for (const action of actions.findAllByType(Pressable)) expect(StyleSheet.flatten(action.props.style)).toMatchObject({ flex: 1, minHeight: 50 });
   });
 
   it("covers session alerts and screen states without a retry action", () => {

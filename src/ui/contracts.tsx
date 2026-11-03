@@ -1,5 +1,6 @@
 import { ActivityIndicator as AntActivityIndicator, Button as AntButton, InputItem, Modal as AntModal, Provider } from "@ant-design/react-native";
-import { Platform, StyleSheet, Text, View, type TextInputProps } from "react-native";
+import { type ComponentProps } from "react";
+import { Platform, Pressable, StyleSheet, Text, View, type TextInputProps } from "react-native";
 
 import { colors, radius } from "@/theme/tokens";
 
@@ -7,6 +8,10 @@ import { colors, radius } from "@/theme/tokens";
 export const smartTroAntTheme = Object.freeze({ brand_primary: colors.action, brand_primary_tap: colors.primaryPressed, brand_success: "#2D7A46", brand_warning: colors.warm, brand_error: colors.danger, color_text_base: "#2E2E2E", color_text_base_inverse: "#FFFFFF", color_text_caption: "#675440", color_text_disabled: "#8D857B", fill_body: "#FFF2DB", fill_base: "#FFFFFF", fill_tap: "#F2E8D8", fill_disabled: "#F2E8D8", fill_mask: "rgba(46, 46, 46, 0.42)", border_color_base: "#D9C4A4", border_color_thin: "#E6CDA8", primary_button_fill: colors.action, primary_button_fill_tap: colors.primaryPressed, ghost_button_color: colors.action, ghost_button_fill_tap: "#F2E8D8", warning_button_fill: colors.danger, warning_button_fill_tap: "#8F2E2E", toast_fill: "#E2F3E7", radius_sm: radius.sm, radius_md: radius.md, button_height: 50, button_font_size: 16, font_size_base: 16, font_size_heading: 16, font_size_subhead: 15, modal_font_size_heading: 21, modal_button_height: 50 });
 
 export function UiProvider({ children }: { children: React.ReactNode }) { return <Provider theme={smartTroAntTheme}>{children}</Provider>; }
+
+// Product controls use this contract so native Pressable stays behind src/ui.
+export type PressableControlProps = ComponentProps<typeof Pressable>;
+export function PressableControl(props: PressableControlProps) { return <Pressable {...props} />; }
 
 export type ButtonProps = { label: string; onPress: () => void; disabled?: boolean; loading?: boolean; tone?: "primary" | "secondary" | "danger"; accessibilityLabel?: string };
 export function Button({ label, onPress, disabled = false, loading = false, tone = "primary", accessibilityLabel }: ButtonProps) {

@@ -98,6 +98,21 @@ describe("AccountScreen", () => {
     act(() => renderer.unmount());
   });
 
+  it("keeps tabs selectable, keyboard-focusable, and visibly focused without changing selected colors", () => {
+    process.env.EXPO_PUBLIC_ACCOUNT_REVIEW_SCENARIO = "one";
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<AccountScreen onBack={jest.fn()} onChangePassword={jest.fn()} onEditProfile={jest.fn()} onSignOut={jest.fn()} sessionKey="renter-a" />); });
+    act(() => { jest.advanceTimersByTime(220); });
+    const tab = renderer.root.findAllByType(Pressable).find((node) => text(node).includes("Cá nhân"))!;
+    expect(tab.props).toMatchObject({ accessibilityRole: "tab", accessibilityState: { selected: true } });
+    expect(tab.props.style({ pressed: false })).toEqual(expect.arrayContaining([expect.objectContaining({ borderBottomColor: "#A84300" })]));
+    act(() => tab.props.onFocus());
+    expect(tab.props.style({ pressed: false })).toEqual(expect.arrayContaining([expect.objectContaining({ outlineColor: "#A84300", outlineWidth: 2 })]));
+    act(() => tab.props.onBlur());
+    expect(tab.props.style({ pressed: false })).not.toEqual(expect.arrayContaining([expect.objectContaining({ outlineColor: "#A84300" })]));
+    act(() => renderer.unmount());
+  });
+
   it("uses non-sensitive partial/error behavior for invalid email and a nullable phone label", () => {
     process.env.EXPO_PUBLIC_ACCOUNT_REVIEW_SCENARIO = "email-invalid";
     let renderer!: TestRenderer.ReactTestRenderer;

@@ -1,11 +1,11 @@
 import { getPathFromState, getStateFromPath, NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAuth } from "@/auth/AuthProvider";
-import { ScreenState, Toast, type ToastEvent } from "@/ui";
+import { PressableControl, ScreenState, Toast, type ToastEvent } from "@/ui";
 import { AuthScreen } from "@/screens/AuthScreen";
 import { HomeScreen } from "@/screens/HomeScreen";
 import { AccountScreen } from "@/screens/AccountScreen";
@@ -60,7 +60,7 @@ function AuthenticatedEditProfile({ navigation, route }: { navigation: { canGoBa
 
 function DestinationScreen({ navigation, route }: { navigation: { goBack: () => void }; route: { params: RootStackParamList["Destination"] } }) {
   const destination = route.params.action === "change-password" ? "UC-06 — Đổi mật khẩu" : homeDestinations[route.params.action];
-  return <SafeAreaView style={styles.safe}><View style={styles.content}><Text accessibilityRole="header" style={styles.title}>{destination}</Text><Text style={styles.copy}>Bạn đã đến điểm điều hướng được chọn từ Trang chủ.</Text><Pressable accessibilityRole="button" accessibilityLabel="Quay lại Trang chủ" onPress={navigation.goBack} style={styles.back}><Text style={styles.backText}>Quay lại Trang chủ</Text></Pressable></View></SafeAreaView>;
+  return <SafeAreaView style={styles.safe}><View style={styles.content}><Text accessibilityRole="header" style={styles.title}>{destination}</Text><Text style={styles.copy}>Bạn đã đến điểm điều hướng được chọn từ Trang chủ.</Text><PressableControl accessibilityRole="button" accessibilityLabel="Quay lại Trang chủ" onPress={navigation.goBack} style={styles.back}><Text style={styles.backText}>Quay lại Trang chủ</Text></PressableControl></View></SafeAreaView>;
 }
 
 export function RootNavigator() {

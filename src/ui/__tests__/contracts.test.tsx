@@ -2,7 +2,7 @@ import React from "react";
 import { Platform, Pressable, Text, TextInput, View } from "react-native";
 import TestRenderer, { act } from "react-test-renderer";
 
-import { Button, Dialog, Field, ScreenState, UiProvider, smartTroAntTheme } from "../contracts";
+import { Button, Dialog, Field, PressableControl, ScreenState, UiProvider, smartTroAntTheme } from "../contracts";
 
 describe("production UI contracts", () => {
   it("uses the Ant provider and locks its SmartTro state palette", () => {
@@ -25,6 +25,15 @@ describe("production UI contracts", () => {
     let renderer!: TestRenderer.ReactTestRenderer;
     act(() => { renderer = TestRenderer.create(<><Button disabled label="Disabled" onPress={jest.fn()} /><Button label="Loading" loading onPress={jest.fn()} /></>); });
     for (const control of renderer.root.findAllByType(Pressable)) expect(control.props.accessibilityState).toEqual({ disabled: true });
+  });
+
+  it("forwards accessible press interactions through the public control contract", () => {
+    const onBlur = jest.fn(); const onFocus = jest.fn(); const onPress = jest.fn(); let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<PressableControl accessibilityRole="tab" accessibilityState={{ selected: true }} onBlur={onBlur} onFocus={onFocus} onPress={onPress}><Text>Tab</Text></PressableControl>); });
+    const control = renderer.root.findByType(Pressable);
+    expect(control.props).toMatchObject({ accessibilityRole: "tab", accessibilityState: { selected: true } });
+    act(() => { control.props.onFocus(); control.props.onBlur(); control.props.onPress(); });
+    expect(onFocus).toHaveBeenCalledTimes(1); expect(onBlur).toHaveBeenCalledTimes(1); expect(onPress).toHaveBeenCalledTimes(1);
   });
 
   it.each([

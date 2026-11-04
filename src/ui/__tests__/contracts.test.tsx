@@ -2,7 +2,9 @@ import React from "react";
 import { Platform, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import TestRenderer, { act } from "react-test-renderer";
 
-import { Button, Dialog, Field, PressableControl, ScreenState, UiProvider, smartTroAntTheme } from "../contracts";
+import { Button, Dialog, Field, FormPasswordField, PressableControl, ScreenState, UiProvider, smartTroAntTheme } from "../contracts";
+
+jest.mock("@expo/vector-icons/FontAwesome", () => "FontAwesome");
 
 describe("production UI contracts", () => {
   it("uses the Ant provider and locks its SmartTro state palette", () => {
@@ -65,6 +67,22 @@ describe("production UI contracts", () => {
     act(() => { renderer.update(<Field label="Name" onChangeText={onChangeText} value="Mai" />); });
     expect(renderer.root.findByType(TextInput).props.disabled).toBe(false);
     expect(renderer.root.findAllByType(Text).map((node) => node.props.children)).toEqual([["Name", ""]]);
+  });
+
+  it("keeps password reveal controls inside the outlined Field family", () => {
+    const onBlur = jest.fn(); const onChangeText = jest.fn(); const onTogglePassword = jest.fn(); let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<FormPasswordField error="Invalid" hint="Help" label="Password" maxLength={128} onBlur={onBlur} onChangeText={onChangeText} onTogglePassword={onTogglePassword} passwordVisible={false} required value="secret" />); });
+    const input = renderer.root.findByType(TextInput);
+    expect(input.props).toMatchObject({ accessibilityLabel: "Password", maxLength: 128, secureTextEntry: true, value: "secret" });
+    expect(input.props.styles.input).toMatchObject({ backgroundColor: "#FFFFFF", borderColor: "#B33A3A", borderRadius: 8, borderWidth: 2, height: 50, paddingRight: 50 });
+    expect(renderer.root.findAllByType(Text).map((node) => node.props.children)).toEqual([["Password", " *"], "Help", "Invalid"]);
+    const reveal = renderer.root.findByProps({ accessibilityLabel: "Hiện mật khẩu" });
+    expect(StyleSheet.flatten(reveal.props.style)).toMatchObject({ height: 50, position: "absolute", right: 0, width: 50 });
+    act(() => { input.props.onBlur(); input.props.onChangeText("changed"); reveal.props.onPress(); });
+    expect(onBlur).toHaveBeenCalledTimes(1); expect(onChangeText).toHaveBeenCalledWith("changed"); expect(onTogglePassword).toHaveBeenCalledTimes(1);
+    act(() => { renderer.update(<FormPasswordField label="Password" onBlur={onBlur} onChangeText={onChangeText} onTogglePassword={onTogglePassword} passwordVisible value="secret" />); });
+    expect(renderer.root.findByType(TextInput).props.secureTextEntry).toBe(false);
+    expect(renderer.root.findByProps({ accessibilityLabel: "Ẩn mật khẩu" }).props.accessibilityState).toEqual({ expanded: true });
   });
 
   it("maps dialogs and all screen states through public contracts", () => {

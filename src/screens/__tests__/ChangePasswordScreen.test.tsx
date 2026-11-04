@@ -20,7 +20,17 @@ describe("ChangePasswordScreen", () => {
     expect(renderer.root.findByProps({ accessibilityLabel: "Mật khẩu hiện tại" })).toBeTruthy();
     expect(copy(renderer.root)).not.toContain("Nhập mật khẩu hiện tại.");
     expect(renderer.root.findAllByType(Pressable).filter((node) => node.props.accessibilityLabel === "Hiện mật khẩu")).toHaveLength(3);
+    expect(fields[0]!.props.styles.input).toMatchObject({ backgroundColor: "#FFFFFF", borderColor: "#D9C4A4", borderRadius: 8, borderWidth: 1, height: 50, paddingRight: 50 });
     expect(button(renderer.root, "Đổi mật khẩu").props.accessibilityState).toEqual({ disabled: true });
+  });
+
+  it("toggles each outlined password field independently", () => {
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<ChangePasswordScreen onExit={jest.fn()} onSessionExpired={jest.fn()} onSuccess={jest.fn()} />); });
+    const reveals = renderer.root.findAllByType(Pressable).filter((node) => node.props.accessibilityLabel === "Hiện mật khẩu");
+    act(() => reveals[1]!.props.onPress());
+    expect(renderer.root.findAllByType(TextInput).map((field) => field.props.secureTextEntry)).toEqual([true, false, true]);
+    expect(renderer.root.findAllByType(Pressable).filter((node) => node.props.accessibilityLabel === "Ẩn mật khẩu")).toHaveLength(1);
   });
 
   it("validates only after each field blurs, then updates that error while typing", () => {

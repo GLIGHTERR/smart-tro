@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, TextInput, View, type TextInputProps } from "rea
 import { FocusWithinField } from "../FocusWithinField";
 import { fieldFocusStyle, fieldPlatformProps } from "./fieldPlatform";
 
-export type BaseAuthFieldProps = Pick<TextInputProps, "autoFocus" | "editable" | "keyboardType" | "secureTextEntry" | "selectTextOnFocus"> & {
+export type BaseAuthFieldProps = Pick<TextInputProps, "autoFocus" | "editable" | "keyboardType" | "onBlur" | "secureTextEntry" | "selectTextOnFocus"> & {
   label: string;
   value: string;
   onChangeText: (value: string) => void;
@@ -14,7 +14,7 @@ export type BaseAuthFieldProps = Pick<TextInputProps, "autoFocus" | "editable" |
 
 // The shell is the only surface/chrome owner. The input and optional action
 // remain transparent so native and browser autofill cannot split the field.
-export function BaseAuthField({ label, value, onChangeText, autoFocus = false, editable = true, keyboardType = "default", secureTextEntry = false, selectTextOnFocus = false, passwordVisible = false, onTogglePassword }: BaseAuthFieldProps) {
+export function BaseAuthField({ label, value, onChangeText, autoFocus = false, editable = true, keyboardType = "default", onBlur, secureTextEntry = false, selectTextOnFocus = false, passwordVisible = false, onTogglePassword }: BaseAuthFieldProps) {
   const [focused, setFocused] = useState(false);
   const isPassword = secureTextEntry && Boolean(onTogglePassword);
   const type = secureTextEntry && !passwordVisible ? "password" : keyboardType;
@@ -22,7 +22,7 @@ export function BaseAuthField({ label, value, onChangeText, autoFocus = false, e
 
   return <FocusWithinField style={[styles.field, focused && fieldFocusStyle]} testID={`auth-field-${label}`}>
     <View {...fieldPlatformProps} style={styles.surface}>
-      <TextInput accessibilityLabel={label} autoCapitalize="none" autoCorrect={false} autoFocus={autoFocus} editable={editable} keyboardType={keyboardType} onBlur={() => setFocused(false)} onChangeText={onChangeText} onFocus={() => setFocused(true)} placeholder={label} placeholderTextColor="#A78B68" secureTextEntry={secureTextEntry && !passwordVisible} selectTextOnFocus={selectTextOnFocus} style={[styles.input, isPassword && styles.passwordInput]} testID={`auth-input-${label}`} value={value} {...({ type } as TextInputProps)} />
+      <TextInput accessibilityLabel={label} autoCapitalize="none" autoCorrect={false} autoFocus={autoFocus} editable={editable} keyboardType={keyboardType} onBlur={(event) => { setFocused(false); onBlur?.(event); }} onChangeText={onChangeText} onFocus={() => setFocused(true)} placeholder={label} placeholderTextColor="#A78B68" secureTextEntry={secureTextEntry && !passwordVisible} selectTextOnFocus={selectTextOnFocus} style={[styles.input, isPassword && styles.passwordInput]} testID={`auth-input-${label}`} value={value} {...({ type } as TextInputProps)} />
       {reveal}
     </View>
   </FocusWithinField>;

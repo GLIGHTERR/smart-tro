@@ -16,4 +16,9 @@ export function validateChangePassword(form: ChangePasswordForm): ChangePassword
   return errors;
 }
 
+export function visibleChangePasswordErrors(form: ChangePasswordForm, touched: Partial<Record<keyof ChangePasswordForm, boolean>>): ChangePasswordErrors {
+  const errors = validateChangePassword(form);
+  return Object.fromEntries(Object.entries(errors).filter(([field]) => touched[field as keyof ChangePasswordForm])) as ChangePasswordErrors;
+}
+
 export function isChangePasswordDirty(form: ChangePasswordForm) { return Boolean(form.currentPassword || form.newPassword || form.confirmation); }

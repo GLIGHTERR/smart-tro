@@ -16,7 +16,7 @@ describe("ChangePasswordScreen", () => {
     act(() => { renderer = TestRenderer.create(<ChangePasswordScreen onExit={jest.fn()} onSessionExpired={jest.fn()} onSuccess={jest.fn()} />); });
     const fields = renderer.root.findAllByType(TextInput);
     expect(fields).toHaveLength(3);
-    expect(fields.every((field) => field.props.secureTextEntry)).toBe(true);
+    expect(fields.every((field) => field.props.type === "password")).toBe(true);
     expect(renderer.root.findByProps({ accessibilityLabel: "Mật khẩu hiện tại" })).toBeTruthy();
     expect(copy(renderer.root)).not.toContain("Nhập mật khẩu hiện tại.");
     expect(renderer.root.findAllByType(Pressable).filter((node) => node.props.accessibilityLabel === "Hiện mật khẩu")).toHaveLength(3);
@@ -29,7 +29,7 @@ describe("ChangePasswordScreen", () => {
     act(() => { renderer = TestRenderer.create(<ChangePasswordScreen onExit={jest.fn()} onSessionExpired={jest.fn()} onSuccess={jest.fn()} />); });
     const reveals = renderer.root.findAllByType(Pressable).filter((node) => node.props.accessibilityLabel === "Hiện mật khẩu");
     act(() => reveals[1]!.props.onPress());
-    expect(renderer.root.findAllByType(TextInput).map((field) => field.props.secureTextEntry)).toEqual([true, false, true]);
+    expect(renderer.root.findAllByType(TextInput).map((field) => field.props.type)).toEqual(["password", "text", "password"]);
     expect(renderer.root.findAllByType(Pressable).filter((node) => node.props.accessibilityLabel === "Ẩn mật khẩu")).toHaveLength(1);
   });
 

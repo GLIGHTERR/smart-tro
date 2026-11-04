@@ -23,4 +23,5 @@ jobs:
       - run: npm run test:web
         env:
           EXPO_PUBLIC_HOME_REVIEW: "true"
+      - run: npm run test:web:change-password
       - run: npm run test:web:ui-pilot

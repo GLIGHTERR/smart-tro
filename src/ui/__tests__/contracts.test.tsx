@@ -73,7 +73,7 @@ describe("production UI contracts", () => {
     const onBlur = jest.fn(); const onChangeText = jest.fn(); const onTogglePassword = jest.fn(); let renderer!: TestRenderer.ReactTestRenderer;
     act(() => { renderer = TestRenderer.create(<FormPasswordField error="Invalid" hint="Help" label="Password" maxLength={128} onBlur={onBlur} onChangeText={onChangeText} onTogglePassword={onTogglePassword} passwordVisible={false} required value="secret" />); });
     const input = renderer.root.findByType(TextInput);
-    expect(input.props).toMatchObject({ accessibilityLabel: "Password", maxLength: 128, secureTextEntry: true, value: "secret" });
+    expect(input.props).toMatchObject({ accessibilityLabel: "Password", maxLength: 128, type: "password", value: "secret" });
     expect(input.props.styles.input).toMatchObject({ backgroundColor: "#FFFFFF", borderColor: "#B33A3A", borderRadius: 8, borderWidth: 2, height: 50, paddingRight: 50 });
     expect(renderer.root.findAllByType(Text).map((node) => node.props.children)).toEqual([["Password", " *"], "Help", "Invalid"]);
     const reveal = renderer.root.findByProps({ accessibilityLabel: "Hiện mật khẩu" });
@@ -81,7 +81,7 @@ describe("production UI contracts", () => {
     act(() => { input.props.onBlur(); input.props.onChangeText("changed"); reveal.props.onPress(); });
     expect(onBlur).toHaveBeenCalledTimes(1); expect(onChangeText).toHaveBeenCalledWith("changed"); expect(onTogglePassword).toHaveBeenCalledTimes(1);
     act(() => { renderer.update(<FormPasswordField label="Password" onBlur={onBlur} onChangeText={onChangeText} onTogglePassword={onTogglePassword} passwordVisible value="secret" />); });
-    expect(renderer.root.findByType(TextInput).props.secureTextEntry).toBe(false);
+    expect(renderer.root.findByType(TextInput).props.type).toBe("text");
     expect(renderer.root.findByProps({ accessibilityLabel: "Ẩn mật khẩu" }).props.accessibilityState).toEqual({ expanded: true });
   });
 

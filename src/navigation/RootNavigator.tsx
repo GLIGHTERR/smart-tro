@@ -10,11 +10,12 @@ import { AuthScreen } from "@/screens/AuthScreen";
 import { HomeScreen } from "@/screens/HomeScreen";
 import { AccountScreen } from "@/screens/AccountScreen";
 import { EditPersonalInformationScreen } from "@/screens/EditPersonalInformationScreen";
+import { ChangePasswordScreen } from "@/screens/ChangePasswordScreen";
 import type { EditableProfile } from "@/screens/editPersonalInformationModel";
 import type { ProfileUpdatePayload } from "@/profile/gateway";
 import { homeDestinations, type HomeAction } from "@/screens/homeModel";
 
-type RootStackParamList = { Auth: undefined; Home: undefined; Account: { authoritativeProfile?: ProfileUpdatePayload["profile"] } | undefined; EditProfile: { profile: EditableProfile }; Destination: { action: Exclude<HomeAction, "account"> | "change-password" } };
+type RootStackParamList = { Auth: undefined; Home: undefined; Account: { authoritativeProfile?: ProfileUpdatePayload["profile"] } | undefined; EditProfile: { profile: EditableProfile }; ChangePassword: undefined; Destination: { action: Exclude<HomeAction, "account"> } };
 type ProfileUpdateToast = { show: () => void };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -22,7 +23,7 @@ const ProfileUpdateToastContext = createContext<ProfileUpdateToast | null>(null)
 const isWebReview = process.env.EXPO_PUBLIC_HOME_REVIEW === "true" || process.env.EXPO_PUBLIC_ACCOUNT_REVIEW === "true";
 const linking = {
   prefixes: [],
-  config: { screens: { Home: "", Account: "account", EditProfile: "edit-profile", Destination: "destination/:action" } },
+  config: { screens: { Home: "", Account: "account", EditProfile: "edit-profile", ChangePassword: "change-password", Destination: "destination/:action" } },
   getPathFromState: (state: Parameters<typeof getPathFromState>[0], config: Parameters<typeof getPathFromState>[1]) => `/smart-tro${getPathFromState(state, config)}`,
   getStateFromPath: (path: string, config: Parameters<typeof getStateFromPath>[1]) => getStateFromPath(path.replace(/^\/?smart-tro\/?/, ""), config),
 };
@@ -43,12 +44,12 @@ function useProfileUpdateToast() {
 
 function AuthenticatedHome({ navigation }: { navigation: { navigate: (screen: "Account") => void } & { navigate: (screen: "Destination", params: { action: Exclude<HomeAction, "account"> }) => void } }) { const { token } = useAuth(); return <HomeScreen sessionKey={token ?? ""} onNavigate={(action) => action === "account" ? navigation.navigate("Account") : navigation.navigate("Destination", { action })} />; }
 
-function AuthenticatedAccount({ navigation, route }: { navigation: { canGoBack: () => boolean; goBack: () => void; navigate: ((screen: "EditProfile", params: RootStackParamList["EditProfile"]) => void) & ((screen: "Destination", params: { action: "change-password" }) => void); reset: (state: { index: number; routes: { name: "Home" }[] }) => void; setParams: (params: { updateSuccess?: undefined }) => void; addListener: (event: "focus", listener: () => void) => () => void }; route: { params?: RootStackParamList["Account"] } }) {
+function AuthenticatedAccount({ navigation, route }: { navigation: { canGoBack: () => boolean; goBack: () => void; navigate: ((screen: "EditProfile", params: RootStackParamList["EditProfile"]) => void) & ((screen: "ChangePassword") => void); reset: (state: { index: number; routes: { name: "Home" }[] }) => void; setParams: (params: { updateSuccess?: undefined }) => void; addListener: (event: "focus", listener: () => void) => () => void }; route: { params?: RootStackParamList["Account"] } }) {
   const { token, signOut } = useAuth();
   const refreshKey = useRef(0);
   const [, forceRefresh] = useState(0);
   useEffect(() => navigation.addListener("focus", () => { refreshKey.current += 1; forceRefresh(refreshKey.current); }), [navigation]);
-  return <AccountScreen authoritativeProfile={route.params?.authoritativeProfile} key={refreshKey.current} sessionKey={token ?? ""} onBack={() => navigation.canGoBack() ? navigation.goBack() : navigation.reset({ index: 0, routes: [{ name: "Home" }] })} onChangePassword={() => navigation.navigate("Destination", { action: "change-password" })} onEditProfile={(profile) => navigation.navigate("EditProfile", { profile })} onSignOut={signOut} />;
+  return <AccountScreen authoritativeProfile={route.params?.authoritativeProfile} key={refreshKey.current} sessionKey={token ?? ""} onBack={() => navigation.canGoBack() ? navigation.goBack() : navigation.reset({ index: 0, routes: [{ name: "Home" }] })} onChangePassword={() => navigation.navigate("ChangePassword")} onEditProfile={(profile) => navigation.navigate("EditProfile", { profile })} onSignOut={signOut} />;
 }
 
 function AuthenticatedEditProfile({ navigation, route }: { navigation: { canGoBack: () => boolean; goBack: () => void; popTo: (screen: "Account", params: NonNullable<RootStackParamList["Account"]>) => void; reset: (state: { index: number; routes: { name: "Home" }[] }) => void; addListener: (event: "beforeRemove", listener: (event: { preventDefault: () => void; data: { action: { type: string } } }) => void) => () => void; dispatch: (action: { type: string }) => void }; route: { params: RootStackParamList["EditProfile"] } }) {
@@ -58,15 +59,22 @@ function AuthenticatedEditProfile({ navigation, route }: { navigation: { canGoBa
   return <EditPersonalInformationScreen navigation={navigation} profile={route.params.profile} sessionKey={token ?? ""} onExit={exit} onSaved={(authoritativeProfile) => { show(); navigation.popTo("Account", { authoritativeProfile }); }} onSessionError={signOut} />;
 }
 
+function AuthenticatedChangePassword({ navigation }: { navigation: { canGoBack: () => boolean; goBack: () => void; reset: (state: { index: number; routes: { name: "Auth" }[] }) => void; addListener: (event: "beforeRemove", listener: (event: { preventDefault: () => void; data: { action: { type: string } } }) => void) => () => void; dispatch: (action: { type: string }) => void } }) {
+  const { signOut } = useAuth();
+  const exit = () => navigation.canGoBack() ? navigation.goBack() : navigation.reset({ index: 0, routes: [{ name: "Auth" }] });
+  const complete = () => { void Promise.resolve(signOut()).finally(() => navigation.reset({ index: 0, routes: [{ name: "Auth" }] })); };
+  return <ChangePasswordScreen navigation={navigation} onExit={exit} onSessionExpired={complete} onSuccess={complete} />;
+}
+
 function DestinationScreen({ navigation, route }: { navigation: { goBack: () => void }; route: { params: RootStackParamList["Destination"] } }) {
-  const destination = route.params.action === "change-password" ? "UC-06 — Đổi mật khẩu" : homeDestinations[route.params.action];
+  const destination = homeDestinations[route.params.action];
   return <SafeAreaView style={styles.safe}><View style={styles.content}><Text accessibilityRole="header" style={styles.title}>{destination}</Text><Text style={styles.copy}>Bạn đã đến điểm điều hướng được chọn từ Trang chủ.</Text><PressableControl accessibilityRole="button" accessibilityLabel="Quay lại Trang chủ" onPress={navigation.goBack} style={styles.back}><Text style={styles.backText}>Quay lại Trang chủ</Text></PressableControl></View></SafeAreaView>;
 }
 
 export function RootNavigator() {
   const { token, isRestoring } = useAuth();
   if (isRestoring) return <ScreenState kind="loading" />;
-  return <ProfileUpdateToastProvider><NavigationContainer linking={linking}>{token || isWebReview ? <Stack.Navigator screenOptions={{ headerShown: false }}><Stack.Screen name="Home" component={AuthenticatedHome} /><Stack.Screen name="Account" component={AuthenticatedAccount} /><Stack.Screen name="EditProfile" component={AuthenticatedEditProfile} /><Stack.Screen name="Destination" component={DestinationScreen} /></Stack.Navigator> : <Stack.Navigator screenOptions={{ headerShown: false }}><Stack.Screen name="Auth" component={AuthScreen} /></Stack.Navigator>}</NavigationContainer></ProfileUpdateToastProvider>;
+  return <ProfileUpdateToastProvider><NavigationContainer linking={linking}>{token || isWebReview ? <Stack.Navigator screenOptions={{ headerShown: false }}><Stack.Screen name="Home" component={AuthenticatedHome} /><Stack.Screen name="Account" component={AuthenticatedAccount} /><Stack.Screen name="EditProfile" component={AuthenticatedEditProfile} /><Stack.Screen name="ChangePassword" component={AuthenticatedChangePassword} /><Stack.Screen name="Destination" component={DestinationScreen} /></Stack.Navigator> : <Stack.Navigator screenOptions={{ headerShown: false }}><Stack.Screen name="Auth" component={AuthScreen} /></Stack.Navigator>}</NavigationContainer></ProfileUpdateToastProvider>;
 }
 
 const styles = StyleSheet.create({

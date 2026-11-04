@@ -19,10 +19,10 @@ export function Button({ label, onPress, disabled = false, loading = false, tone
   return <AntButton accessibilityLabel={accessibilityLabel} activeStyle={styles.pressed} disabled={blocked} loading={loading} onPress={onPress} style={styles.button} type={tone === "secondary" ? "ghost" : tone === "danger" ? "warning" : "primary"}>{label}</AntButton>;
 }
 
-export type FieldProps = Pick<TextInputProps, "autoCapitalize" | "keyboardType" | "maxLength"> & { label: string; value: string; onChangeText: (value: string) => void; error?: string; hint?: string; required?: boolean; disabled?: boolean };
-export function Field({ label, value, onChangeText, error, hint, required = false, disabled = false, autoCapitalize = "none", keyboardType = "default", maxLength }: FieldProps) {
+export type FieldProps = Pick<TextInputProps, "autoCapitalize" | "keyboardType" | "maxLength"> & { label: string; value: string; onChangeText: (value: string) => void; error?: string; hint?: string; required?: boolean; disabled?: boolean; secureTextEntry?: boolean };
+export function Field({ label, value, onChangeText, error, hint, required = false, disabled = false, autoCapitalize = "none", keyboardType = "default", maxLength, secureTextEntry = false }: FieldProps) {
   const fieldStyles = error ? { ...inputStyles, input: StyleSheet.flatten([inputStyles.input, inputStyles.inputError]) } : inputStyles;
-  return <View style={styles.field}><Text style={styles.label}>{label}{required ? " *" : ""}</Text><InputItem accessibilityHint={hint} accessibilityLabel={label} autoCapitalize={autoCapitalize} autoCorrect={false} disabled={disabled} keyboardType={keyboardType} last maxLength={maxLength} onChange={onChangeText} style={styles.input} styles={fieldStyles} value={value} />{hint ? <Text style={styles.hint}>{hint}</Text> : null}{error ? <Text accessibilityLiveRegion="polite" accessibilityRole="alert" style={styles.error}>{error}</Text> : null}</View>;
+  return <View style={styles.field}><Text style={styles.label}>{label}{required ? " *" : ""}</Text><InputItem accessibilityHint={hint} accessibilityLabel={label} autoCapitalize={autoCapitalize} autoCorrect={false} disabled={disabled} keyboardType={keyboardType} last maxLength={maxLength} onChange={onChangeText} secureTextEntry={secureTextEntry} style={styles.input} styles={fieldStyles} value={value} />{hint ? <Text style={styles.hint}>{hint}</Text> : null}{error ? <Text accessibilityLiveRegion="polite" accessibilityRole="alert" style={styles.error}>{error}</Text> : null}</View>;
 }
 
 export function Dialog({ visible, title, message, onDismiss, children }: { visible: boolean; title: string; message: string; onDismiss: () => void; children: React.ReactNode }) {

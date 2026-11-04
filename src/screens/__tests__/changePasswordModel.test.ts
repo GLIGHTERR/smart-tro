@@ -1,4 +1,4 @@
-import { emptyChangePasswordForm, isChangePasswordDirty, validateChangePassword } from "../changePasswordModel";
+import { emptyChangePasswordForm, isChangePasswordDirty, validateChangePassword, visibleChangePasswordErrors } from "../changePasswordModel";
 
 describe("change-password form rules", () => {
   it("starts with no secret values and is not dirty", () => {
@@ -19,5 +19,12 @@ describe("change-password form rules", () => {
     const form = { currentPassword: "Aa1!current", newPassword: "Bb2@changed", confirmation: "Bb2@changed" };
     expect(validateChangePassword(form)).toEqual({});
     expect(isChangePasswordDirty({ ...form, currentPassword: "" })).toBe(true);
+  });
+
+  it("shows errors only for fields touched by blur", () => {
+    const form = emptyChangePasswordForm();
+    expect(visibleChangePasswordErrors(form, {})).toEqual({});
+    expect(visibleChangePasswordErrors(form, { newPassword: true })).toEqual({ newPassword: "Nhập mật khẩu mới." });
+    expect(visibleChangePasswordErrors({ currentPassword: "Aa1!current", newPassword: "Bb2@changed", confirmation: "mismatch" }, { confirmation: true })).toEqual({ confirmation: "Xác nhận mật khẩu mới không khớp." });
   });
 });

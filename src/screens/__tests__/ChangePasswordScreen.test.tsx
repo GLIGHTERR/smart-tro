@@ -5,6 +5,7 @@ import TestRenderer, { act, type ReactTestInstance } from "react-test-renderer";
 import { ChangePasswordScreen } from "../ChangePasswordScreen";
 
 jest.mock("react-native-safe-area-context", () => ({ SafeAreaView: "SafeAreaView" }));
+jest.mock("@expo/vector-icons/FontAwesome", () => "FontAwesome");
 function copy(root: ReactTestInstance) { return root.findAllByType(Text).map((node) => node.props.children).flat(Infinity).join("|"); }
 function button(root: ReactTestInstance, label: string) { const found = root.findAllByType(Pressable).find((node) => copy(node).includes(label)); if (!found) throw new Error(`Missing ${label}`); return found; }
 function completeForm(root: ReactTestInstance) { const fields = root.findAllByType(TextInput); act(() => { fields[0]!.props.onChangeText("Aa1!current"); fields[1]!.props.onChangeText("Bb2@changed"); fields[2]!.props.onChangeText("Bb2@changed"); }); }
@@ -16,8 +17,23 @@ describe("ChangePasswordScreen", () => {
     const fields = renderer.root.findAllByType(TextInput);
     expect(fields).toHaveLength(3);
     expect(fields.every((field) => field.props.secureTextEntry)).toBe(true);
-    expect(copy(renderer.root)).toContain("Mật khẩu hiện tại");
+    expect(renderer.root.findByProps({ accessibilityLabel: "Mật khẩu hiện tại" })).toBeTruthy();
+    expect(copy(renderer.root)).not.toContain("Nhập mật khẩu hiện tại.");
+    expect(renderer.root.findAllByType(Pressable).filter((node) => node.props.accessibilityLabel === "Hiện mật khẩu")).toHaveLength(3);
     expect(button(renderer.root, "Đổi mật khẩu").props.accessibilityState).toEqual({ disabled: true });
+  });
+
+  it("validates only after each field blurs, then updates that error while typing", () => {
+    let renderer!: TestRenderer.ReactTestRenderer;
+    act(() => { renderer = TestRenderer.create(<ChangePasswordScreen onExit={jest.fn()} onSessionExpired={jest.fn()} onSuccess={jest.fn()} />); });
+    const fields = renderer.root.findAllByType(TextInput);
+    act(() => fields[1]!.props.onBlur());
+    expect(copy(renderer.root)).toContain("Nhập mật khẩu mới.");
+    expect(copy(renderer.root)).not.toContain("Nhập mật khẩu hiện tại.");
+    act(() => fields[1]!.props.onChangeText("Bb2@changed"));
+    expect(copy(renderer.root)).not.toContain("Nhập mật khẩu mới.");
+    act(() => { fields[2]!.props.onChangeText("mismatch"); fields[2]!.props.onBlur(); });
+    expect(copy(renderer.root)).toContain("Xác nhận mật khẩu mới không khớp.");
   });
 
   it("prevents double submission and clears values before the success handoff", async () => {
@@ -43,8 +59,9 @@ describe("ChangePasswordScreen", () => {
     act(() => { renderer = TestRenderer.create(<ChangePasswordScreen reviewResult="session" onExit={onExit} onSessionExpired={onSessionExpired} onSuccess={jest.fn()} />); });
     act(() => renderer.root.findAllByType(TextInput)[0]!.props.onChangeText("Aa1!current"));
     act(() => button(renderer.root, "Hủy").props.onPress());
-    expect(copy(renderer.root)).toContain("Hủy thay đổi?");
-    act(() => button(renderer.root, "Bỏ thay đổi").props.onPress());
+    expect(copy(renderer.root)).toContain("Hủy đổi mật khẩu?");
+    expect(copy(renderer.root)).toContain("Thao tác đổi mật khẩu chưa hoàn tất. Bạn có chắc muốn hủy?");
+    act(() => button(renderer.root, "Hủy đổi mật khẩu").props.onPress());
     expect(onExit).toHaveBeenCalledTimes(1);
     completeForm(renderer.root);
     await act(async () => { button(renderer.root, "Đổi mật khẩu").props.onPress(); await Promise.resolve(); });

@@ -16,10 +16,10 @@ import type { ProfileUpdatePayload } from "@/profile/gateway";
 import { homeDestinations, type HomeAction } from "@/screens/homeModel";
 
 type RootStackParamList = { Auth: undefined; Home: undefined; Account: { authoritativeProfile?: ProfileUpdatePayload["profile"] } | undefined; EditProfile: { profile: EditableProfile }; ChangePassword: undefined; Destination: { action: Exclude<HomeAction, "account"> } };
-type ProfileUpdateToast = { show: () => void };
+type CompletionToast = { show: (message: string) => void };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
-const ProfileUpdateToastContext = createContext<ProfileUpdateToast | null>(null);
+const ProfileUpdateToastContext = createContext<CompletionToast | null>(null);
 const isWebReview = process.env.EXPO_PUBLIC_HOME_REVIEW === "true" || process.env.EXPO_PUBLIC_ACCOUNT_REVIEW === "true";
 const linking = {
   prefixes: [],
@@ -30,7 +30,7 @@ const linking = {
 
 function ProfileUpdateToastProvider({ children }: { children: ReactNode }) {
   const [event, setEvent] = useState<ToastEvent>();
-  const show = useCallback(() => setEvent({ id: `profile-update-${Date.now()}`, message: "Đã cập nhật thông tin cá nhân." }), []);
+  const show = useCallback((message: string) => setEvent({ id: `completion-${Date.now()}`, message }), []);
   const consume = useCallback((eventId: string) => setEvent((current) => current?.id === eventId ? undefined : current), []);
   // Keep this mounted above the stack so an Account focus/remount cannot dismiss the active toast.
   return <ProfileUpdateToastContext.Provider value={{ show }}>{children}<Toast event={event} onConsume={consume} /></ProfileUpdateToastContext.Provider>;
@@ -56,14 +56,15 @@ function AuthenticatedEditProfile({ navigation, route }: { navigation: { canGoBa
   const { token, signOut } = useAuth();
   const { show } = useProfileUpdateToast();
   const exit = () => navigation.canGoBack() ? navigation.goBack() : navigation.reset({ index: 0, routes: [{ name: "Home" }] });
-  return <EditPersonalInformationScreen navigation={navigation} profile={route.params.profile} sessionKey={token ?? ""} onExit={exit} onSaved={(authoritativeProfile) => { show(); navigation.popTo("Account", { authoritativeProfile }); }} onSessionError={signOut} />;
+  return <EditPersonalInformationScreen navigation={navigation} profile={route.params.profile} sessionKey={token ?? ""} onExit={exit} onSaved={(authoritativeProfile) => { show("Đã cập nhật thông tin cá nhân."); navigation.popTo("Account", { authoritativeProfile }); }} onSessionError={signOut} />;
 }
 
-function AuthenticatedChangePassword({ navigation }: { navigation: { canGoBack: () => boolean; goBack: () => void; reset: (state: { index: number; routes: { name: "Auth" }[] }) => void; addListener: (event: "beforeRemove", listener: (event: { preventDefault: () => void; data: { action: { type: string } } }) => void) => () => void; dispatch: (action: { type: string }) => void } }) {
+function AuthenticatedChangePassword({ navigation }: { navigation: { canGoBack: () => boolean; goBack: () => void; popTo: (screen: "Account", params?: RootStackParamList["Account"]) => void; reset: (state: { index: number; routes: { name: "Auth" }[] }) => void; addListener: (event: "beforeRemove", listener: (event: { preventDefault: () => void; data: { action: { type: string } } }) => void) => () => void; dispatch: (action: { type: string }) => void } }) {
   const { signOut } = useAuth();
+  const { show } = useProfileUpdateToast();
   const exit = () => navigation.canGoBack() ? navigation.goBack() : navigation.reset({ index: 0, routes: [{ name: "Auth" }] });
-  const complete = () => { void Promise.resolve(signOut()).finally(() => navigation.reset({ index: 0, routes: [{ name: "Auth" }] })); };
-  return <ChangePasswordScreen navigation={navigation} onExit={exit} onSessionExpired={complete} onSuccess={complete} />;
+  const complete = () => { show("Đổi mật khẩu thành công."); navigation.popTo("Account"); };
+  return <ChangePasswordScreen navigation={navigation} onExit={exit} onSessionExpired={signOut} onSuccess={complete} />;
 }
 
 function DestinationScreen({ navigation, route }: { navigation: { goBack: () => void }; route: { params: RootStackParamList["Destination"] } }) {

@@ -75,6 +75,7 @@
       "src/screens/accountModel.ts",
       "src/screens/editPersonalInformationModel.ts",
       "src/screens/changePasswordModel.ts",
+      "src/screens/changePasswordGateway.ts",
       "src/screens/homeModel.ts",
       "src/startup/fontState.ts",
       "src/ui/contracts.tsx",
@@ -152,6 +153,12 @@
         "statements": 100
       },
       "./src/screens/changePasswordModel.ts": {
+        "branches": 100,
+        "functions": 100,
+        "lines": 100,
+        "statements": 100
+      },
+      "./src/screens/changePasswordGateway.ts": {
         "branches": 100,
         "functions": 100,
         "lines": 100,

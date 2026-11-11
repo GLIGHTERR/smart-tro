@@ -60,11 +60,11 @@ function AuthenticatedEditProfile({ navigation, route }: { navigation: { canGoBa
 }
 
 function AuthenticatedChangePassword({ navigation }: { navigation: { canGoBack: () => boolean; goBack: () => void; popTo: (screen: "Account", params?: RootStackParamList["Account"]) => void; reset: (state: { index: number; routes: { name: "Auth" }[] }) => void; addListener: (event: "beforeRemove", listener: (event: { preventDefault: () => void; data: { action: { type: string } } }) => void) => () => void; dispatch: (action: { type: string }) => void } }) {
-  const { signOut } = useAuth();
+  const { token, signOut } = useAuth();
   const { show } = useProfileUpdateToast();
   const exit = () => navigation.canGoBack() ? navigation.goBack() : navigation.reset({ index: 0, routes: [{ name: "Auth" }] });
   const complete = () => { show("Đổi mật khẩu thành công."); navigation.popTo("Account"); };
-  return <ChangePasswordScreen navigation={navigation} onExit={exit} onSessionExpired={signOut} onSuccess={complete} />;
+  return <ChangePasswordScreen navigation={navigation} onExit={exit} onSessionExpired={signOut} onSuccess={complete} sessionKey={token ?? ""} />;
 }
 
 function DestinationScreen({ navigation, route }: { navigation: { goBack: () => void }; route: { params: RootStackParamList["Destination"] } }) {

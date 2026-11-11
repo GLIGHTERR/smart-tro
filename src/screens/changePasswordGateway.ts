@@ -41,8 +41,8 @@ const DEFAULT_TIMEOUT_MS = 60_000;
 
 function errorCode(status: number, body: unknown): ChangePasswordErrorCode {
   const code = body && typeof body === "object" ? ((body as ErrorPayload).error?.code ?? (body as ErrorPayload).code) : undefined;
-  if (status === 401 || code === "INVALID_SESSION") return "INVALID_SESSION";
   if (code === "INVALID_CREDENTIALS") return "INVALID_CURRENT_PASSWORD";
+  if (status === 401 || code === "INVALID_SESSION") return "INVALID_SESSION";
   if (status === 429 || code === "AUTH_RATE_LIMITED") return "RATE_LIMITED";
   if (status === 409 || code === "PASSWORD_CHANGE_CONFLICT") return "CONFLICT";
   if (status === 400 || code === "PASSWORD_CONFIRMATION_MISMATCH" || code === "PASSWORD_UNCHANGED" || code === "IDEMPOTENCY_KEY_REQUIRED") return "VALIDATION_ERROR";

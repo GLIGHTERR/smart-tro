@@ -19,6 +19,7 @@ describe("change-password gateway", () => {
 
   it.each([
     [401, {}, "INVALID_SESSION"],
+    [401, { error: { code: "INVALID_CREDENTIALS" } }, "INVALID_CURRENT_PASSWORD"],
     [400, { error: { code: "INVALID_SESSION" } }, "INVALID_SESSION"],
     [400, { error: { code: "INVALID_CREDENTIALS" } }, "INVALID_CURRENT_PASSWORD"],
     [429, {}, "RATE_LIMITED"],
